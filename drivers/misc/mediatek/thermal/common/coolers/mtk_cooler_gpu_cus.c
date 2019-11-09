@@ -68,7 +68,7 @@ static int mtk_cl_gpu_set_cur_state
 			mtk_gpu_power[g_gpu_level + gpu_max_opp].gpufreq_power);
 	} else {
 		mtk_cooler_gpu_dprintk("%s: mtk_gpu_power_table=%p, state=%d, GPU_OPP=%d\n",
-			__func__, mtk_gpu_power, state, Num_of_GPU_OPP - gpu_max_opp);
+			__func__, mtk_gpu_power, state, (int) (Num_of_GPU_OPP - gpu_max_opp));
 	}
 
 	return 0;

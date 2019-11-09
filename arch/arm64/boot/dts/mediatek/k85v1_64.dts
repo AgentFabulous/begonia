@@ -571,5 +571,4 @@
 	};
 }; /* IRTX GPIO Settings -End */
 
-#include <k85v1_64/cust.dtsi>
 /*End of this file, DO NOT ADD ANYTHING HERE*/
