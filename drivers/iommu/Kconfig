@@ -364,8 +364,26 @@ config MTK_IOMMU_V1
 	select MEMORY
 	select MTK_SMI
 	help
-	  Support for the M4U on certain Mediatek SoCs. M4U generation 1 HW is
-	  Multimedia Memory Managememt Unit. This option enables remapping of
+	  Support M4U on Mediatek SoCs of tablet and legacy HW design.
+	  M4U: Multimedia Memory Managememt Unit.
+	  This option enables remapping of
+	  DMA memory accesses for the multimedia subsystem.
+
+	  if unsure, say N here.
+
+config MTK_IOMMU_V2
+	bool "MTK IOMMU Version 2"
+	depends on ARM || ARM64
+	select ARM_DMA_USE_IOMMU
+	select IOMMU_API
+	select IOMMU_DMA
+	select IOMMU_IO_PGTABLE_ARMV7S
+	select MEMORY
+	select MTK_SMI
+	help
+	  Support M4U on Mediatek SoCs of smart phone and new HW design.
+	  M4U: Multimedia Memory Managememt Unit.
+	  This option enables remapping of
 	  DMA memory accesses for the multimedia subsystem.
 
 	  if unsure, say N here.

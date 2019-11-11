@@ -573,8 +573,10 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
 	}
 
 	if (iommu_map_sg(domain, iova, sgt.sgl, sgt.orig_nents, prot)
-			< size)
+	    < size) {
+		pr_notice("%s, %d, err iommu map sg\n", __func__, __LINE__);
 		goto out_free_sg;
+	}
 
 	*handle = iova;
 	sg_free_table(&sgt);
@@ -671,6 +673,10 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
 		unsigned int s_length = sg_dma_len(s);
 		unsigned int s_iova_len = s->length;
 
+#ifdef CONFIG_MTK_IOMMU_V2
+		if (sg_page(s) == NULL)
+			s_iova_off = 0;
+#endif
 		s->offset += s_iova_off;
 		s->length = s_length;
 		sg_dma_address(s) = IOMMU_MAPPING_ERROR;
@@ -696,7 +702,6 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
 
 			sg_dma_address(cur) = dma_addr + s_iova_off;
 		}
-
 		sg_dma_len(cur) = cur_len;
 		dma_addr += s_iova_len;
 
@@ -755,6 +760,135 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 		size_t s_length = s->length;
 		size_t pad_len = (mask - iova_len + 1) & mask;
 
+		/*
+		 * FIXME: Mediatek workaround for the buffer that don't has
+		 * "struct page *"
+		 */
+#ifdef CONFIG_MTK_IOMMU_V2
+#ifdef CONFIG_MTK_PSEUDO_M4U
+		if (IS_ERR(sg_page(s))) {
+			s_length = sg_dma_len(s);
+			s->length = s_length;
+			iova_len += s_length;
+			prev = s;
+			continue;
+		}
+#endif
+		sg_dma_address(s) = s_iova_off;
+		sg_dma_len(s) = s_length;
+		s->offset -= s_iova_off;
+		s_length = iova_align(iovad, s_length + s_iova_off);
+		s->length = s_length;
+#else
+#ifndef CONFIG_MTK_PSEUDO_M4U
+		sg_dma_address(s) = s_iova_off;
+		sg_dma_len(s) = s_length;
+		s->offset -= s_iova_off;
+		s_length = iova_align(iovad, s_length + s_iova_off);
+		s->length = s_length;
+#else
+		if (!sg_dma_address(s) && !sg_dma_len(s)) {
+			sg_dma_address(s) = s_iova_off;
+			sg_dma_len(s) = s_length;
+			s->offset -= s_iova_off;
+			s_length = iova_align(iovad, s_length + s_iova_off);
+			s->length = s_length;
+		} else {
+			/*
+			 * pseudo m4u store the s_length in sg_dma_len, it may
+			 * be in different field depend on the
+			 * CONFIG_NEED_SG_DMA_LENGTH, get the length from the
+			 * macro.
+			 */
+			s_length = sg_dma_len(s);
+			s->length = s_length;
+		}
+#endif
+#endif
+		/*
+		 * Due to the alignment of our single IOVA allocation, we can
+		 * depend on these assumptions about the segment boundary mask:
+		 * - If mask size >= IOVA size, then the IOVA range cannot
+		 *   possibly fall across a boundary, so we don't care.
+		 * - If mask size < IOVA size, then the IOVA range must start
+		 *   exactly on a boundary, therefore we can lay things out
+		 *   based purely on segment lengths without needing to know
+		 *   the actual addresses beforehand.
+		 * - The mask must be a power of 2, so pad_len == 0 if
+		 *   iova_len == 0, thus we cannot dereference prev the first
+		 *   time through here (i.e. before it has a meaningful value).
+		 */
+		if (pad_len && pad_len < s_length - 1) {
+			prev->length += pad_len;
+			iova_len += pad_len;
+		}
+
+		iova_len += s_length;
+		prev = s;
+	}
+
+	iova = iommu_dma_alloc_iova(domain, iova_len, dma_get_mask(dev), dev);
+	if (!iova) {
+		pr_notice("%s, %d, failed at alloc iova\n", __func__, __LINE__);
+		goto out_restore_sg;
+	}
+
+	/*
+	 * We'll leave any physical concatenation to the IOMMU driver's
+	 * implementation - it knows better than we do.
+	 */
+	if (iommu_map_sg(domain, iova, sg, nents, prot) < iova_len) {
+		pr_notice("%s, %d, failed at map sg\n", __func__, __LINE__);
+		goto out_free_iova;
+	}
+
+	return __finalise_sg(dev, sg, nents, iova);
+
+out_free_iova:
+	iommu_dma_free_iova(cookie, iova, iova_len);
+out_restore_sg:
+	__invalidate_sg(sg, nents);
+	return 0;
+}
+
+#ifdef CONFIG_MTK_IOMMU_V2
+#define ARM_MAPPING_ERROR		(~(dma_addr_t)0x0)
+dma_addr_t iommu_dma_map_sg_fixed(struct device *dev, struct scatterlist *sg,
+		int nents, int prot, dma_addr_t dma_limit)
+{
+	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
+	struct scatterlist *s, *prev = NULL;
+	dma_addr_t iova = ARM_MAPPING_ERROR;
+	size_t iova_len = 0;
+	unsigned long mask = dma_get_seg_boundary(dev);
+	int i;
+
+	/*
+	 * Work out how much IOVA space we need, and align the segments to
+	 * IOVA granules for the IOMMU driver to handle. With some clever
+	 * trickery we can modify the list in-place, but reversibly, by
+	 * stashing the unaligned parts in the as-yet-unused DMA fields.
+	 */
+	for_each_sg(sg, s, nents, i) {
+		size_t s_iova_off = iova_offset(iovad, s->offset);
+		size_t s_length = s->length;
+		size_t pad_len = (mask - iova_len + 1) & mask;
+
+		/*
+		 * FIXME: Mediatek workaround for the buffer that don't has
+		 * "struct page *"
+		 */
+#ifdef CONFIG_MTK_PSEUDO_M4U
+		if (IS_ERR(sg_page(s))) {
+			s_length = sg_dma_len(s);
+			s->length = s_length;
+			iova_len += s_length;
+			prev = s;
+			continue;
+		}
+#endif
 		sg_dma_address(s) = s_iova_off;
 		sg_dma_len(s) = s_length;
 		s->offset -= s_iova_off;
@@ -783,18 +917,24 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 		prev = s;
 	}
 
-	iova = iommu_dma_alloc_iova(domain, iova_len, dma_get_mask(dev), dev);
-	if (!iova)
+	iova = iommu_dma_alloc_iova(domain, iova_len, dma_limit, dev);
+	if (!iova) {
+		pr_notice("%s, %d, failed at alloc iova, dma_limit=0x%lx\n",
+			__func__, __LINE__, dma_limit);
 		goto out_restore_sg;
+	}
 
 	/*
 	 * We'll leave any physical concatenation to the IOMMU driver's
 	 * implementation - it knows better than we do.
 	 */
-	if (iommu_map_sg(domain, iova, sg, nents, prot) < iova_len)
+	if (iommu_map_sg(domain, iova, sg, nents, prot) < iova_len) {
+		pr_notice("%s, %d, failed at map sg\n", __func__, __LINE__);
 		goto out_free_iova;
+	}
 
-	return __finalise_sg(dev, sg, nents, iova);
+	__finalise_sg(dev, sg, nents, iova);
+	return iova;
 
 out_free_iova:
 	iommu_dma_free_iova(cookie, iova, iova_len);
@@ -802,6 +942,7 @@ out_restore_sg:
 	__invalidate_sg(sg, nents);
 	return 0;
 }
+#endif
 
 void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 		enum dma_data_direction dir, unsigned long attrs)
