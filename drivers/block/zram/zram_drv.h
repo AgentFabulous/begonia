@@ -125,4 +125,7 @@ struct zram {
 	spinlock_t bitmap_lock;
 #endif
 };
+
+/* mlog */
+unsigned long zram_mlog(void);
 #endif

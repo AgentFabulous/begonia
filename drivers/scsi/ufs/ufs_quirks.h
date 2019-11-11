@@ -131,4 +131,11 @@ struct ufs_dev_fix {
  */
 #define UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME	(1 << 8)
 
+/*
+ * MTK PATCH
+ * Some UFS memory device needs limited RPMB max rw size otherwise
+ * device issue, for example, device hang, may happen in some scenarios.
+ */
+#define UFS_DEVICE_QUIRK_LIMITED_RPMB_MAX_RW_SIZE	(1 << 30)
+
 #endif /* UFS_QUIRKS_H_ */

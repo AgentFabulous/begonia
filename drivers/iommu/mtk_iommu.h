@@ -33,33 +33,47 @@ struct mtk_iommu_suspend_reg {
 	u32				int_control0;
 	u32				int_main_control;
 	u32				ivrp_paddr;
+	u32				vld_pa_range;
 };
 
 enum mtk_iommu_plat {
 	M4U_MT2701,
 	M4U_MT2712,
+	M4U_MT8168,
 	M4U_MT8173,
+	M4U_MT8183,
+	iommu_mt6xxx_v0,
+};
+
+struct mtk_iommu_plat_data {
+	enum mtk_iommu_plat m4u_plat;
+	bool has_4gb_mode;
+	int iommu_cnt;
+	/* The larb-id may be remapped in the smi-common. */
+	bool larbid_remap_enable;
+	unsigned int larbid_in_common[MTK_LARB_NR_MAX];
 };
 
 struct mtk_iommu_domain;
 
 struct mtk_iommu_data {
-	void __iomem			*base;
-	int				irq;
-	struct device			*dev;
-	struct clk			*bclk;
-	phys_addr_t			protect_base; /* protect memory base */
-	struct mtk_iommu_suspend_reg	reg;
-	struct mtk_iommu_domain		*m4u_dom;
-	struct iommu_group		*m4u_group;
-	struct mtk_smi_iommu		smi_imu;      /* SMI larb iommu info */
-	bool                            enable_4GB;
-	bool				tlb_flush_active;
+	void __iomem *base;
+	int irq;
+	struct device *dev;
+	struct clk *bclk;
+	phys_addr_t protect_base; /* protect memory base */
+	struct mtk_iommu_suspend_reg reg;
+	struct mtk_iommu_domain	*m4u_dom;
+	struct iommu_group *m4u_group;
+	struct mtk_smi_iommu smi_imu; /* SMI larb iommu info */
+	bool enable_4GB;   /* Dram is over 4gb */
+	bool tlb_flush_active;
 
-	struct iommu_device		iommu;
-	enum mtk_iommu_plat		m4u_plat;
+	struct iommu_device iommu;
+	const struct mtk_iommu_plat_data *plat_data;
 
-	struct list_head		list;
+	struct list_head list;
+	unsigned int m4uid;
 };
 
 static inline int compare_of(struct device *dev, void *data)

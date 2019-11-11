@@ -1,6 +1,7 @@
 /* drivers/misc/uid_sys_stats.c
  *
  * Copyright (C) 2014 - 2015 Google, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -420,6 +421,9 @@ static ssize_t uid_remove_write(struct file *file,
 		kstrtol(end_uid, 10, &uid_end) != 0) {
 		return -EINVAL;
 	}
+
+	if (uid_start >= INT_MAX || uid_end >= INT_MAX)
+		return -EINVAL;
 
 	/* Also remove uids from /proc/uid_time_in_state */
 	cpufreq_task_times_remove_uids(uid_start, uid_end);
