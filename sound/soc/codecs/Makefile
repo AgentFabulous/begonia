@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
+subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
+
 snd-soc-88pm860x-objs := 88pm860x-codec.o
 snd-soc-ab8500-codec-objs := ab8500-codec.o
 snd-soc-ac97-objs := ac97.o
@@ -96,6 +98,8 @@ snd-soc-mc13783-objs := mc13783.o
 snd-soc-ml26124-objs := ml26124.o
 snd-soc-msm8916-analog-objs := msm8916-wcd-analog.o
 snd-soc-msm8916-digital-objs := msm8916-wcd-digital.o
+snd-soc-mt6358-objs := mt6358.o
+snd-soc-mt6359-objs := mt6359.o
 snd-soc-nau8540-objs := nau8540.o
 snd-soc-nau8810-objs := nau8810.o
 snd-soc-nau8824-objs := nau8824.o
@@ -230,7 +234,10 @@ snd-soc-wm9712-objs := wm9712.o
 snd-soc-wm9713-objs := wm9713.o
 snd-soc-wm-hubs-objs := wm_hubs.o
 snd-soc-zx-aud96p22-objs := zx_aud96p22.o
+snd-soc-rt5509-objs := rt5509.o rt5509-regmap.o rt5509-calib.o
+
 # Amp
+snd-soc-mt6660-objs := mt6660.o mt6660-regmap.o mt6660-param.o
 snd-soc-dio2125-objs := dio2125.o
 snd-soc-max9877-objs := max9877.o
 snd-soc-max98504-objs := max98504.o
@@ -336,6 +343,8 @@ obj-$(CONFIG_SND_SOC_MC13783)	+= snd-soc-mc13783.o
 obj-$(CONFIG_SND_SOC_ML26124)	+= snd-soc-ml26124.o
 obj-$(CONFIG_SND_SOC_MSM8916_WCD_ANALOG) +=snd-soc-msm8916-analog.o
 obj-$(CONFIG_SND_SOC_MSM8916_WCD_DIGITAL) +=snd-soc-msm8916-digital.o
+obj-$(CONFIG_SND_SOC_MT6358)	+= snd-soc-mt6358.o
+obj-$(CONFIG_SND_SOC_MT6359)	+= snd-soc-mt6359.o
 obj-$(CONFIG_SND_SOC_NAU8540)   += snd-soc-nau8540.o
 obj-$(CONFIG_SND_SOC_NAU8810)   += snd-soc-nau8810.o
 obj-$(CONFIG_SND_SOC_NAU8824)   += snd-soc-nau8824.o
@@ -468,9 +477,27 @@ obj-$(CONFIG_SND_SOC_WM9713)	+= snd-soc-wm9713.o
 obj-$(CONFIG_SND_SOC_WM_ADSP)	+= snd-soc-wm-adsp.o
 obj-$(CONFIG_SND_SOC_WM_HUBS)	+= snd-soc-wm-hubs.o
 obj-$(CONFIG_SND_SOC_ZX_AUD96P22) += snd-soc-zx-aud96p22.o
+obj-$(CONFIG_SND_SOC_TFA9874)	+= tfa98xx/
 
 # Amp
 obj-$(CONFIG_SND_SOC_DIO2125)	+= snd-soc-dio2125.o
 obj-$(CONFIG_SND_SOC_MAX9877)	+= snd-soc-max9877.o
 obj-$(CONFIG_SND_SOC_MAX98504)	+= snd-soc-max98504.o
 obj-$(CONFIG_SND_SOC_TPA6130A2)	+= snd-soc-tpa6130a2.o
+obj-$(CONFIG_SND_SOC_RT5509)	+= snd-soc-rt5509.o
+obj-$(CONFIG_SND_SOC_MT6660)	+= snd-soc-mt6660.o
+# Begonia Audio SmartPA Begin
+obj-$(CONFIG_SND_SOC_TFA9874)	+= tfa98xx/
+# Begonia Audio SmartPA End
+
+ifeq ($(CONFIG_SND_SOC_MT6358),y)
+  MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+  subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+  subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
+endif
+
+ifeq ($(CONFIG_SND_SOC_MT6359),y)
+  MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+  subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+  subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/accdet/mt6359
+endif
