@@ -276,6 +276,13 @@ struct held_lock {
 	 */
 	unsigned int gen_id;
 #endif
+
+	/* MTK_LOCK_DEBUG_HELD_LOCK */
+#define HELD_LOCK_STACK_TRACE_DEPTH 24
+	struct stack_trace trace;
+	unsigned long entries[HELD_LOCK_STACK_TRACE_DEPTH];
+	/* MTK_LOCK_MONITOR */
+	unsigned long long timestamp;
 };
 
 #ifdef CONFIG_LOCKDEP_CROSSRELEASE
@@ -727,9 +734,24 @@ do {									\
 
 #ifdef CONFIG_LOCKDEP
 void lockdep_rcu_suspicious(const char *file, const int line, const char *s);
+extern unsigned long long debug_locks_off_ts;
 #else
 static inline void
 lockdep_rcu_suspicious(const char *file, const int line, const char *s)
+{
+}
+#endif
+
+#ifdef CONFIG_PROVE_LOCKING
+void check_held_locks(int force);
+void mt_aee_dump_held_locks(void);
+#else
+static inline void
+check_held_locks(int force)
+{
+}
+static inline void
+mt_aee_dump_held_locks(void)
 {
 }
 #endif

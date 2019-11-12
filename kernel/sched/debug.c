@@ -280,10 +280,16 @@ sd_alloc_ctl_energy_table(struct sched_group_energy *sge)
 			sge->nr_idle_states*sizeof(struct idle_state), 0444,
 			proc_doulongvec_minmax, false);
 	set_table_entry(&table[2], "nr_cap_states", &sge->nr_cap_states,
-			sizeof(int), 0444, proc_dointvec_minmax, false);
+			sizeof(int), 0644, proc_dointvec_minmax, false);
+#ifndef CONFIG_MTK_UNIFY_POWER
 	set_table_entry(&table[3], "cap_states", &sge->cap_states[0].cap,
 			sge->nr_cap_states*sizeof(struct capacity_state), 0444,
 			proc_doulongvec_minmax, false);
+#else
+	set_table_entry(&table[3], "cap_states", &sge->cap_states[0].cap,
+			sge->nr_cap_states*sizeof(struct upower_tbl_row), 0644,
+			proc_doulongvec_minmax, false);
+#endif
 
 	return table;
 }
@@ -721,7 +727,8 @@ static void print_cpu(struct seq_file *m, int cpu)
 			   cpu, freq / 1000, (freq % 1000));
 	}
 #else
-	SEQ_printf(m, "cpu#%d\n", cpu);
+	SEQ_printf(m, "cpu#%d: %s\n", cpu,
+			cpu_is_offline(cpu) ? "Offline" : "Online");
 #endif
 
 #define P(x)								\
@@ -842,9 +849,15 @@ static int sched_debug_show(struct seq_file *m, void *v)
 {
 	int cpu = (unsigned long)(v - 2);
 
-	if (cpu != -1)
+	if (cpu != -1) {
+		unsigned long flags;
+
+		/* sched: add lock */
+		read_lock_irqsave(&tasklist_lock, flags);
 		print_cpu(m, cpu);
-	else
+		read_unlock_irqrestore(&tasklist_lock, flags);
+		SEQ_printf(m, "\n");
+	} else
 		sched_debug_header(m);
 
 	return 0;
@@ -853,10 +866,13 @@ static int sched_debug_show(struct seq_file *m, void *v)
 void sysrq_sched_debug_show(void)
 {
 	int cpu;
+	unsigned long flags;
 
+	read_lock_irqsave(&tasklist_lock, flags);
 	sched_debug_header(NULL);
-	for_each_online_cpu(cpu)
+	for_each_possible_cpu(cpu)
 		print_cpu(NULL, cpu);
+	read_unlock_irqrestore(&tasklist_lock, flags);
 
 }
 
@@ -1114,3 +1130,5 @@ void proc_sched_set_task(struct task_struct *p)
 	memset(&p->se.statistics, 0, sizeof(p->se.statistics));
 #endif
 }
+
+#include "debug_aee.c"

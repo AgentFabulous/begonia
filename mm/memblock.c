@@ -696,6 +696,7 @@ static int __init_memblock memblock_remove_range(struct memblock_type *type,
 
 int __init_memblock memblock_remove(phys_addr_t base, phys_addr_t size)
 {
+	kmemleak_free_part(__va(base), size);
 	return memblock_remove_range(&memblock.memory, base, size);
 }
 
@@ -711,14 +712,24 @@ int __init_memblock memblock_free(phys_addr_t base, phys_addr_t size)
 	return memblock_remove_range(&memblock.reserved, base, size);
 }
 
+static int __init_memblock memblock_reserve_region(phys_addr_t base,
+						   phys_addr_t size,
+						   int nid,
+						   unsigned long flags)
+{
+	struct memblock_type *_rgn = &memblock.reserved;
+
+	memblock_dbg("memblock_reserve: [%#016llx-%#016llx] flags %#02lx %pF\n",
+		     (unsigned long long)base,
+		     (unsigned long long)base + size - 1,
+		     flags, (void *)_RET_IP_);
+
+	return memblock_add_range(_rgn, base, size, nid, flags);
+}
+
 int __init_memblock memblock_reserve(phys_addr_t base, phys_addr_t size)
 {
-	phys_addr_t end = base + size - 1;
-
-	memblock_dbg("memblock_reserve: [%pa-%pa] %pF\n",
-		     &base, &end, (void *)_RET_IP_);
-
-	return memblock_add_range(&memblock.reserved, base, size, MAX_NUMNODES, 0);
+	return memblock_reserve_region(base, size, MAX_NUMNODES, 0);
 }
 
 /**
