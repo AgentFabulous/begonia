@@ -10,7 +10,7 @@
  * Fork is rather simple, once you get the hang of it, but the memory
  * management can be a bitch. See 'mm/memory.c': 'copy_page_range()'
  */
-
+#define DEBUG
 #include <linux/slab.h>
 #include <linux/sched/autogroup.h>
 #include <linux/sched/mm.h>
@@ -104,6 +104,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/task.h>
 
+#include <mt-plat/mtk_pidmap.h>
+
 /*
  * Minimum number of threads to boot the kernel
  */
@@ -113,6 +115,8 @@
  * Maximum number of threads
  */
 #define MAX_THREADS FUTEX_TID_MASK
+
+#define WARN_FORK_DUR 1000000000
 
 /*
  * Protected counters by write_lock_irq(&tasklist_lock)
@@ -521,16 +525,25 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	if (node == NUMA_NO_NODE)
 		node = tsk_fork_get_node(orig);
 	tsk = alloc_task_struct_node(node);
-	if (!tsk)
+	if (!tsk) {
+		pr_debug_ratelimited("[%d:%s] fork fail at alloc_tsk_node\n",
+			current->pid, current->comm);
 		return NULL;
-
+	}
 	stack = alloc_thread_stack_node(tsk, node);
-	if (!stack)
+	if (!stack) {
+		pr_debug_ratelimited("[%d:%s] fork fail at alloc_thread_stack_node\n",
+			current->pid, current->comm);
 		goto free_tsk;
+	}
 
 	stack_vm_area = task_stack_vm_area(tsk);
 
 	err = arch_dup_task_struct(tsk, orig);
+	if (err) {
+		pr_debug_ratelimited("[%d:%s] fork fail at arch_dup_task_struct, err:%d\n",
+			current->pid, current->comm, err);
+	}
 
 	/*
 	 * arch_dup_task_struct() clobbers the stack-related fields.  Make
@@ -600,7 +613,7 @@ free_tsk:
 static __latent_entropy int dup_mmap(struct mm_struct *mm,
 					struct mm_struct *oldmm)
 {
-	struct vm_area_struct *mpnt, *tmp, *prev, **pprev;
+	struct vm_area_struct *mpnt, *tmp, *prev, **pprev, *last = NULL;
 	struct rb_node **rb_link, *rb_parent;
 	int retval;
 	unsigned long charge;
@@ -656,7 +669,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		if (!tmp)
 			goto fail_nomem;
 		*tmp = *mpnt;
-		INIT_LIST_HEAD(&tmp->anon_vma_chain);
+		INIT_VMA(tmp);
 		retval = vma_dup_policy(mpnt, tmp);
 		if (retval)
 			goto fail_nomem_policy;
@@ -713,8 +726,18 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		rb_parent = &tmp->vm_rb;
 
 		mm->map_count++;
-		if (!(tmp->vm_flags & VM_WIPEONFORK))
+		if (!(tmp->vm_flags & VM_WIPEONFORK)) {
+			if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
+				/*
+				 * Mark this VMA as changing to prevent the
+				 * speculative page fault hanlder to process
+				 * it until the TLB are flushed below.
+				 */
+				last = mpnt;
+				vm_raw_write_begin(mpnt);
+			}
 			retval = copy_page_range(mm, oldmm, mpnt);
+		}
 
 		if (tmp->vm_ops && tmp->vm_ops->open)
 			tmp->vm_ops->open(tmp);
@@ -727,6 +750,22 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 out:
 	up_write(&mm->mmap_sem);
 	flush_tlb_mm(oldmm);
+
+	if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
+		/*
+		 * Since the TLB has been flush, we can safely unmark the
+		 * copied VMAs and allows the speculative page fault handler to
+		 * process them again.
+		 * Walk back the VMA list from the last marked VMA.
+		 */
+		for (; last; last = last->vm_prev) {
+			if (last->vm_flags & VM_DONTCOPY)
+				continue;
+			if (!(last->vm_flags & VM_WIPEONFORK))
+				vm_raw_write_end(last);
+		}
+	}
+
 	up_write(&oldmm->mmap_sem);
 	dup_userfaultfd_complete(&uf);
 fail_uprobe_end:
@@ -813,6 +852,9 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 	mm->mmap = NULL;
 	mm->mm_rb = RB_ROOT;
 	mm->vmacache_seqnum = 0;
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+	rwlock_init(&mm->mm_rb_lock);
+#endif
 	atomic_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
 	init_rwsem(&mm->mmap_sem);
@@ -1226,6 +1268,13 @@ static int copy_mm(unsigned long clone_flags, struct task_struct *tsk)
 	int retval;
 
 	tsk->min_flt = tsk->maj_flt = 0;
+#ifdef CONFIG_MTK_MLOG
+	tsk->fm_flt = 0;
+#ifdef CONFIG_SWAP
+	tsk->swap_in = tsk->swap_out = 0;
+#endif
+#endif
+
 	tsk->nvcsw = tsk->nivcsw = 0;
 #ifdef CONFIG_DETECT_HUNG_TASK
 	tsk->last_switch_count = tsk->nvcsw + tsk->nivcsw;
@@ -1551,10 +1600,15 @@ static __latent_entropy struct task_struct *copy_process(
 {
 	int retval;
 	struct task_struct *p;
+	unsigned long sig[_NSIG_WORDS];
+	unsigned long shared_sig[_NSIG_WORDS];
+	int i;
 
-	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
+	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS)) {
+		pr_debug_ratelimited("[%d:%s] fork fail at cpp 1, clone_flags:0x%x\n",
+			current->pid, current->comm, (unsigned int)clone_flags);
 		return ERR_PTR(-EINVAL);
-
+	}
 	if ((clone_flags & (CLONE_NEWUSER|CLONE_FS)) == (CLONE_NEWUSER|CLONE_FS))
 		return ERR_PTR(-EINVAL);
 
@@ -1562,17 +1616,21 @@ static __latent_entropy struct task_struct *copy_process(
 	 * Thread groups must share signals as well, and detached threads
 	 * can only be started up within the thread group.
 	 */
-	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
+	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND)) {
+		pr_debug_ratelimited("[%d:%s] fork fail at cpp 2, clone_flags:0x%x\n",
+			current->pid, current->comm, (unsigned int)clone_flags);
 		return ERR_PTR(-EINVAL);
-
+	}
 	/*
 	 * Shared signal handlers imply shared VM. By way of the above,
 	 * thread groups also imply shared VM. Blocking this case allows
 	 * for various simplifications in other code.
 	 */
-	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM))
+	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM)) {
+		pr_debug_ratelimited("[%d:%s] fork fail at cpp 3, clone_flags:0x%x\n",
+			current->pid, current->comm, (unsigned int)clone_flags);
 		return ERR_PTR(-EINVAL);
-
+	}
 	/*
 	 * Siblings of global init remain as zombies on exit since they are
 	 * not reaped by their parent (swapper). To solve this and to avoid
@@ -1580,9 +1638,11 @@ static __latent_entropy struct task_struct *copy_process(
 	 * from creating siblings.
 	 */
 	if ((clone_flags & CLONE_PARENT) &&
-				current->signal->flags & SIGNAL_UNKILLABLE)
+				current->signal->flags & SIGNAL_UNKILLABLE) {
+		pr_debug_ratelimited("[%d:%s] fork fail at cpp 4, clone_flags:0x%x\n",
+			current->pid, current->comm, (unsigned int)clone_flags);
 		return ERR_PTR(-EINVAL);
-
+	}
 	/*
 	 * If the new process will be in a different pid or user namespace
 	 * do not allow it to share a thread group with the forking task.
@@ -1596,8 +1656,11 @@ static __latent_entropy struct task_struct *copy_process(
 
 	retval = -ENOMEM;
 	p = dup_task_struct(current, node);
-	if (!p)
+	if (!p) {
+		pr_debug_ratelimited("[%d:%s] fork fail at dup_task_struct, p=%p\n",
+			current->pid, current->comm, p);
 		goto fork_out;
+	}
 
 	cpufreq_task_times_init(p);
 
@@ -1887,6 +1950,12 @@ static __latent_entropy struct task_struct *copy_process(
 	recalc_sigpending();
 	if (signal_pending(current)) {
 		retval = -ERESTARTNOINTR;
+		memcpy(sig, current->pending.signal.sig, sizeof(sig));
+		memcpy(shared_sig, current->signal->shared_pending.signal.sig,
+		       sizeof(shared_sig));
+		for (i = 0; i < _NSIG_WORDS; ++i)
+			pr_debug_ratelimited("pending i=%d sig=0x%lx shared_sig=0x%lx\n",
+			       i, sig[i], shared_sig[i]);
 		goto bad_fork_cancel_cgroup;
 	}
 	if (unlikely(!(ns_of_pid(pid)->nr_hashed & PIDNS_HASH_ADDING))) {
@@ -1945,6 +2014,7 @@ static __latent_entropy struct task_struct *copy_process(
 	perf_event_fork(p);
 
 	trace_task_newtask(p, clone_flags);
+	mtk_pidmap_update(p);
 	uprobe_copy_process(p, clone_flags);
 
 	return p;
@@ -2041,7 +2111,9 @@ long _do_fork(unsigned long clone_flags,
 	struct task_struct *p;
 	int trace = 0;
 	long nr;
+	unsigned long long start, end, dur;
 
+	start = sched_clock();
 	/*
 	 * Determine whether and which event to report to ptracer.  When
 	 * called from kernel_thread or CLONE_UNTRACED is explicitly
@@ -2087,6 +2159,16 @@ long _do_fork(unsigned long clone_flags,
 			get_task_struct(p);
 		}
 
+		end = sched_clock();
+		dur = end - start;
+		trace_sched_fork_time(current, p, dur);
+		if (dur > WARN_FORK_DUR) {
+			pr_debug_ratelimited("[%d:%s] fork [%d:%s] total fork time[%llu ns] > 1s\n",
+			current->pid, current->comm, p->pid, p->comm, dur);
+			pr_debug_ratelimited("Mem-Info:\n");
+			show_free_areas(0, NULL);
+		}
+
 		wake_up_new_task(p);
 
 		/* forking complete and child started to run, tell ptracer */
@@ -2101,6 +2183,8 @@ long _do_fork(unsigned long clone_flags,
 		put_pid(pid);
 	} else {
 		nr = PTR_ERR(p);
+		pr_debug_ratelimited("[%d:%s] fork fail:[%p, %d]\n",
+			current->pid, current->comm, p, (int) nr);
 	}
 	return nr;
 }

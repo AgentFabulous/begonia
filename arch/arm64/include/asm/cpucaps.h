@@ -45,7 +45,9 @@
 #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
 #define ARM64_SSBD				26
 #define ARM64_MISMATCHED_CACHE_TYPE		27
+#define ARM64_SSBS				28
+#define ARM64_WORKAROUND_1406411		29
 
-#define ARM64_NCAPS				28
+#define ARM64_NCAPS				30
 
 #endif /* __ASM_CPUCAPS_H */

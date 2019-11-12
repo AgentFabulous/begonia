@@ -24,6 +24,40 @@
 #include <linux/rcupdate.h>
 #include <linux/workqueue.h>
 
+
+#ifdef CONFIG_MTK_FD_BAD_DEBUG
+/* #define BAD_FD_PROCESS "m.android.email" */
+#define BAD_FD_PROCESS "mblog"
+
+#ifdef CONFIG_STACKTRACE
+static void dump_backtrace(int fd, int tid)
+{
+	struct stack_trace trace;
+	unsigned long entries[8];
+	char kbuf[1024];
+
+	trace.nr_entries = 0;
+	trace.max_entries = ARRAY_SIZE(entries);
+	trace.entries = entries;
+	trace.skip = 2;
+
+	save_stack_trace(&trace);
+
+	/* print_stack_trace(&trace, 0); */
+	snprint_stack_trace(kbuf, sizeof(kbuf), &trace, 0);
+	pr_info("fd: %d, tid: %d, cur_tid: %d\n%s\n",
+		fd, tid, current->pid, kbuf);
+}
+#else
+static void dump_backtrace(int fd, int tid)
+{
+	pr_info("fd: %d, tid: %d, cur_tid: %d\n"
+			"dump backtrace skipped.\n", fd, tid, current->pid);
+}
+#endif
+#endif
+
+
 unsigned int sysctl_nr_open __read_mostly = 1024*1024;
 unsigned int sysctl_nr_open_min = BITS_PER_LONG;
 /* our min() is unusable in constant expressions ;-/ */
@@ -478,6 +512,148 @@ static unsigned int find_next_fd(struct fdtable *fdt, unsigned int start)
 	return find_next_zero_bit(fdt->open_fds, maxfd, start);
 }
 
+
+#ifdef CONFIG_MTK_FD_LEAK_DETECT
+#define FD_CHECK_NAME_SIZE 256
+/* Declare a radix tree to construct fd set tree */
+static RADIX_TREE(over_fd_tree, GFP_KERNEL);
+static LIST_HEAD(fd_listhead);
+static DEFINE_MUTEX(over_fd_mutex);
+static int dump_current_open_files;
+
+struct over_fd_entry {
+	int num_of_fd;
+	char name[FD_CHECK_NAME_SIZE];
+	int hash;
+	struct list_head fd_link;
+};
+
+/*
+ * Get File Name from FD value
+ */
+static long get_file_name_from_fd(struct files_struct *files,
+		int fd, int procid, struct over_fd_entry *res_name)
+{
+	char *tmp;
+	char *pathname;
+	struct file *file;
+	struct path path;
+
+	spin_lock(&files->file_lock);
+	file = fget(fd);
+	if (!file) {
+		spin_unlock(&files->file_lock);
+		return 0;
+	}
+	path_get(&file->f_path);
+	path = file->f_path;
+	fput(file);
+	spin_unlock(&files->file_lock);
+	tmp = (char *)__get_free_page(GFP_KERNEL | __GFP_RECLAIMABLE);
+	if (!tmp)
+		return 0;
+
+	pathname = d_path(&path, tmp, PAGE_SIZE);
+	path_put(&path);
+
+	if (IS_ERR(pathname)) {
+		free_page((unsigned long)tmp);
+		return PTR_ERR(pathname);
+	}  /* do something here with pathname */
+
+	if (pathname != NULL && res_name != NULL) {
+		strncpy(res_name->name, pathname, FD_CHECK_NAME_SIZE - 1);
+		res_name->name[FD_CHECK_NAME_SIZE - 1] = '\0';
+	}
+
+	free_page((unsigned long)tmp);
+	return 1;
+}
+
+static unsigned int get_hash(char *name)
+{
+	return full_name_hash(NULL, name, strlen(name));
+}
+
+static struct over_fd_entry *fd_lookup(unsigned int hash)
+{
+	return radix_tree_lookup(&over_fd_tree, hash);
+}
+
+static void fd_insert(struct over_fd_entry *entry)
+{
+	unsigned int hash = get_hash(entry->name);
+	struct over_fd_entry *find_entry = fd_lookup(hash);
+	int ret = 0;
+
+	/* Can't find the element, just add the element */
+	if (!find_entry) {
+		entry->num_of_fd = 1;
+		entry->hash = hash;
+		list_add_tail(&entry->fd_link, &fd_listhead);
+		ret = radix_tree_insert(&over_fd_tree, hash, (void *)entry);
+		if (ret)
+			pr_debug("fd insert radix_tree_insert fail");
+	} else {	/* Cover the original element */
+		find_entry->num_of_fd = find_entry->num_of_fd+1;
+		kfree(entry);
+	}
+}
+
+static void fd_delete(unsigned int hash)
+{
+	radix_tree_delete(&over_fd_tree, hash);
+}
+
+void fd_show_open_files(pid_t pid,
+		struct files_struct *files, struct fdtable *fdt)
+{
+	int i = 0;
+	struct over_fd_entry *lentry;
+	long result;
+	int num_of_entry;
+	int sum_fds_of_pid = 0;
+
+	mutex_lock(&over_fd_mutex);
+	for (i = 0; i < fdt->max_fds; i++) {
+		struct over_fd_entry *entry = kzalloc(
+				sizeof(struct over_fd_entry), GFP_KERNEL);
+
+		if (entry) {
+			memset(entry->name, 0, sizeof(entry->name));
+			result = get_file_name_from_fd(files, i, pid, entry);
+			if (result == 1) {
+				fd_insert(entry);
+				sum_fds_of_pid++;
+			}
+		}
+	}
+
+	for (; ;) {
+		if (list_empty(&fd_listhead))
+			break;
+
+		lentry = list_entry((&fd_listhead)->next,
+				struct over_fd_entry, fd_link);
+		if (lentry != NULL) {
+			num_of_entry = lentry->num_of_fd;
+			pr_info("[FDLEAK]OverAllocFDError(PID:%d  fileName:%s Num:%d)\n",
+					pid, lentry->name,
+					num_of_entry);
+			list_del((&fd_listhead)->next);
+			fd_delete(lentry->hash);
+			kfree(lentry);
+		}
+	}
+
+	if (sum_fds_of_pid)
+		pr_info("[FDLEAK]OverAllocFDError(PID:%d totalFDs:%d)\n",
+				pid, sum_fds_of_pid);
+
+	mutex_unlock(&over_fd_mutex);
+}
+#endif
+
 /*
  * allocate a file descriptor, mark it busy.
  */
@@ -487,6 +663,10 @@ int __alloc_fd(struct files_struct *files,
 	unsigned int fd;
 	int error;
 	struct fdtable *fdt;
+#ifdef CONFIG_MTK_FD_BAD_DEBUG
+	struct task_struct *process = current->group_leader;
+	int tid = current->pid;
+#endif
 
 	spin_lock(&files->file_lock);
 repeat:
@@ -536,6 +716,27 @@ repeat:
 
 out:
 	spin_unlock(&files->file_lock);
+
+#ifdef CONFIG_MTK_FD_BAD_DEBUG
+	if (strstr(process->comm, BAD_FD_PROCESS)) {
+		pr_info("[FD_DEBUG] alloc fd = %d, tid: %d, pid: %d, %s",
+			error, tid, current->tgid, process->comm);
+		dump_backtrace(error, tid);
+	}
+#endif
+
+#ifdef CONFIG_MTK_FD_LEAK_DETECT
+	if (error == -EMFILE && !dump_current_open_files) {
+		/*add Backbone into FD white list for skype*/
+		/*if (strcmp(current->comm, "Backbone") != 0) {*/
+		dump_current_open_files = 0x1;
+		pr_info("[FDLEAK][%d:%s]fd over RLIMIT_NOFILE:%ld\n",
+			current->pid, current->comm, rlimit(RLIMIT_NOFILE));
+		fd_show_open_files(current->pid, files, fdt);
+		/*}*/
+	}
+#endif
+
 	return error;
 }
 
@@ -561,9 +762,21 @@ static void __put_unused_fd(struct files_struct *files, unsigned int fd)
 void put_unused_fd(unsigned int fd)
 {
 	struct files_struct *files = current->files;
+#ifdef CONFIG_MTK_FD_BAD_DEBUG
+	struct task_struct *process = current->group_leader;
+	int tid = current->pid;
+#endif
+
 	spin_lock(&files->file_lock);
 	__put_unused_fd(files, fd);
 	spin_unlock(&files->file_lock);
+#ifdef CONFIG_MTK_FD_BAD_DEBUG
+	if (strstr(process->comm, BAD_FD_PROCESS)) {
+		pr_info("[FD_DEBUG] free fd = %d, tid: %d, pid: %d, %s",
+			fd, tid, current->tgid, process->comm);
+		dump_backtrace(fd, tid);
+	}
+#endif
 }
 
 EXPORT_SYMBOL(put_unused_fd);
@@ -623,6 +836,11 @@ int __close_fd(struct files_struct *files, unsigned fd)
 {
 	struct file *file;
 	struct fdtable *fdt;
+#ifdef CONFIG_MTK_FD_BAD_DEBUG
+	struct task_struct *process = current->group_leader;
+	int tid = current->pid;
+#endif
+
 
 	spin_lock(&files->file_lock);
 	fdt = files_fdtable(files);
@@ -635,6 +853,13 @@ int __close_fd(struct files_struct *files, unsigned fd)
 	__clear_close_on_exec(fd, fdt);
 	__put_unused_fd(files, fd);
 	spin_unlock(&files->file_lock);
+#ifdef CONFIG_MTK_FD_BAD_DEBUG
+	if (strstr(process->comm, BAD_FD_PROCESS)) {
+		pr_info("[FD_DEBUG] free fd = %d, tid: %d, pid: %d, %s",
+			fd, tid, current->tgid, process->comm);
+		dump_backtrace(fd, tid);
+	}
+#endif
 	return filp_close(file, files);
 
 out_unlock:

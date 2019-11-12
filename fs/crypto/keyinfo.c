@@ -15,6 +15,7 @@
 #include <crypto/aes.h>
 #include <crypto/sha.h>
 #include <crypto/skcipher.h>
+#include <linux/hie.h>
 #include "fscrypt_private.h"
 
 static struct crypto_shash *essiv_hash_tfm;
@@ -108,6 +109,13 @@ static int validate_user_key(struct fscrypt_info *crypt_info,
 	master_key = (struct fscrypt_key *)ukp->data;
 	BUILD_BUG_ON(FS_AES_128_ECB_KEY_SIZE != FS_KEY_DERIVATION_NONCE_SIZE);
 
+#ifdef CONFIG_HIE_DEBUG
+	if (hie_debug(HIE_DBG_FS))
+		pr_info("HIE: %s: prefix:%s ci: %p, master_key:%p, size:%d, mode:%d, min_keysize: %d\n",
+			__func__, prefix, crypt_info, master_key,
+			master_key->size, master_key->mode, min_keysize);
+#endif
+
 	if (master_key->size < min_keysize || master_key->size > FS_MAX_KEY_SIZE
 	    || master_key->size % AES_BLOCK_SIZE != 0) {
 		printk_once(KERN_WARNING
@@ -116,7 +124,16 @@ static int validate_user_key(struct fscrypt_info *crypt_info,
 		res = -ENOKEY;
 		goto out;
 	}
-	res = derive_key_aes(ctx->nonce, master_key, raw_key);
+
+	if (!fscrypt_is_private_mode(crypt_info)) {
+		res = derive_key_aes(ctx->nonce,
+			master_key, raw_key);
+	} else {
+		memcpy(crypt_info->ci_raw_key,
+		    master_key->raw,
+		    sizeof(crypt_info->ci_raw_key));
+		res = 0;
+	}
 out:
 	up_read(&keyring_key->sem);
 	key_put(keyring_key);
@@ -152,8 +169,13 @@ static int determine_cipher_type(struct fscrypt_info *ci, struct inode *inode,
 	}
 
 	if (S_ISREG(inode->i_mode)) {
+		ci->ci_mode = CI_DATA_MODE;
 		mode = ci->ci_data_mode;
+		/* HIE: default use aes-256-xts */
+		if (mode == FS_ENCRYPTION_MODE_PRIVATE)
+			mode = FS_ENCRYPTION_MODE_AES_256_XTS;
 	} else if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode)) {
+		ci->ci_mode = CI_FNAME_MODE;
 		mode = ci->ci_filename_mode;
 	} else {
 		WARN_ONCE(1, "fscrypt: filesystem tried to load encryption info for inode %lu, which is not encryptable (file type %d)\n",
@@ -163,6 +185,14 @@ static int determine_cipher_type(struct fscrypt_info *ci, struct inode *inode,
 
 	*cipher_str_ret = available_modes[mode].cipher_str;
 	*keysize_ret = available_modes[mode].keysize;
+
+#ifdef CONFIG_HIE_DEBUG
+	if (hie_debug(HIE_DBG_FS))
+		pr_info("HIE: %s: inode: %p, %ld, mode: %d, cipher: %s, keysize: %d\n",
+			__func__, inode, inode->i_ino,
+			mode, *cipher_str_ret, *keysize_ret);
+#endif
+
 	return 0;
 }
 
@@ -242,6 +272,67 @@ void __exit fscrypt_essiv_cleanup(void)
 	crypto_free_shash(essiv_hash_tfm);
 }
 
+u8 fscrypt_data_crypt_mode(const struct inode *inode, u8 mode)
+{
+	if (mode == FS_ENCRYPTION_MODE_INVALID)
+		return FS_ENCRYPTION_MODE_INVALID;
+
+	return hie_is_capable(inode->i_sb) ?
+		FS_ENCRYPTION_MODE_PRIVATE : mode;
+}
+
+static void fscrypt_put_crypt_info(struct fscrypt_info *ci)
+{
+	unsigned long flags;
+
+	if (!ci)
+		return;
+
+	/* only ci_count == 1, add lock protection */
+	if (atomic_dec_and_lock_irqsafe(&ci->ci_count, &ci->ci_lock, &flags)) {
+		ci->ci_status |= CI_FREEING;
+		spin_unlock_irqrestore(&ci->ci_lock, flags);
+		put_crypt_info(ci);
+	}
+}
+
+static struct fscrypt_info *fscrypt_get_crypt_info(struct fscrypt_info *ci,
+	bool init)
+{
+	unsigned long flags;
+
+	if (init) {
+		spin_lock_init(&ci->ci_lock);
+		atomic_set(&ci->ci_count, 0);
+		ci->ci_status = 0;
+	}
+
+	spin_lock_irqsave(&ci->ci_lock, flags);
+	if (!(ci->ci_status & CI_FREEING)) {
+		atomic_inc(&ci->ci_count);
+		spin_unlock_irqrestore(&ci->ci_lock, flags);
+	} else {
+		spin_unlock_irqrestore(&ci->ci_lock, flags);
+		ci = NULL;
+	}
+
+	return ci;
+}
+
+void *fscrypt_crypt_info_act(void *ci, int act)
+{
+	struct fscrypt_info *fi;
+
+	fi = (struct fscrypt_info *)ci;
+
+	if (act & BIO_BC_INFO_GET)
+		return fscrypt_get_crypt_info(ci, false);
+	else if (act & BIO_BC_INFO_PUT)
+		fscrypt_put_crypt_info(ci);
+
+	return NULL;
+}
+
 int fscrypt_get_encryption_info(struct inode *inode)
 {
 	struct fscrypt_info *crypt_info;
@@ -284,13 +375,23 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	if (!crypt_info)
 		return -ENOMEM;
 
+	fscrypt_get_crypt_info(crypt_info, true);
 	crypt_info->ci_flags = ctx.flags;
-	crypt_info->ci_data_mode = ctx.contents_encryption_mode;
+	crypt_info->ci_data_mode =
+		fscrypt_data_crypt_mode(inode, ctx.contents_encryption_mode);
 	crypt_info->ci_filename_mode = ctx.filenames_encryption_mode;
 	crypt_info->ci_ctfm = NULL;
 	crypt_info->ci_essiv_tfm = NULL;
 	memcpy(crypt_info->ci_master_key, ctx.master_key_descriptor,
 				sizeof(crypt_info->ci_master_key));
+
+#ifdef CONFIG_HIE_DEBUG
+	if (hie_debug(HIE_DBG_FS))
+		pr_info("HIE: %s: inode: %p, %ld, res: %d, dmode: %d, fmode: %d\n",
+			__func__, inode, inode->i_ino,
+			res, crypt_info->ci_data_mode,
+			crypt_info->ci_filename_mode);
+#endif
 
 	res = determine_cipher_type(crypt_info, inode, &cipher_str, &keysize);
 	if (res)
@@ -319,6 +420,10 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	} else if (res) {
 		goto out;
 	}
+
+	if (fscrypt_is_private_mode(crypt_info))
+		goto hw_encrypt_out;
+
 	ctfm = crypto_alloc_skcipher(cipher_str, 0, 0);
 	if (!ctfm || IS_ERR(ctfm)) {
 		res = ctfm ? PTR_ERR(ctfm) : -ENOMEM;
@@ -346,6 +451,7 @@ int fscrypt_get_encryption_info(struct inode *inode)
 			goto out;
 		}
 	}
+hw_encrypt_out:
 	if (cmpxchg(&inode->i_crypt_info, NULL, crypt_info) == NULL)
 		crypt_info = NULL;
 out:
@@ -359,7 +465,7 @@ EXPORT_SYMBOL(fscrypt_get_encryption_info);
 
 void fscrypt_put_encryption_info(struct inode *inode)
 {
-	put_crypt_info(inode->i_crypt_info);
+	fscrypt_put_crypt_info(inode->i_crypt_info);
 	inode->i_crypt_info = NULL;
 }
 EXPORT_SYMBOL(fscrypt_put_encryption_info);

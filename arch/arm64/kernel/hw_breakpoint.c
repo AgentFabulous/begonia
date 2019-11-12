@@ -941,6 +941,12 @@ static int hw_breakpoint_reset(unsigned int cpu)
 {
 	int i;
 	struct perf_event **slots;
+
+#ifdef CONFIG_MTK_WATCHPOINT
+	/* mediatek will use our own operations for hw breakpoint/watchpoint */
+	return 0;
+#endif
+
 	/*
 	 * When a CPU goes through cold-boot, it does not have any installed
 	 * slot, so it is safe to share the same function for restoring and

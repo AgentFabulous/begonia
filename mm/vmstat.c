@@ -1114,6 +1114,7 @@ const char * const vmstat_text[] = {
 
 	"pgfault",
 	"pgmajfault",
+	"pgfmfault",
 	"pglazyfreed",
 
 	"pgrefill",
@@ -1220,7 +1221,16 @@ const char * const vmstat_text[] = {
 	"swap_ra",
 	"swap_ra_hit",
 #endif
-#endif /* CONFIG_VM_EVENTS_COUNTERS */
+
+#ifdef CONFIG_ZONE_MOVABLE_CMA
+	"zmc_lru_migrated",
+	"zmc_lru_migration_nomem",
+#endif /* CONFIG_ZONE_MOVABLE_CMA */
+
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+	"speculative_pgfault",
+#endif
+#endif /* CONFIG_VM_EVENT_COUNTERS */
 };
 #endif /* CONFIG_PROC_FS || CONFIG_SYSFS || CONFIG_NUMA */
 

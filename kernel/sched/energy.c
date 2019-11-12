@@ -28,9 +28,11 @@
 #include <linux/sched/energy.h>
 #include <linux/stddef.h>
 #include <linux/arch_topology.h>
+#include "energy_plus.h"
 
 struct sched_group_energy *sge_array[NR_CPUS][NR_SD_LEVELS];
 
+#ifndef CONFIG_MTK_UNIFY_POWER
 static void free_resources(void)
 {
 	int cpu, sd_level;
@@ -140,3 +142,6 @@ void init_sched_energy_costs(void)
 out:
 	free_resources();
 }
+#endif
+
+#include "energy_plus.c"

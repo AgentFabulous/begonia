@@ -50,6 +50,12 @@ struct fscrypt_context {
 
 #define FS_ENCRYPTION_CONTEXT_FORMAT_V1		1
 
+enum fscrypt_ci_mode {
+	CI_NONE_MODE = 0,
+	CI_DATA_MODE,
+	CI_FNAME_MODE,
+};
+
 /**
  * For encrypted symlinks, the ciphertext length is stored at the beginning
  * of the string in little-endian format.
@@ -59,17 +65,24 @@ struct fscrypt_symlink_data {
 	char encrypted_path[1];
 } __packed;
 
+#define CI_FREEING (1 << 0)
+
 /*
  * A pointer to this structure is stored in the file system's in-core
  * representation of an inode.
  */
 struct fscrypt_info {
+	u8 ci_mode;
 	u8 ci_data_mode;
 	u8 ci_filename_mode;
 	u8 ci_flags;
+	u8 ci_status;
+	atomic_t ci_count;
+	spinlock_t ci_lock;
 	struct crypto_skcipher *ci_ctfm;
 	struct crypto_cipher *ci_essiv_tfm;
 	u8 ci_master_key[FS_KEY_DESCRIPTOR_SIZE];
+	u8 ci_raw_key[FS_MAX_KEY_SIZE];
 };
 
 typedef enum {
@@ -79,6 +92,12 @@ typedef enum {
 
 #define FS_CTX_REQUIRES_FREE_ENCRYPT_FL		0x00000001
 #define FS_CTX_HAS_BOUNCE_BUFFER_FL		0x00000002
+
+static inline bool fscrypt_is_private_mode(struct fscrypt_info *ci)
+{
+	return ci->ci_mode == CI_DATA_MODE &&
+		ci->ci_data_mode == FS_ENCRYPTION_MODE_PRIVATE;
+}
 
 static inline bool fscrypt_valid_enc_modes(u32 contents_mode,
 					   u32 filenames_mode)
@@ -93,6 +112,10 @@ static inline bool fscrypt_valid_enc_modes(u32 contents_mode,
 
 	if (contents_mode == FS_ENCRYPTION_MODE_SPECK128_256_XTS &&
 	    filenames_mode == FS_ENCRYPTION_MODE_SPECK128_256_CTS)
+		return true;
+
+	if (contents_mode == FS_ENCRYPTION_MODE_PRIVATE &&
+	    filenames_mode == FS_ENCRYPTION_MODE_AES_256_CTS)
 		return true;
 
 	return false;
@@ -119,5 +142,8 @@ extern bool fscrypt_fname_encrypted_size(const struct inode *inode,
 
 /* keyinfo.c */
 extern void __exit fscrypt_essiv_cleanup(void);
+
+/* policy.c */
+extern u8 fscrypt_data_crypt_mode(const struct inode *inode, u8 mode);
 
 #endif /* _FSCRYPT_PRIVATE_H */

@@ -37,5 +37,6 @@
 #define HWCAP_FCMA		(1 << 14)
 #define HWCAP_LRCPC		(1 << 15)
 #define HWCAP_DCPOP		(1 << 16)
+#define HWCAP_SSBS		(1 << 17)
 
 #endif /* _UAPI__ASM_HWCAP_H */

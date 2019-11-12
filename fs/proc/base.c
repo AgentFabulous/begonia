@@ -249,8 +249,10 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 	env_end = mm->env_end;
 	up_read(&mm->mmap_sem);
 
-	BUG_ON(arg_start > arg_end);
-	BUG_ON(env_start > env_end);
+	if ((arg_start > arg_end) || (env_start > env_end)) {
+		rv = 0;
+		goto out_mmput;
+	}
 
 	len1 = arg_end - arg_start;
 	len2 = env_end - env_start;
@@ -485,6 +487,29 @@ static int proc_pid_schedstat(struct seq_file *m, struct pid_namespace *ns,
 		   (unsigned long long)task->se.sum_exec_runtime,
 		   (unsigned long long)task->sched_info.run_delay,
 		   task->sched_info.pcount);
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_UCLAMP_TASK
+/*
+ * Provides /proc/PID/tasks/TID/util_clamp
+ */
+static int proc_pid_util_clamp(struct seq_file *m, struct pid_namespace *ns,
+			      struct pid *pid, struct task_struct *task)
+{
+	unsigned int util_min, effective_util_min;
+	unsigned int util_max, effective_util_max;
+
+	util_min = uclamp_task_util(task, UCLAMP_MIN);
+	util_max = uclamp_task_util(task, UCLAMP_MAX);
+	effective_util_min = uclamp_task_effective_util(task, UCLAMP_MIN);
+	effective_util_max = uclamp_task_effective_util(task, UCLAMP_MAX);
+
+	seq_printf(m, "min: %u min_eff: %u\nmax: %u max_eff: %u\n",
+			util_min, effective_util_min,
+			util_max, effective_util_max);
 
 	return 0;
 }
@@ -3391,6 +3416,9 @@ static const struct pid_entry tid_base_stuff[] = {
 #endif
 #ifdef CONFIG_SCHED_INFO
 	ONE("schedstat", S_IRUGO, proc_pid_schedstat),
+#endif
+#ifdef CONFIG_UCLAMP_TASK
+	ONE("util_clamp",  0444, proc_pid_util_clamp),
 #endif
 #ifdef CONFIG_LATENCYTOP
 	REG("latency",  S_IRUGO, proc_lstats_operations),

@@ -56,6 +56,10 @@ dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
 		unsigned long offset, size_t size, int prot);
 int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 		int nents, int prot);
+#ifdef CONFIG_MTK_IOMMU_V2
+dma_addr_t iommu_dma_map_sg_fixed(struct device *dev, struct scatterlist *sg,
+		int nents, int prot, dma_addr_t dma_limit);
+#endif
 
 /*
  * Arch code with no special attribute handling may use these

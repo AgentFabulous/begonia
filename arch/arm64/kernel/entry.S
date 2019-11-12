@@ -316,8 +316,10 @@ alternative_else_nop_endif
 	ldr	x23, [sp, #S_SP]		// load return stack pointer
 	msr	sp_el0, x23
 	tst	x22, #PSR_MODE32_BIT		// native task?
+	orr	x0, x22, #PSR_SSBS_BIT
+	orr	x1, x22, #PSR_AA32_SSBS_BIT
+	csel	x22, x0, x1, eq
 	b.eq	3f
-
 #ifdef CONFIG_ARM64_ERRATUM_845719
 alternative_if ARM64_WORKAROUND_845719
 #ifdef CONFIG_PID_IN_CONTEXTIDR
@@ -548,6 +550,26 @@ ENDPROC(el1_error_invalid)
 	.align	6
 el1_sync:
 	kernel_entry 1
+	mov	x0, sp
+	get_thread_info x20	// top of stack
+	ldr	w4, [x20, #TI_CPU_EXCP]
+	add	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+	cmp	w4, #0x1
+	b.ne	el1_sync_nest
+	str	x0, [x20, #TI_REGS_ON_EXCP]
+el1_sync_nest:
+	mrs	x1, esr_el1			// read the syndrome register
+	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+	b.ne	el1_sync_nest_skip_dec
+	sub	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+el1_sync_nest_skip_dec:
+	cmp	w4, #0x2
+	b.lt	el1_sync_nest_skip
+	bl	aee_stop_nested_panic
+el1_sync_nest_skip:
 	mrs	x1, esr_el1			// read the syndrome register
 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
@@ -583,6 +605,13 @@ el1_da:
 	clear_address_tag x0, x3
 	mov	x2, sp				// struct pt_regs
 	bl	do_mem_abort
+	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+	b.eq	el1_da_nest_skip_dec
+	get_thread_info x20	// top of stack
+	ldr	w4, [x20, #TI_CPU_EXCP]
+	sub	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+el1_da_nest_skip_dec:
 
 	// disable interrupts before pulling preserved data off the stack
 	disable_irq
@@ -603,17 +632,32 @@ el1_undef:
 	enable_dbg
 	mov	x0, sp
 	bl	do_undefinstr
-	ASM_BUG()
+	get_thread_info x20     // top of stack
+	ldr	w4, [x20, #TI_CPU_EXCP]
+	sub	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+	kernel_exit 1
 el1_dbg:
 	/*
 	 * Debug exception handling
 	 */
+#ifdef CONFIG_ARM64_ERRATUM_1406411
+	alternative_insn						\
+	"nop; nop; nop",						\
+	"mrs x2, S3_0_C15_C1_0;orr x2, x2 ,#(1 << 10);msr S3_0_C15_C1_0, x2",\
+	ARM64_WORKAROUND_1406411
+#endif
 	cmp	x24, #ESR_ELx_EC_BRK64		// if BRK64
 	cinc	x24, x24, eq			// set bit '0'
 	tbz	x24, #0, el1_inv		// EL1 only
 	mrs	x0, far_el1
 	mov	x2, sp				// struct pt_regs
 	bl	do_debug_exception
+	get_thread_info x20	// top of stack
+	ldr	w4, [x20, #TI_CPU_EXCP]
+	sub	w4, w4, #0x1
+	str	w4, [x20, #TI_CPU_EXCP]
+
 	kernel_exit 1
 el1_inv:
 	// TODO: add support for undefined instructions in kernel mode
@@ -823,6 +867,12 @@ el0_dbg:
 	/*
 	 * Debug exception handling
 	 */
+#ifdef CONFIG_ARM64_ERRATUM_1406411
+	alternative_insn						\
+	"nop; nop; nop",						\
+	"mrs x2, S3_0_C15_C1_0;orr x2, x2 ,#(1 << 10);msr S3_0_C15_C1_0, x2",\
+	ARM64_WORKAROUND_1406411
+#endif
 	tbnz	x24, #0, el0_inv		// EL0 only
 	mrs	x0, far_el1
 	mov	x1, x25

@@ -4,6 +4,7 @@
 
 /*
  * Copyright 1995 Linus Torvalds
+ * Copyright (C) 2019 XiaoMi, Inc.
  */
 #include <linux/mm.h>
 #include <linux/fs.h>
@@ -223,7 +224,7 @@ extern struct page *__page_cache_alloc(gfp_t gfp);
 #else
 static inline struct page *__page_cache_alloc(gfp_t gfp)
 {
-	return alloc_pages(gfp, 0);
+	return alloc_pages(gfp | __GFP_CMA, 0);
 }
 #endif
 
@@ -239,8 +240,14 @@ static inline struct page *page_cache_alloc_cold(struct address_space *x)
 
 static inline gfp_t readahead_gfp_mask(struct address_space *x)
 {
+#ifdef CONFIG_CMA_REFUSE_PAGE_CACHE
 	return mapping_gfp_mask(x) |
 				  __GFP_COLD | __GFP_NORETRY | __GFP_NOWARN;
+#else
+	return mapping_gfp_mask(x) |
+				  __GFP_COLD | __GFP_NORETRY | __GFP_NOWARN |
+				  __GFP_CMA;
+#endif
 }
 
 typedef int filler_t(struct file *, struct page *);
@@ -452,8 +459,8 @@ static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
 	pgoff_t pgoff;
 	if (unlikely(is_vm_hugetlb_page(vma)))
 		return linear_hugepage_index(vma, address);
-	pgoff = (address - vma->vm_start) >> PAGE_SHIFT;
-	pgoff += vma->vm_pgoff;
+	pgoff = (address - READ_ONCE(vma->vm_start)) >> PAGE_SHIFT;
+	pgoff += READ_ONCE(vma->vm_pgoff);
 	return pgoff;
 }
 

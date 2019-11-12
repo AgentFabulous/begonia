@@ -2,6 +2,7 @@
  *  MTK SPI bus driver definitions
  *
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  * Author: Leilk Liu <leilk.liu@mediatek.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -18,5 +19,11 @@ struct mtk_chip_config {
 	u32 rx_mlsb;
 	u32 cs_pol;
 	u32 sample_sel;
+
+	//patch the parameter as customized
+	u32 cs_setuptime;
+	u32 cs_holdtime;
+	u32 cs_idletime;
+	u32 deassert_mode;
 };
 #endif

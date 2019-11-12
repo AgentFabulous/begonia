@@ -29,6 +29,12 @@
 
 #include "internal.h"
 
+#if defined(CONFIG_MTK_AEE_FEATURE) && \
+	defined(CONFIG_MTK_FD_LEAK_SPECIFIC_DEBUG)
+#include <mt-plat/aee.h>
+#endif
+
+
 /*
  * The max size that a non-root user is allowed to grow the pipe. Can
  * be set by root in /proc/sys/fs/pipe-max-size
@@ -263,6 +269,10 @@ pipe_read(struct kiocb *iocb, struct iov_iter *to)
 	do_wakeup = 0;
 	ret = 0;
 	__pipe_lock(pipe);
+
+	if (strcmp(current->comm, "dnsmasq") == 0)
+		pr_info("[mtk_net][%s]\n", __func__);
+
 	for (;;) {
 		int bufs = pipe->nrbufs;
 		if (bufs) {
@@ -327,13 +337,19 @@ pipe_read(struct kiocb *iocb, struct iov_iter *to)
 			}
 		}
 		if (signal_pending(current)) {
+			if (strcmp(current->comm, "dnsmasq") == 0)
+				pr_info("[mtk_net][%d][%s]signal_pending, ret=%zd\n",
+					__LINE__, __func__,  ret);
 			if (!ret)
 				ret = -ERESTARTSYS;
 			break;
 		}
 		if (do_wakeup) {
 			wake_up_interruptible_sync_poll(&pipe->wait, POLLOUT | POLLWRNORM);
- 			kill_fasync(&pipe->fasync_writers, SIGIO, POLL_OUT);
+			kill_fasync(&pipe->fasync_writers, SIGIO, POLL_OUT);
+			if (strcmp(current->comm, "dnsmasq") == 0)
+				pr_info("[mtk_net][%d][%s]do_wakeup\n",
+					__LINE__, __func__);
 		}
 		pipe_wait(pipe);
 	}
@@ -343,6 +359,9 @@ pipe_read(struct kiocb *iocb, struct iov_iter *to)
 	if (do_wakeup) {
 		wake_up_interruptible_sync_poll(&pipe->wait, POLLOUT | POLLWRNORM);
 		kill_fasync(&pipe->fasync_writers, SIGIO, POLL_OUT);
+		if (strcmp(current->comm, "dnsmasq") == 0)
+			pr_info("[mtk_net][%d][%s] do_wakeup\n",
+				__LINE__, __func__);
 	}
 	if (ret > 0)
 		file_accessed(filp);
@@ -375,6 +394,9 @@ pipe_write(struct kiocb *iocb, struct iov_iter *from)
 		ret = -EPIPE;
 		goto out;
 	}
+
+	if (strcmp(current->comm, "dnsmasq") == 0)
+		pr_info("[mtk_net][%d][%s]\n", __LINE__, __func__);
 
 	/* We try to merge small writes */
 	chars = total_len & (PAGE_SIZE-1); /* size of the last buffer */
@@ -463,6 +485,9 @@ pipe_write(struct kiocb *iocb, struct iov_iter *from)
 			break;
 		}
 		if (signal_pending(current)) {
+			if (strcmp(current->comm, "dnsmasq") == 0)
+				pr_info("[mtk_net][%d][%s]signal_pending, ret=%zd\n",
+					__LINE__, __func__, ret);
 			if (!ret)
 				ret = -ERESTARTSYS;
 			break;
@@ -471,6 +496,9 @@ pipe_write(struct kiocb *iocb, struct iov_iter *from)
 			wake_up_interruptible_sync_poll(&pipe->wait, POLLIN | POLLRDNORM);
 			kill_fasync(&pipe->fasync_readers, SIGIO, POLL_IN);
 			do_wakeup = 0;
+			if (strcmp(current->comm, "dnsmasq") == 0)
+				pr_info("[mtk_net][%d][%s]do_wakeup\n",
+					__LINE__, __func__);
 		}
 		pipe->waiting_writers++;
 		pipe_wait(pipe);
@@ -533,6 +561,12 @@ pipe_poll(struct file *filp, poll_table *wait)
 			mask |= POLLHUP;
 	}
 
+	if (strcmp(current->comm, "dnsmasq") == 0) {
+		if (mask)
+			pr_info("[mtk_net][%d][%s]read mask : 0x%04x\n",
+				__LINE__, __func__, mask);
+	}
+
 	if (filp->f_mode & FMODE_WRITE) {
 		mask |= (nrbufs < pipe->buffers) ? POLLOUT | POLLWRNORM : 0;
 		/*
@@ -541,8 +575,20 @@ pipe_poll(struct file *filp, poll_table *wait)
 		 */
 		if (!pipe->readers)
 			mask |= POLLERR;
+
+		if (strcmp(current->comm, "dnsmasq") == 0) {
+			if (mask)
+				pr_info("[mtk_net][%d][%s]FMODE_WRITE read mask : 0x%04x\n",
+					__LINE__, __func__, mask);
+		}
 	}
 
+	if (((filp->f_mode & FMODE_READ) == 0) &&
+				((filp->f_mode & FMODE_WRITE) == 0)) {
+		if (strcmp(current->comm, "dnsmasq") == 0)
+			pr_info("[mtk_net][%d][%s]mask NULL\n",
+				__LINE__, __func__);
+	}
 	return mask;
 }
 
@@ -576,6 +622,8 @@ pipe_release(struct inode *inode, struct file *file)
 		wake_up_interruptible_sync_poll(&pipe->wait, POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM | POLLERR | POLLHUP);
 		kill_fasync(&pipe->fasync_readers, SIGIO, POLL_IN);
 		kill_fasync(&pipe->fasync_writers, SIGIO, POLL_OUT);
+		if (strcmp(current->comm, "dnsmasq") == 0)
+			pr_info("[mtk_net][%d][%s]\n", __LINE__, __func__);
 	}
 	__pipe_unlock(pipe);
 
@@ -795,6 +843,12 @@ static int __do_pipe_flags(int *fd, struct file **files, int flags)
 {
 	int error;
 	int fdw, fdr;
+#if defined(CONFIG_MTK_AEE_FEATURE) && \
+	defined(CONFIG_MTK_FD_LEAK_SPECIFIC_DEBUG)
+	/* pipe leak debug */
+	int greaterFd;
+#endif
+
 
 	if (flags & ~(O_CLOEXEC | O_NONBLOCK | O_DIRECT))
 		return -EINVAL;
@@ -816,6 +870,38 @@ static int __do_pipe_flags(int *fd, struct file **files, int flags)
 	audit_fd_pair(fdr, fdw);
 	fd[0] = fdr;
 	fd[1] = fdw;
+
+#if defined(CONFIG_MTK_AEE_FEATURE) && \
+	defined(CONFIG_MTK_FD_LEAK_SPECIFIC_DEBUG)
+	/* sample and report warning */
+	greaterFd = (fdr > fdw) ? fdr : fdw;
+	if ((greaterFd >= 1000 && greaterFd < 1020) ||
+		(greaterFd >= 2000 && greaterFd < 2012) ||
+		(greaterFd >= 3000 && greaterFd < 3012)) {
+
+		char aee_msg[200];
+		struct task_struct *process = current->group_leader;
+
+		snprintf(aee_msg, sizeof(aee_msg),
+			"[FDLEAK] pipe_fd[%d, %d], %s [tid:%d] [pid:%d],\n"
+			"Process: %s, %d, %d\n",
+			fdr, fdw, current->comm, current->pid, current->tgid,
+			process->comm, process->pid, process->tgid);
+		if (strstr(process->comm, "omx@1.0-service")) {
+			aee_kernel_warning_api("FDLEAK_DEBUG", 0,
+				DB_OPT_DEFAULT |
+				DB_OPT_LOW_MEMORY_KILLER |
+				DB_OPT_PID_MEMORY_INFO | /* smaps and hprof*/
+				DB_OPT_NATIVE_BACKTRACE |
+				DB_OPT_DUMPSYS_ACTIVITY |
+				/* DB_OPT_PROCESS_COREDUMP | */
+				DB_OPT_DUMPSYS_SURFACEFLINGER |
+				DB_OPT_DUMPSYS_GFXINFO |
+				DB_OPT_DUMPSYS_PROCSTATS,
+				"show kernel & natvie backtace\n", aee_msg);
+		}
+	}
+#endif
 	return 0;
 
  err_fdr:
@@ -883,6 +969,9 @@ static int wait_for_partner(struct pipe_inode_info *pipe, unsigned int *cnt)
 static void wake_up_partner(struct pipe_inode_info *pipe)
 {
 	wake_up_interruptible(&pipe->wait);
+
+	if (strcmp(current->comm, "dnsmasq") == 0)
+		pr_info("[mtk_net][%d][%s]pipe->wait\n", __LINE__, __func__);
 }
 
 static int fifo_open(struct inode *inode, struct file *filp)
@@ -995,12 +1084,18 @@ err_rd:
 	if (!--pipe->readers)
 		wake_up_interruptible(&pipe->wait);
 	ret = -ERESTARTSYS;
+	if (strcmp(current->comm, "dnsmasq") == 0)
+		pr_info("[mtk_net][%d][%s]err_rd: pipe->wait\n",
+			__LINE__, __func__);
 	goto err;
 
 err_wr:
 	if (!--pipe->writers)
 		wake_up_interruptible(&pipe->wait);
 	ret = -ERESTARTSYS;
+	if (strcmp(current->comm, "dnsmasq") == 0)
+		pr_info("[mtk_net][%d][%s]err_wr: pipe->wait\n",
+			__LINE__, __func__);
 	goto err;
 
 err:

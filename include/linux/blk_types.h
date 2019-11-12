@@ -18,6 +18,21 @@ struct io_context;
 struct cgroup_subsys_state;
 typedef void (bio_end_io_t) (struct bio *);
 
+#define BIO_BC_INFO_GET     (1 << 0)
+#define BIO_BC_INFO_PUT     (1 << 1)
+
+struct bio_crypt_ctx {
+	unsigned int        bc_flags;
+	unsigned int        bc_key_size;
+	struct super_block  *bc_sb;
+	unsigned long       bc_ino;
+	unsigned long       bc_iv;              /* for BC_IV_CTX only */
+	void                *bc_info;
+	void                *(*bc_info_act)(void *ci, int act);
+#ifdef CONFIG_HIE_DUMMY_CRYPT
+	u32                dummy_crypt_key;
+#endif
+};
 /*
  * Block error status values.  See block/blk-core:blk_errors for the details.
  * Alpha cannot write a byte atomically, so we need to use 32-bit value.
@@ -103,6 +118,20 @@ struct bio {
 
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
 
+#ifdef CONFIG_MTK_HW_FDE
+		/*
+		 * MTK PATH:
+		 *
+		 * Indicating this bio request needs encryption or decryption by
+		 * HW FDE (Full Disk Encryption) engine.
+		 *
+		 * Set by DM Crypt.
+		 * Quried by HW FDE engine driver, e.g., eMMC/UFS.
+		 */
+		unsigned int		bi_hw_fde;
+		unsigned int		bi_key_idx;
+#endif
+
 	/*
 	 * Everything starting with bi_max_vecs will be preserved by bio_reset()
 	 */
@@ -115,6 +144,8 @@ struct bio {
 
 	struct bio_set		*bi_pool;
 
+	/* Encryption context. May contain secret key material. */
+	struct bio_crypt_ctx	bi_crypt_ctx;
 	/*
 	 * We can inline a number of vecs at the end of the bio, to avoid
 	 * double allocations for a small number of bio_vecs. This member
@@ -234,6 +265,9 @@ enum req_flag_bits {
 	__REQ_NOUNMAP,		/* do not free blocks when zeroing */
 
 	__REQ_NOWAIT,           /* Don't wait if request will block */
+#ifdef MTK_UFS_HQA
+	__REQ_POWER_LOSS,	/* MTK PATCH for SPOH */
+#endif
 	__REQ_NR_BITS,		/* stops here */
 };
 
@@ -253,6 +287,11 @@ enum req_flag_bits {
 
 #define REQ_NOUNMAP		(1ULL << __REQ_NOUNMAP)
 #define REQ_NOWAIT		(1ULL << __REQ_NOWAIT)
+
+#ifdef MTK_UFS_HQA
+/* MTK PATCH for SPOH */
+#define REQ_POWER_LOSS		(1ULL << __REQ_POWER_LOSS)
+#endif
 
 #define REQ_FAILFAST_MASK \
 	(REQ_FAILFAST_DEV | REQ_FAILFAST_TRANSPORT | REQ_FAILFAST_DRIVER)
@@ -341,5 +380,80 @@ struct blk_rq_stat {
 	s32 nr_batch;
 	u64 batch;
 };
+
+/*
+ * block crypt flags
+ */
+enum bc_flags_bits {
+	__BC_CRYPT,        /* marks the request needs crypt */
+	__BC_IV_PAGE_IDX,  /* use page index as iv. */
+	__BC_IV_CTX,       /* use the iv saved in crypt context */
+	__BC_AES_128_XTS,  /* crypt algorithms */
+	__BC_AES_192_XTS,
+	__BC_AES_256_XTS,
+	__BC_AES_128_CBC,
+	__BC_AES_256_CBC,
+	__BC_AES_128_ECB,
+	__BC_AES_256_ECB,
+};
+
+#define BC_CRYPT	(1UL << __BC_CRYPT)
+#define BC_IV_PAGE_IDX  (1UL << __BC_IV_PAGE_IDX)
+#define BC_IV_CTX       (1UL << __BC_IV_CTX)
+#define BC_AES_128_XTS	(1UL << __BC_AES_128_XTS)
+#define BC_AES_192_XTS	(1UL << __BC_AES_192_XTS)
+#define BC_AES_256_XTS	(1UL << __BC_AES_256_XTS)
+#define BC_AES_128_CBC	(1UL << __BC_AES_128_CBC)
+#define BC_AES_256_CBC	(1UL << __BC_AES_256_CBC)
+#define BC_AES_128_ECB	(1UL << __BC_AES_128_ECB)
+#define BC_AES_256_ECB	(1UL << __BC_AES_256_ECB)
+
+#define BC_INVALID_IV    (~0UL)
+
+static inline void bio_bcf_set(struct bio *bio, unsigned int flag)
+{
+	if (bio)
+		bio->bi_crypt_ctx.bc_flags |= flag;
+}
+
+static inline void bio_bcf_clear(struct bio *bio, unsigned int flag)
+{
+	if (bio)
+		bio->bi_crypt_ctx.bc_flags &= (~flag);
+}
+
+static inline bool bio_bcf_test(struct bio *bio, unsigned int flag)
+{
+	return bio ? (bio->bi_crypt_ctx.bc_flags & flag) : 0;
+}
+
+static inline bool bio_encrypted(struct bio *bio)
+{
+	return bio_bcf_test(bio, BC_CRYPT);
+}
+
+static inline unsigned long bio_bc_inode(const struct bio *bio)
+{
+	return bio->bi_crypt_ctx.bc_ino;
+}
+
+static inline void *bio_bc_sb(const struct bio *bio)
+{
+	return (void *)bio->bi_crypt_ctx.bc_sb;
+}
+
+static inline unsigned int bio_bc_key_size(const struct bio *bio)
+{
+	return bio->bi_crypt_ctx.bc_key_size;
+}
+
+static inline
+void bio_bc_iv_set(struct bio *bio, unsigned long iv)
+{
+	bio->bi_crypt_ctx.bc_iv = iv;
+	bio_bcf_set(bio, BC_IV_CTX);
+}
+
+unsigned long bio_bc_iv_get(struct bio *bio);
 
 #endif /* __LINUX_BLK_TYPES_H */
