@@ -344,8 +344,8 @@ int update_eas_boost_value(int kicker, int cgroup_idx, int value)
 	int final_boost = 0;
 	int i, len = 0, len1 = 0;
 
-	char msg[LOG_BUF_SIZE];
-	char msg1[LOG_BUF_SIZE];
+	char msg[LOG_BUF_SIZE+1];
+	char msg1[LOG_BUF_SIZE+1];
 
 	if (cgroup_idx >= NR_CGROUP || cgroup_idx < 0) {
 		pr_debug("cgroup_idx:%d, error\n", cgroup_idx);
@@ -434,8 +434,8 @@ int update_eas_uclamp_min(int kicker, int cgroup_idx, int value)
 	int final_uclamp = 0;
 	int i, len = 0, len1 = 0;
 
-	char msg[LOG_BUF_SIZE];
-	char msg1[LOG_BUF_SIZE];
+	char msg[LOG_BUF_SIZE+1];
+	char msg1[LOG_BUF_SIZE+1];
 
 	if (cgroup_idx >= NR_CGROUP || cgroup_idx < 0) {
 		pr_debug(" cgroup_idx:%d, error\n", cgroup_idx);

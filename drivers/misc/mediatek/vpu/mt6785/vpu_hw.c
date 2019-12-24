@@ -3467,6 +3467,7 @@ int vpu_sdsp_get_power(struct vpu_user *user)
 	uint8_t vcore_opp_index = 0; /*0~15, 0 is max*/
 	uint8_t dsp_freq_index = 0;  /*0~15, 0 is max*/
 	int core = 0;
+	short temp = 0;
 
 	if (sdsp_power_counter == 0) {
 		for (core = 0 ; core < MTK_VPU_CORE ; core++) {
@@ -3478,7 +3479,9 @@ int vpu_sdsp_get_power(struct vpu_user *user)
 			mutex_unlock(&(vpu_service_cores[core].state_mutex));
 		}
 	}
-	sdsp_power_counter++;
+	temp = (short)sdsp_power_counter;
+	++temp; 
+	sdsp_power_counter = (bool)temp;
 	mod_delayed_work(wq, &sdsp_work,
 		msecs_to_jiffies(SDSP_KEEP_TIME_MS));
 
@@ -3491,7 +3494,9 @@ int vpu_sdsp_put_power(struct vpu_user *user)
 	int ret = 0;
 	int core = 0;
 
-	sdsp_power_counter--;
+	short temp = (short)sdsp_power_counter;
+	--temp; 
+	sdsp_power_counter = (bool)temp;
 
 	if (sdsp_power_counter == 0) {
 		for (core = 0 ; core < MTK_VPU_CORE ; core++) {

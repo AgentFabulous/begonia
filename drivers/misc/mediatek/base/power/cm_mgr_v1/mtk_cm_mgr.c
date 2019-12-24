@@ -505,7 +505,7 @@ void check_cm_mgr_status_internal(void)
 #endif /* CONFIG_MTK_CPU_FREQ */
 #endif /* USE_NEW_CPU_OPP */
 		total_bw = cm_mgr_get_bw() / 512;
-		memset(count_ack, 0, ARRAY_SIZE(count_ack));
+		memset(count_ack, 0, (size_t)(sizeof(int)*ARRAY_SIZE(count_ack)));
 
 		if (total_bw_value)
 			total_bw = total_bw_value;
@@ -520,7 +520,7 @@ void check_cm_mgr_status_internal(void)
 		}
 
 		/* get max loading */
-		memset(max_load, 0, ARRAY_SIZE(count_ack));
+		memset(max_load, 0, (size_t)(sizeof(int)*ARRAY_SIZE(count_ack)));
 
 		for_each_possible_cpu(i) {
 			int avg_load;
