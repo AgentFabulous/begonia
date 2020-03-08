@@ -2,6 +2,7 @@
 /*
  * Copyright (C) 2018 ARM Ltd, All Rights Reserved.
  */
+
 #include <linux/compat.h>
 #include <linux/errno.h>
 #include <linux/prctl.h>
@@ -9,7 +10,9 @@
 #include <linux/sched/task_stack.h>
 #include <linux/thread_info.h>
 
+#include <asm/compat.h>
 #include <asm/cpufeature.h>
+
 static void ssbd_ssbs_enable(struct task_struct *task)
 {
 	u64 val = is_compat_thread(task_thread_info(task)) ?
@@ -125,4 +128,3 @@ int arch_prctl_spec_ctrl_get(struct task_struct *task, unsigned long which)
 		return -ENODEV;
 	}
 }
-
