@@ -88,4 +88,6 @@ int kbase_vinstr_hwcnt_reader_setup(
 	struct kbase_vinstr_context *vinstr_ctx,
 	struct kbase_ioctl_hwcnt_reader_setup *setup);
 
+void MTK_kbasep_vinstr_hwcnt_set_interval(struct kbase_vinstr_context *vctx, unsigned int interval);
+
 #endif /* _KBASE_VINSTR_H_ */

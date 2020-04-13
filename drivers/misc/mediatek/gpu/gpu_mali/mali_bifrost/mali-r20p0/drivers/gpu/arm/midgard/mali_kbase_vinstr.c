@@ -988,3 +988,10 @@ static int kbasep_vinstr_hwcnt_reader_release(struct inode *inode,
 
 	return 0;
 }
+
+void MTK_kbasep_vinstr_hwcnt_set_interval(struct kbase_vinstr_context *vctx, unsigned int interval) {
+        struct kbase_vinstr_client *pos;
+        list_for_each_entry(pos, &vctx->clients, node) {
+                kbasep_vinstr_hwcnt_reader_ioctl_set_interval(pos, interval);
+        }
+}

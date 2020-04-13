@@ -58,7 +58,7 @@ EXPORT_SYMBOL(MTKGPUPower_model_start);
 
 void MTKGPUPower_model_stop(void){
 	mutex_lock(&gpu_pmu_info_lock);
-	MTK_kbasep_vinstr_hwcnt_release(pm_kbdev->vinstr_ctx);
+	kbase_vinstr_term(pm_kbdev->vinstr_ctx);
 	//reset gpu_hw_counter
 	init_flag = 0;
 	mutex_unlock(&gpu_pmu_info_lock);

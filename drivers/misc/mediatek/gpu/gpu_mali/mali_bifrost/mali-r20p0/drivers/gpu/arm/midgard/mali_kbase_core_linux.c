@@ -210,49 +210,6 @@ static int mtk_bandwith_resource_init(struct kbase_device *kbdev)
 }
 #endif
 
-#if defined(MTK_GPU_BM_2)
-static void get_rec_addr(void)
-{
-#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
-       int i;
-       unsigned char *ptr;
-
-       /* get sspm reserved mem */
-       rec_phys_addr = sspm_reserve_mem_get_phys(GPU_MEM_ID);
-       rec_virt_addr = sspm_reserve_mem_get_virt(GPU_MEM_ID);
-       rec_size = sspm_reserve_mem_get_size(GPU_MEM_ID);
-
-       /* clear */
-       ptr = (unsigned char *)(uintptr_t)rec_virt_addr;
-       for (i = 0; i < rec_size; i++)
-               ptr[i] = 0x0;
-
-       gpu_info_ref = (struct v1_data *)(uintptr_t)rec_virt_addr;
-#endif
-}
-
-static int mtk_bandwith_resource_init(struct kbase_device *kbdev)
-{
-        int err = 0;
-
-        get_rec_addr();
-
-	if(gpu_info_ref == NULL) {
-		err = -1;
-		pr_debug("%s: get sspm reserved memory fail\n", __func__);
-		return err;
-	}
-
-        kbdev->v1 = gpu_info_ref;
-        kbdev->v1->version = 1;
-        kbdev->job_status_addr.phyaddr = rec_phys_addr;
-
-        MTKGPUQoS_setup(kbdev->v1, kbdev->job_status_addr.phyaddr, rec_size);
-
-        return err;
-}
-#endif
-
 /**
  * kbase_file_new - Create an object representing a device file
  *
