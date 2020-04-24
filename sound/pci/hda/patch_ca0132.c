@@ -1300,14 +1300,13 @@ struct scp_msg {
 
 static void dspio_clear_response_queue(struct hda_codec *codec)
 {
-	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
 	unsigned int dummy = 0;
-	int status;
+	int status = -1;
 
 	/* clear all from the response queue */
 	do {
 		status = dspio_read(codec, &dummy);
-	} while (status == 0 && time_before(jiffies, timeout));
+	} while (status == 0);
 }
 
 static int dspio_get_response_data(struct hda_codec *codec)
