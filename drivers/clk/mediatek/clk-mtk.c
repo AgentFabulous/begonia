@@ -22,7 +22,9 @@
 #include <linux/mfd/syscon.h>
 
 #include "clk-mtk.h"
+#include "clk-mux.h"
 #include "clk-gate.h"
+#include "clk-fixup-div.h"
 
 struct clk_onecell_data *mtk_alloc_clk_data(unsigned int clk_num)
 {
@@ -47,6 +49,35 @@ err_out:
 	kfree(clk_data);
 
 	return NULL;
+}
+
+void mtk_clk_register_fixup_dividers(const struct mtk_clk_divider *mcds,
+			int num, void __iomem *base, spinlock_t *lock,
+				struct clk_onecell_data *clk_data)
+{
+	struct clk *clk;
+	int i;
+
+	for (i = 0; i < num; i++) {
+		const struct mtk_clk_divider *mcd = &mcds[i];
+
+		if (clk_data && !IS_ERR_OR_NULL(clk_data->clks[mcd->id]))
+			continue;
+
+		clk = mtk_clk_fixup_divider(mcd->name, mcd->parent_name,
+			mcd->flags, base + mcd->div_reg,
+			base + mcd->div_reg_fixup, mcd->div_shift,
+			mcd->div_width, mcd->clk_divider_flags, lock);
+
+		if (IS_ERR(clk)) {
+			pr_err("Failed to register clk %s: %ld\n",
+				mcd->name, PTR_ERR(clk));
+			continue;
+		}
+
+		if (clk_data)
+			clk_data->clks[mcd->id] = clk;
+	}
 }
 
 void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
@@ -100,7 +131,33 @@ void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
 			clk_data->clks[ff->id] = clk;
 	}
 }
+#if defined(CONFIG_MACH_MT6739)
+void __init mtk_clk_register_factors_pdn(
+	const struct mtk_fixed_factor_pdn *clks,
+	int num, struct clk_onecell_data *clk_data, void __iomem *base)
+{
+	int i;
+	struct clk *clk;
 
+	for (i = 0; i < num; i++) {
+		const struct mtk_fixed_factor_pdn *ff = &clks[i];
+
+		clk = mtk_clk_register_fixed_factor_pdn(NULL, ff->name,
+			ff->parent_name,
+			CLK_SET_RATE_PARENT, ff->mult, ff->div,
+			ff->shift, ff->pd_reg, base);
+
+		if (IS_ERR(clk)) {
+			pr_debug("Failed to register clk %s: %ld\n",
+					ff->name, PTR_ERR(clk));
+			continue;
+		}
+
+		if (clk_data)
+			clk_data->clks[ff->id] = clk;
+	}
+}
+#endif
 int mtk_clk_register_gates(struct device_node *node,
 		const struct mtk_gate *clks,
 		int num, struct clk_onecell_data *clk_data)
@@ -130,7 +187,8 @@ int mtk_clk_register_gates(struct device_node *node,
 				gate->regs->set_ofs,
 				gate->regs->clr_ofs,
 				gate->regs->sta_ofs,
-				gate->shift, gate->ops);
+				gate->shift, gate->ops,
+				gate->flags);
 
 		if (IS_ERR(clk)) {
 			pr_err("Failed to register clk %s: %ld\n",
@@ -139,6 +197,46 @@ int mtk_clk_register_gates(struct device_node *node,
 		}
 
 		clk_data->clks[gate->id] = clk;
+	}
+
+	return 0;
+}
+
+int mtk_clk_register_muxes(const struct mtk_mux *muxes,
+			   int num, struct device_node *node,
+			   spinlock_t *lock,
+			   struct clk_onecell_data *clk_data)
+{
+	struct regmap *regmap;
+	struct clk *clk;
+	int i;
+
+	if (!clk_data)
+		return -ENOMEM;
+
+	regmap = syscon_node_to_regmap(node);
+	if (IS_ERR(regmap)) {
+		pr_err("Cannot find regmap for %pOF: %ld\n", node,
+		       PTR_ERR(regmap));
+		return PTR_ERR(regmap);
+	}
+
+	for (i = 0; i < num; i++) {
+		const struct mtk_mux *mux = &muxes[i];
+
+		if (clk_data && !IS_ERR_OR_NULL(clk_data->clks[mux->id]))
+			continue;
+
+		clk = mtk_clk_register_mux(mux, regmap, lock);
+
+		if (IS_ERR(clk)) {
+			pr_err("Failed to register clk %s: %ld\n",
+			       mux->name, PTR_ERR(clk));
+			continue;
+		}
+
+		if (clk_data)
+			clk_data->clks[mux->id] = clk;
 	}
 
 	return 0;

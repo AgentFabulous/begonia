@@ -77,6 +77,8 @@ source "drivers/hwmon/Kconfig"
 
 source "drivers/thermal/Kconfig"
 
+source "drivers/trusty/Kconfig"
+
 source "drivers/watchdog/Kconfig"
 
 source "drivers/ssb/Kconfig"
@@ -194,6 +196,10 @@ source "drivers/android/Kconfig"
 source "drivers/nvdimm/Kconfig"
 
 source "drivers/dax/Kconfig"
+
+source "drivers/nfc/Kconfig"
+
+source "drivers/p73-spi/Kconfig"
 
 source "drivers/nvmem/Kconfig"
 

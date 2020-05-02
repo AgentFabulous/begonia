@@ -25,6 +25,11 @@ config INPUT
 
 if INPUT
 
+config LAST_TOUCH_EVENTS
+	bool "Debug touch event"
+	help
+	  Say Y here if you would like to record last touch events.
+
 config INPUT_LEDS
 	tristate "Export input device LEDs in sysfs"
 	depends on LEDS_CLASS
@@ -210,6 +215,8 @@ source "drivers/input/tablet/Kconfig"
 source "drivers/input/touchscreen/Kconfig"
 
 source "drivers/input/misc/Kconfig"
+
+source "drivers/input/fingerprint/Kconfig"
 
 source "drivers/input/rmi4/Kconfig"
 

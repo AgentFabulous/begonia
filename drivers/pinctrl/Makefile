@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
 # generic pinmux support
+ifeq ($(cc-name),clang)
+ccflags-y += -Wno-error=enum-conversion
+endif
 
 subdir-ccflags-$(CONFIG_DEBUG_PINCTRL)	+= -DDEBUG
 
@@ -65,4 +68,5 @@ obj-y				+= ti/
 obj-$(CONFIG_PINCTRL_UNIPHIER)	+= uniphier/
 obj-$(CONFIG_ARCH_VT8500)	+= vt8500/
 obj-$(CONFIG_PINCTRL_MTK)	+= mediatek/
+obj-$(CONFIG_PINCTRL_MTK_V2)    += mediatek/
 obj-$(CONFIG_PINCTRL_ZX)	+= zte/
