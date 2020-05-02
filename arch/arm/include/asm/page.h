@@ -2,6 +2,7 @@
  *  arch/arm/include/asm/page.h
  *
  *  Copyright (C) 1995-2003 Russell King
+ *  Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -161,6 +162,15 @@ extern int pfn_valid(unsigned long);
 #endif
 
 #include <asm/memory.h>
+
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+#define spf_access_check spf_access_check
+extern bool __access_error(unsigned long fsr, unsigned long vma_flags);
+static inline bool spf_access_error(unsigned long fsr, unsigned long vma_flags)
+{
+	return __access_error(fsr, vma_flags);
+}
+#endif
 
 #endif /* !__ASSEMBLY__ */
 

@@ -98,6 +98,364 @@ config ARCH_MEDIATEK
 	help
 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
 
+config MTK_IGNORE_SSBS
+	bool "Mediatek option to ignore SSBS check"
+	help
+	  Sometimes we need to bypass SSBS check manually to
+	  prevent cpu online check from failure. This option
+	  is for that. Please select it if needed. Anything in
+	  doubt, just say N
+
+config MACH_MT6785
+	bool "MediaTek MT6785"
+	select ARM_DSU_PMU
+	select HIE
+	select MTK_TIMER_SYSTIMER
+	select MTK_GIC_V3_EXT
+	select PINCTRL
+	select PINCTRL_MT6785
+	select IRQ_DOMAIN
+	select MFD_SYSCON
+	select MTK_SYSIRQ
+	select MTK_SYS_CIRQ
+	select FAST_CIRQ_CLONE_FLUSH
+	select EXT4_FS
+	select EXT4_FS_SECURITY
+	select EXT4_ENCRYPTION
+	select SDCARD_FS
+	select OVERLAY_FS
+	select CPU_IDLE
+	select MTK_BASE_POWER
+	select PM_DEVFREQ
+	select ARM64_CRYPTO
+	select CRYPTO_SHA2_ARM64_CE
+	select CRYPTO_AES_ARM64_CE_BLK
+	select MTK_SYSTRACKER_V2
+	select MTK_CACHE_PARITY_CHECK
+	select MTK_LASTBUS_INTERFACE
+	select MTK_DRAMC
+	select MTK_EMI
+	select MTK_PID_MAP
+	select MTK_PLAT_SRAM_FLAG
+	select MTK_DEBUG_LATCH
+	select MTK_DFD_INTERNAL_DUMP
+	select MTK_SECURITY_SW_SUPPORT
+	select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+	select MTK_BOUNCING_CHECK if MTK_AEE_FEATURE
+	select MTK_DEVMPU
+	select MTK_GIC_TARGET_ALL
+	select DEVAPC_MT6785
+	select CLOCKSOURCE_VALIDATE_LAST_CYCLE
+	help
+	  This enables support for MediaTek MT6785
+	  Support for aarch64 Architecture
+	  Support for fpga_64_mt6785 related projects
+	  Support for mt6785 related projects
+
+
+config MACH_MT6765
+	bool "MediaTek MT6765"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_AMBA
+	select CPU_V7
+	select HAVE_SMP
+	select NEED_MACH_MEMORY_H
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select ARMV7_COMPAT
+	select ARMV7_COMPAT_CPUINFO
+	select CPU_IDLE
+	select PINCTRL
+	select PINCTRL_MT6765
+	select MFD_SYSCON
+	select MTK_BASE_POWER
+	select MTK_GIC_V3_EXT
+	select MTK_SYSIRQ
+	select MTK_TIMER_APXGPT
+	select MTK_TIMER_TIMESYNC
+	select OVERLAY_FS
+	select MTK_SYSTRACKER_V2
+	select MTK_BOUNCING_CHECK if MTK_AEE_FEATURE
+	select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+	select MTK_DRAMC
+	select PM_DEVFREQ
+	select MTK_EMI
+	select MTK_SYS_CIRQ
+	select MTK_GIC_TARGET_ALL
+	select FAST_CIRQ_CLONE_FLUSH
+	select MTK_FIQ_CACHE
+	select MTK_DEBUG_LATCH
+	select MTK_DFD_INTERNAL_DUMP
+	select MTK_PLAT_SRAM_FLAG
+	select MTK_L2C_PARITY_CHECK
+	help
+	  This enables support for MediaTek MT6765
+	  Highly power-efficient, performance-oriented 4G LTE processor for premium,
+	  thin-design smartphones. MT6765 also offers significant multitasking and
+	  multimedia improvements.
+
+config MACH_MT6771
+	bool "MediaTek MT6771"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_AMBA
+	select CPU_V7
+	select HAVE_SMP
+	select HIE
+	select MTK_PID_MAP
+	select MTK_IO_BOOST
+	select NEED_MACH_MEMORY_H
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select ARMV7_COMPAT
+	select ARMV7_COMPAT_CPUINFO
+	select PINCTRL
+	select PINCTRL_MT6771
+	select MFD_SYSCON
+	select MTK_DRAMC
+	select CPU_IDLE
+	select MTK_BASE_POWER
+	select MTK_GIC_V3_EXT
+	select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+	select MTK_SYSIRQ
+	select MTK_EMI
+	select MTK_DEBUG_LATCH
+	select MTK_PLAT_SRAM_FLAG
+	select ARM64_CRYPTO
+	select CRYPTO_SHA2_ARM64_CE
+	select CRYPTO_AES_ARM64_CE_BLK
+	select MTK_ES_REG
+	select MTK_CQDMA
+	select MTK_IRQ_NEW_DESIGN
+	select MTK_SYS_CIRQ
+	select FAST_CIRQ_CLONE_FLUSH
+	select MTK_CACHE_FLUSH_BY_SF
+	select MTK_BOUNCING_CHECK if MTK_AEE_FEATURE
+	select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+	select MTK_TIMER_APXGPT
+	select DEVAPC_LEGACY
+	select OVERLAY_FS
+	select MTK_SYSTRACKER_V2
+	select MTK_SECURITY_SW_SUPPORT
+	help
+	  This enables support for MediaTek MT6771
+	  Support for aarch64 Architecture
+	  Support for fpga_64_mt6771 related projects
+	  Support for mt6771 related projects
+
+config MACH_MT6768
+	bool "MediaTek MT6768"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_AMBA
+	select ARM_DSU_PMU
+	select CPU_V7
+	select HAVE_SMP
+	select NEED_MACH_MEMORY_H
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select ARMV7_COMPAT
+	select ARMV7_COMPAT_CPUINFO
+	select EXT4_FS
+	select EXT4_FS_SECURITY
+	select EXT4_ENCRYPTION
+	select HIE
+	select PINCTRL
+	select PINCTRL_MT6768
+	select MFD_SYSCON
+	select CPU_IDLE
+	select MTK_BASE_POWER
+	select MTK_GIC_V3_EXT
+	select MTK_PID_MAP
+	select MTK_SYSIRQ
+	select MTK_DEBUG_LATCH
+	select MTK_PLAT_SRAM_FLAG
+	select MTK_DFD_INTERNAL_DUMP
+	select MTK_EMI
+	select MTK_DRAMC
+	select ARM64_CRYPTO
+	select CRYPTO_SHA2_ARM64_CE
+	select CRYPTO_AES_ARM64_CE_BLK
+	select SDCARD_FS
+	select MTK_SYSTRACKER_V2
+	select MTK_CACHE_PARITY_CHECK
+	select MTK_LASTBUS_INTERFACE
+	select MTK_DEBUG_LATCH
+	select MTK_ES_REG
+	select MTK_CQDMA
+	select MTK_GIC_TARGET_ALL
+	select MTK_SYS_CIRQ
+	select FAST_CIRQ_CLONE_FLUSH
+	select MTK_ION_CACHE_OPTIMIZATION
+	select MTK_BOUNCING_CHECK if MTK_AEE_FEATURE
+	select MTK_TIMER_SYSTIMER
+	select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+	select MTK_SECURITY_SW_SUPPORT
+	select DEVAPC_MT6768
+	select OVERLAY_FS
+	select MTK_IGNORE_SSBS
+	help
+	  This enables support for MediaTek MT6768
+	  Support for aarch64 Architecture
+	  Support for fpga_64_mt6768 related projects
+	  Support for mt6768 related projects
+
+config MACH_MT6739
+	bool "MediaTek MT6739"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_AMBA
+	select CPU_V7
+	select HAVE_SMP
+	select EXT4_FS
+	select EXT4_FS_ENCRYPTION
+	select EXT4_FS_SECURITY
+	select EXT4_ENCRYPTION
+	select F2FS_FS
+	select F2FS_FS_ENCRYPTION
+	select F2FS_FS_SECURITY
+	select F2FS_FS_XATTR
+	select NEED_MACH_MEMORY_H
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select MTK_SYS_CIRQ
+	select MTK_GIC_TARGET_ALL
+	select ARMV7_COMPAT
+	select ARMV7_COMPAT_CPUINFO
+	select CPU_IDLE
+	select PINCTRL
+	select PINCTRL_MT6739
+	select MFD_SYSCON
+	select MTK_BASE_POWER
+	select MTK_SYSTRACKER_V2
+	select MTK_GIC_V3_EXT
+	select MTK_IRQ_NEW_DESIGN
+	select MTK_IRQ_NEW_DESIGN_DEBUG
+	select MTK_BOUNCING_CHECK if MTK_AEE_FEATURE
+	select ARM64_ERRATUM_845719
+	select MTK_CQDMA
+	select MTK_SYSIRQ
+	select MTK_FIQ_CACHE
+	select FAST_CIRQ_CLONE_FLUSH
+	select MTK_TIMER_APXGPT
+	select ARM64_CRYPTO
+	select CRYPTO_SHA2_ARM64_CE
+	select CRYPTO_AES_ARM64_CE_BLK
+	select DEVAPC_LEGACY
+	select OVERLAY_FS
+	select MTK_SECURITY_SW_SUPPORT
+	help
+	  This enables support for MediaTek MT6739.
+	  It enables all necessary feature for MP including
+	  GIC, ERRATA, debug utilities.
+	  Say Y to enable this option.
+	  Say N to disable.
+
+config MACH_MT8167
+	bool "MediaTek MT8167"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_AMBA
+	select CPU_V7
+	select HAVE_SMP
+	select NEED_MACH_MEMORY_H
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select ARMV7_COMPAT
+	select ARMV7_COMPAT_CPUINFO
+	select CPU_IDLE
+	select CPU_IDLE_GOV_MTK
+	select ARM_MTK_81XX_CPUIDLE
+	select PINCTRL
+	select PINCTRL_MT8167
+	select MFD_SYSCON
+	select MTK_BASE_POWER
+	select MTK_TIMER
+	select MTK_GIC_EXT
+	select MTK_SYS_CIRQ
+	select HAVE_MTK_IN_HOUSE_TEE_SUPPORT
+	select MTK_ICE_DEBUG
+	select ARM64_CRYPTO
+	select CRYPTO_SHA2_ARM64_CE
+	select CRYPTO_AES_ARM64_CE_BLK
+	select OVERLAY_FS
+	help
+	  This enables support for MediaTek MT8167
+	  If you need support for MediaTek MT8167, say Y here.
+	  This including the basic selections,
+	  But not all of them.
+
+config MACH_MT8168
+	bool "MediaTek MT8168"
+	select GENERIC_CLOCKEVENTS
+	select ARM_AMBA
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select PINCTRL
+	select PINCTRL_MT8168
+	select MFD_SYSCON
+	select CPU_IDLE
+	select MTK_BASE_POWER
+	select MTK_GIC_V3_EXT
+	select MTK_SYSIRQ
+	select ARM64_CRYPTO
+	select CRYPTO_SHA2_ARM64_CE
+	select CRYPTO_AES_ARM64_CE_BLK
+	select MTK_BOUNCING_CHECK if AEE_FEATURE
+	select MTK_TIMER_APXGPT
+        help
+          This enables support for MediaTek MT8168
+          Support for aarch64 Architecture
+          Support for fpga_64_mt8168 related projects
+          Support for mt8168 related projects
+
+config MACH_MT6885
+        bool "MediaTek MT6885"
+        select GENERIC_TIME
+        select GENERIC_CLOCKEVENTS
+        select ARCH_HAS_CPUFREQ
+        select ARM_AMBA
+        select CPU_V7
+        select HAVE_SMP
+        select NEED_MACH_MEMORY_H
+        select IRQ_DOMAIN
+        select IRQ_DOMAIN_DEBUG
+        select GENERIC_SCHED_CLOCK
+        select ARMV7_COMPAT
+        select ARMV7_COMPAT_CPUINFO
+        select PINCTRL
+        select PINCTRL_MT6885
+        select MFD_SYSCON
+        select CPU_IDLE
+        select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+        select MTK_SYSIRQ
+        select ARM64_CRYPTO
+        select CRYPTO_SHA2_ARM64_CE
+        select CRYPTO_AES_ARM64_CE_BLK
+        select MTK_ES_REG
+        select MTK_CQDMA
+        select MTK_BOUNCING_CHECK if MTK_AEE_FEATURE
+        select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+        select MTK_TIMER_APXGPT
+	select MTK_BASE_POWER
+        help
+          This enables support for MediaTek MT6885
+          Support for aarch64 Architecture
+          Support for fpga_64_mt6885 related projects
+          Support for mt6885 related projects
+
 config ARCH_MESON
 	bool "Amlogic Platforms"
 	select PINCTRL

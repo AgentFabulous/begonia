@@ -29,6 +29,8 @@
 #include <asm/cputype.h>
 #include <asm/topology.h>
 
+#include "topology_dts.c"
+
 static int __init get_cpu_for_node(struct device_node *node)
 {
 	struct device_node *cpu_node;
@@ -303,19 +305,21 @@ static int cpu_flags(void)
 	return topology_cpu_flags();
 }
 
-static inline
+#ifndef CONFIG_MTK_UNIFY_POWER
+inline
 const struct sched_group_energy * const cpu_core_energy(int cpu)
 {
 	return sge_array[cpu][SD_LEVEL0];
 }
 
-static inline
+inline
 const struct sched_group_energy * const cpu_cluster_energy(int cpu)
 {
 	return sge_array[cpu][SD_LEVEL1];
 }
+#endif
 
-static inline
+inline
 const struct sched_group_energy * const cpu_system_energy(int cpu)
 {
 	return sge_array[cpu][SD_LEVEL2];
@@ -329,7 +333,7 @@ static struct sched_domain_topology_level arm64_topology[] = {
 	{ cpu_coregroup_mask, core_flags, cpu_core_energy, SD_INIT_NAME(MC) },
 #endif
 	{ cpu_cpu_mask, cpu_flags, cpu_cluster_energy, SD_INIT_NAME(DIE) },
-	{ cpu_cpu_mask, NULL, cpu_system_energy, SD_INIT_NAME(SYS) },
+//	{ cpu_cpu_mask, NULL, cpu_system_energy, SD_INIT_NAME(SYS) },
 	{ NULL, }
 };
 
