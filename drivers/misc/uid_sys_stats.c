@@ -1,6 +1,7 @@
 /* drivers/misc/uid_sys_stats.c
  *
  * Copyright (C) 2014 - 2015 Google, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -370,7 +371,7 @@ static int uid_cputime_show(struct seq_file *m, void *v)
 		u64 total_stime = uid_entry->stime +
 							uid_entry->active_stime;
 		seq_printf(m, "%d: %llu %llu\n", uid_entry->uid,
-			ktime_to_ms(total_utime), ktime_to_ms(total_stime));
+			ktime_to_us(total_utime), ktime_to_us(total_stime));
 	}
 
 	rt_mutex_unlock(&uid_lock);
@@ -420,6 +421,9 @@ static ssize_t uid_remove_write(struct file *file,
 		kstrtol(end_uid, 10, &uid_end) != 0) {
 		return -EINVAL;
 	}
+
+	if (uid_start >= INT_MAX || uid_end >= INT_MAX)
+		return -EINVAL;
 
 	/* Also remove uids from /proc/uid_time_in_state */
 	cpufreq_task_times_remove_uids(uid_start, uid_end);
