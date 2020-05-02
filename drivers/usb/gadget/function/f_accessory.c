@@ -2,6 +2,7 @@
  * Gadget Function Driver for Android USB accessories
  *
  * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  * Author: Mike Lockwood <lockwood@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -568,6 +569,7 @@ static ssize_t acc_read(struct file *fp, char __user *buf,
 	struct acc_dev *dev = fp->private_data;
 	struct usb_request *req;
 	ssize_t r = count;
+	ssize_t data_length;
 	unsigned xfer;
 	int ret = 0;
 
@@ -589,6 +591,10 @@ static ssize_t acc_read(struct file *fp, char __user *buf,
 		goto done;
 	}
 
+	data_length = count;
+	data_length += dev->ep_out->maxpacket - 1;
+	data_length -= data_length % dev->ep_out->maxpacket;
+
 	if (dev->rx_done) {
 		// last req cancelled. try to get it.
 		req = dev->rx_req[0];
@@ -598,7 +604,7 @@ static ssize_t acc_read(struct file *fp, char __user *buf,
 requeue_req:
 	/* queue a request */
 	req = dev->rx_req[0];
-	req->length = count;
+	req->length = data_length;
 	dev->rx_done = 0;
 	ret = usb_ep_queue(dev->ep_out, req, GFP_KERNEL);
 	if (ret < 0) {
@@ -668,6 +674,11 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 		req = 0;
 		ret = wait_event_interruptible(dev->write_wq,
 			((req = req_get(dev, &dev->tx_idle)) || !dev->online));
+		if (!dev->online || dev->disconnected) {
+			pr_debug("acc_write dev->error\n");
+			r = -EIO;
+			break;
+		}
 		if (!req) {
 			r = ret;
 			break;
@@ -779,6 +790,9 @@ static const struct file_operations acc_fops = {
 	.read = acc_read,
 	.write = acc_write,
 	.unlocked_ioctl = acc_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = acc_ioctl,
+#endif
 	.open = acc_open,
 	.release = acc_release,
 };

@@ -2,6 +2,7 @@
  * mtu3_qmu.c - Queue Management Unit driver for device controller
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Author: Chunfeng Yun <chunfeng.yun@mediatek.com>
  *
@@ -207,6 +208,17 @@ static int mtu3_prepare_tx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
 		mep->epnum, gpd, enq);
 
 	enq->flag &= ~GPD_FLAGS_HWO;
+
+	if (mep->mtu->is_36bit) {
+		u32 hiaddr;
+		/* next GPD high addr */
+		hiaddr = upper_32_bits(gpd_virt_to_dma(ring, enq));
+		gpd->data_buf_len |= QMU_GPD_NEXT_HI(hiaddr);
+		/* buffer high addr */
+		hiaddr = upper_32_bits(req->dma);
+		gpd->data_buf_len |= QMU_GPD_BUF_HI(hiaddr);
+	}
+
 	gpd->next_gpd = cpu_to_le32((u32)gpd_virt_to_dma(ring, enq));
 
 	if (req->zero)
@@ -240,6 +252,16 @@ static int mtu3_prepare_rx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
 		mep->epnum, gpd, enq);
 
 	enq->flag &= ~GPD_FLAGS_HWO;
+	if (mep->mtu->is_36bit) {
+		u32 hiaddr;
+		/* next GPD high addr */
+		hiaddr = upper_32_bits(gpd_virt_to_dma(ring, enq));
+		gpd->ext_len |= QMU_GPD_NEXT_HI(hiaddr);
+		/* buffer high addr */
+		hiaddr = upper_32_bits(req->dma);
+		gpd->ext_len |= QMU_GPD_BUF_HI(hiaddr);
+	}
+
 	gpd->next_gpd = cpu_to_le32((u32)gpd_virt_to_dma(ring, enq));
 	gpd->chksum = qmu_calc_checksum((u8 *)gpd);
 	gpd->flag |= GPD_FLAGS_HWO;
@@ -418,7 +440,7 @@ static void qmu_done_tx(struct mtu3 *mtu, u8 epnum)
 	dev_dbg(mtu->dev, "%s EP%d, last=%p, current=%p, enq=%p\n",
 		__func__, epnum, gpd, gpd_current, ring->enqueue);
 
-	while (gpd != gpd_current && !(gpd->flag & GPD_FLAGS_HWO)) {
+	while (gpd && gpd != gpd_current && !(gpd->flag & GPD_FLAGS_HWO)) {
 
 		mreq = next_request(mep);
 
@@ -432,6 +454,11 @@ static void qmu_done_tx(struct mtu3 *mtu, u8 epnum)
 		mtu3_req_complete(mep, request, 0);
 
 		gpd = advance_deq_gpd(ring);
+
+		if (!gpd) {
+			pr_err("[TX][ERROR] EP%d, Next GPD is null!!\n", epnum);
+			return;
+		}
 	}
 
 	dev_dbg(mtu->dev, "%s EP%d, deq=%p, enq=%p, complete\n",
@@ -455,7 +482,7 @@ static void qmu_done_rx(struct mtu3 *mtu, u8 epnum)
 	dev_dbg(mtu->dev, "%s EP%d, last=%p, current=%p, enq=%p\n",
 		__func__, epnum, gpd, gpd_current, ring->enqueue);
 
-	while (gpd != gpd_current && !(gpd->flag & GPD_FLAGS_HWO)) {
+	while (gpd && gpd != gpd_current && !(gpd->flag & GPD_FLAGS_HWO)) {
 
 		mreq = next_request(mep);
 
@@ -469,6 +496,11 @@ static void qmu_done_rx(struct mtu3 *mtu, u8 epnum)
 		mtu3_req_complete(mep, req, 0);
 
 		gpd = advance_deq_gpd(ring);
+
+		if (!gpd) {
+			pr_err("[RX][ERROR] EP%d, Next GPD is null!!\n", epnum);
+			return;
+		}
 	}
 
 	dev_dbg(mtu->dev, "%s EP%d, deq=%p, enq=%p, complete\n",

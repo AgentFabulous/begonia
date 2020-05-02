@@ -33,6 +33,9 @@
 #include <linux/bitops.h>
 #include <linux/property.h>
 #include <trace/events/iommu.h>
+#ifdef CONFIG_MTK_IOMMU_V2
+#include "mtk_iommu_ext.h"
+#endif
 
 static struct kset *iommu_group_kset;
 static DEFINE_IDA(iommu_group_ida);
@@ -351,6 +354,8 @@ struct iommu_group *iommu_group_alloc(void)
 	ret = ida_simple_get(&iommu_group_ida, 0, 0, GFP_KERNEL);
 	if (ret < 0) {
 		kfree(group);
+		pr_notice("%s, %d, err ida simple get\n",
+			__func__, __LINE__);
 		return ERR_PTR(ret);
 	}
 	group->id = ret;
@@ -360,6 +365,8 @@ struct iommu_group *iommu_group_alloc(void)
 	if (ret) {
 		ida_simple_remove(&iommu_group_ida, group->id);
 		kfree(group);
+		pr_notice("%s, %d, err ida simple remove\n",
+			__func__, __LINE__);
 		return ERR_PTR(ret);
 	}
 
@@ -492,8 +499,10 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
 	unsigned long pg_size;
 	int ret = 0;
 
-	if (!domain || domain->type != IOMMU_DOMAIN_DMA)
+	if (!domain || domain->type != IOMMU_DOMAIN_DMA) {
+		pr_notice("%s, %d, invalid domain\n", __func__, __LINE__);
 		return 0;
+	}
 
 	BUG_ON(!domain->pgsize_bitmap);
 
@@ -557,8 +566,11 @@ int iommu_group_add_device(struct iommu_group *group, struct device *dev)
 	device->dev = dev;
 
 	ret = sysfs_create_link(&dev->kobj, &group->kobj, "iommu_group");
-	if (ret)
+	if (ret) {
+		pr_notice("%s, %d err create link, ret%d\n",
+			__func__, __LINE__, ret);
 		goto err_free_device;
+	}
 
 	device->name = kasprintf(GFP_KERNEL, "%s", kobject_name(&dev->kobj));
 rename:
@@ -587,16 +599,19 @@ rename:
 
 	dev->iommu_group = group;
 
-	iommu_group_create_direct_mappings(group, dev);
 
 	mutex_lock(&group->mutex);
 	list_add_tail(&device->list, &group->devices);
 	if (group->domain)
 		ret = __iommu_attach_device(group->domain, dev);
 	mutex_unlock(&group->mutex);
-	if (ret)
+	if (ret) {
+		pr_notice("%s, %d err attach device, ret%d\n",
+			__func__, __LINE__, ret);
 		goto err_put_group;
+	}
 
+	iommu_group_create_direct_mappings(group, dev);
 	/* Notify any listeners about change to group. */
 	blocking_notifier_call_chain(&group->notifier,
 				     IOMMU_GROUP_NOTIFY_ADD_DEVICE, dev);
@@ -669,6 +684,7 @@ EXPORT_SYMBOL_GPL(iommu_group_remove_device);
 
 static int iommu_group_device_count(struct iommu_group *group)
 {
+#ifndef CONFIG_MTK_IOMMU_V2
 	struct group_device *entry;
 	int ret = 0;
 
@@ -676,6 +692,9 @@ static int iommu_group_device_count(struct iommu_group *group)
 		ret++;
 
 	return ret;
+#else
+	return 1;
+#endif
 }
 
 /**
@@ -1006,18 +1025,25 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 	int ret;
 
 	group = iommu_group_get(dev);
-	if (group)
+	if (group) {
+		pr_notice("%s, %d, got the group\n", __func__, __LINE__);
 		return group;
-
-	if (!ops)
+	}
+	if (!ops) {
+		pr_notice("%s, %d, invalid ops\n", __func__, __LINE__);
 		return ERR_PTR(-EINVAL);
+	}
 
 	group = ops->device_group(dev);
-	if (WARN_ON_ONCE(group == NULL))
+	if (WARN_ON_ONCE(group == NULL)) {
+		pr_notice("%s, %d, invalid group\n", __func__, __LINE__);
 		return ERR_PTR(-EINVAL);
+	}
 
-	if (IS_ERR(group))
+	if (IS_ERR(group)) {
+		pr_notice("%s, %d, invalid group\n", __func__, __LINE__);
 		return group;
+	}
 
 	/*
 	 * Try to allocate a default domain - needs support from the
@@ -1095,7 +1121,6 @@ static int iommu_bus_notifier(struct notifier_block *nb,
 	const struct iommu_ops *ops = dev->bus->iommu_ops;
 	struct iommu_group *group;
 	unsigned long group_action = 0;
-
 	/*
 	 * ADD/DEL call into iommu driver ops if provided, which may
 	 * result in ADD/DEL notifiers to group->notifier
@@ -1160,13 +1185,18 @@ static int iommu_bus_init(struct bus_type *bus, const struct iommu_ops *ops)
 	nb->notifier_call = iommu_bus_notifier;
 
 	err = bus_register_notifier(bus, nb);
-	if (err)
+	if (err) {
+		pr_notice("%s, %d, err bus register, err=%d\n",
+			__func__, __LINE__, err);
 		goto out_free;
+	}
 
 	err = bus_for_each_dev(bus, NULL, &cb, add_iommu_group);
-	if (err)
+	if (err) {
+		pr_notice("%s, %d, err add iommu group, err=%d\n",
+			__func__, __LINE__, err);
 		goto out_err;
-
+	}
 
 	return 0;
 
@@ -1198,15 +1228,19 @@ int bus_set_iommu(struct bus_type *bus, const struct iommu_ops *ops)
 {
 	int err;
 
-	if (bus->iommu_ops != NULL)
+	if (bus->iommu_ops != NULL) {
+		pr_notice("%s, %d\n", __func__, __LINE__);
 		return -EBUSY;
+	}
 
 	bus->iommu_ops = ops;
 
 	/* Do IOMMU specific setup for this bus-type */
 	err = iommu_bus_init(bus, ops);
-	if (err)
+	if (err) {
+		pr_notice("%s, %d err bus init\n", __func__, __LINE__);
 		bus->iommu_ops = NULL;
+	}
 
 	return err;
 }
@@ -1255,12 +1289,18 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
 {
 	struct iommu_domain *domain;
 
-	if (bus == NULL || bus->iommu_ops == NULL)
+	if (bus == NULL || bus->iommu_ops == NULL) {
+		pr_notice("%s, %d, invalid bus\n",
+			__func__, __LINE__);
 		return NULL;
+	}
 
 	domain = bus->iommu_ops->domain_alloc(type);
-	if (!domain)
+	if (!domain) {
+		pr_notice("%s, %d, err domain alloc\n",
+			__func__, __LINE__);
 		return NULL;
+	}
 
 	domain->ops  = bus->iommu_ops;
 	domain->type = type;
@@ -1286,6 +1326,7 @@ static int __iommu_attach_device(struct iommu_domain *domain,
 				 struct device *dev)
 {
 	int ret;
+
 	if ((domain->ops->is_attach_deferred != NULL) &&
 	    domain->ops->is_attach_deferred(domain, dev))
 		return 0;
@@ -1349,7 +1390,6 @@ void iommu_detach_device(struct iommu_domain *domain, struct device *dev)
 		WARN_ON(1);
 		goto out_unlock;
 	}
-
 	__iommu_detach_group(domain, group);
 
 out_unlock:
@@ -1555,6 +1595,10 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 	else
 		trace_map(orig_iova, orig_paddr, orig_size);
 
+#ifdef CONFIG_MTK_IOMMU_V2
+	if (ret == 0)
+		mtk_iommu_trace_map(orig_iova, orig_paddr, orig_size);
+#endif
 	return ret;
 }
 EXPORT_SYMBOL_GPL(iommu_map);
@@ -1616,6 +1660,9 @@ static size_t __iommu_unmap(struct iommu_domain *domain,
 		ops->iotlb_sync(domain);
 
 	trace_unmap(orig_iova, size, unmapped);
+#ifdef CONFIG_MTK_IOMMU_V2
+	mtk_iommu_trace_unmap(orig_iova, size, unmapped);
+#endif
 	return unmapped;
 }
 
@@ -1647,8 +1694,39 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 	min_pagesz = 1 << __ffs(domain->pgsize_bitmap);
 
 	for_each_sg(sg, s, nents, i) {
-		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
 
+#if defined(CONFIG_MTK_PSEUDO_M4U) && defined(CONFIG_MTK_IOMMU_V2)
+		/*
+		 * FIXME: Mediatek workaround for the buffer that don't has
+		 * "struct page"
+		 */
+		phys_addr_t phys;
+		if (!IS_ERR(sg_page(s))) {
+			phys = page_to_phys(sg_page(s)) + s->offset;
+#ifdef IOMMU_DEBUG_ENABLED
+			if (i == 0 || i == nents-1)
+				pr_notice("%s, %d, sg[%d],domain:%p, iova:0x%lx, nents=%d, mapped=0x%lx, phys=0x%lx, length=0x%x\n",
+					__func__, __LINE__, i,
+					domain, iova + mapped,
+					nents, mapped, phys, s->length);
+#endif
+		} else if (sg_dma_address(s)) {
+			phys = sg_dma_address(s);
+			s->length = sg_dma_len(s);
+#ifdef IOMMU_DEBUG_ENABLED
+			if (i == 0 || i == nents-1)
+				pr_notice("%s, %d, sg[%d],domain:%p, iova:0x%lx, nents=%d, mapped=0x%lx, phys=0x%lx, length=0x%x\n",
+					__func__, __LINE__, i,
+					domain, iova + mapped,
+					nents, mapped, phys, s->length);
+#endif
+		} else {
+			pr_notice("%s, %d, invalid\n", __func__, __LINE__);
+			return 0;
+		}
+#else
+		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
+#endif
 		/*
 		 * We are mapping on IOMMU page boundaries, so offset within
 		 * the page must be 0. However, the IOMMU may support pages
@@ -1662,6 +1740,12 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 		if (ret)
 			goto out_err;
 
+#if 0 //def IOMMU_DEBUG_ENABLED
+		if (i == 0 || i == nents-1)
+			pr_notice("%s, %d, sg%d, double check mapping result:  iova:0x%lx, phys:0x%lx, phys_expect:0x%lx",
+				__func__, __LINE__, i, iova+mapped,
+				iommu_iova_to_phys(domain, iova+mapped), phys);
+#endif
 		mapped += s->length;
 	}
 
