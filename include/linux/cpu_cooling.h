@@ -30,6 +30,8 @@
 
 struct cpufreq_policy;
 
+void cpu_limits_set_level(unsigned int cpu, unsigned int max_freq);
+
 typedef int (*get_static_t)(cpumask_t *cpumask, int interval,
 			    unsigned long voltage, u32 *power);
 

@@ -34,6 +34,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/blk-cgroup.h>
 #include <linux/debugfs.h>
+#include <mt-plat/mtk_blocktag.h> /* MTK PATCH */
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/block.h>
@@ -374,7 +375,9 @@ inline void __blk_run_queue_uncond(struct request_queue *q)
 	 * can wait until all these request_fn calls have finished.
 	 */
 	q->request_fn_active++;
+	preempt_disable();
 	q->request_fn(q);
+	preempt_enable();
 	q->request_fn_active--;
 }
 EXPORT_SYMBOL_GPL(__blk_run_queue_uncond);
@@ -2288,6 +2291,9 @@ blk_qc_t submit_bio(struct bio *bio)
 			count_vm_events(PGPGIN, count);
 		}
 
+#ifdef CONFIG_MTK_BLOCK_TAG
+		mtk_btag_pidlog_submit_bio(bio);
+#endif
 		if (unlikely(block_dump)) {
 			char b[BDEVNAME_SIZE];
 			printk(KERN_DEBUG "%s(%d): %s block %Lu on %s (%u sectors)\n",

@@ -280,7 +280,6 @@ config PAGE_OWNER
 
 config DEBUG_FS
 	bool "Debug Filesystem"
-	select SRCU
 	help
 	  debugfs is a virtual file system that kernel developers use to put
 	  debugging files into.  Enable this option to be able to read and
@@ -338,7 +337,6 @@ config DEBUG_SECTION_MISMATCH
 
 config SECTION_MISMATCH_WARN_ONLY
 	bool "Make section mismatch errors non-fatal"
-	default y
 	help
 	  If you say N here, the build process will fail if there are any
 	  section mismatch, instead of just throwing warnings.

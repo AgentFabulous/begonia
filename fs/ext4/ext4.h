@@ -210,6 +210,7 @@ struct ext4_io_submit {
 	struct bio		*io_bio;
 	ext4_io_end_t		*io_end;
 	sector_t		io_next_block;
+	struct inode		*inode;
 };
 
 /*
@@ -1151,6 +1152,7 @@ struct ext4_inode_info {
 #define EXT4_MOUNT_DIOREAD_NOLOCK	0x400000 /* Enable support for dio read nolocking */
 #define EXT4_MOUNT_JOURNAL_CHECKSUM	0x800000 /* Journal checksums */
 #define EXT4_MOUNT_JOURNAL_ASYNC_COMMIT	0x1000000 /* Journal Async Commit */
+#define EXT4_MOUNT_ASYNC_FSYNC 		0x2000000 /* Tune fsync according to calling process's uid/gid */
 #define EXT4_MOUNT_DELALLOC		0x8000000 /* Delalloc support */
 #define EXT4_MOUNT_DATA_ERR_ABORT	0x10000000 /* Abort on file data write */
 #define EXT4_MOUNT_BLOCK_VALIDITY	0x20000000 /* Block validity checking */
@@ -1479,6 +1481,9 @@ struct ext4_sb_info {
 	atomic_t s_mb_discarded;
 	atomic_t s_lock_busy;
 
+	/* disable barrier on filesystem mounted without nobarrier */
+	unsigned int temp_disable_barrier;
+
 	/* locality groups */
 	struct ext4_locality_group __percpu *s_locality_groups;
 
@@ -1509,6 +1514,12 @@ struct ext4_sb_info {
 
 	/* record the last minlen when FITRIM is called. */
 	atomic_t s_last_trim_minblks;
+
+	/* # of issued fsync/fdatasync */
+	atomic_t s_total_fsync;
+
+	/* # of issued fsync/fdatasync which don't need to wait transaction to complete */
+	atomic_t s_async_fsync;
 
 	/* Reference to checksum algorithm driver via cryptoapi */
 	struct crypto_shash *s_chksum_driver;
@@ -2580,6 +2591,7 @@ extern int ext4_alloc_flex_bg_array(struct super_block *sb,
 				    ext4_group_t ngroup);
 extern const char *ext4_decode_error(struct super_block *sb, int errno,
 				     char nbuf[16]);
+extern int ext4_set_bio_ctx(struct inode *inode, struct bio *bio);
 
 extern __printf(4, 5)
 void __ext4_error(struct super_block *, const char *, unsigned int,

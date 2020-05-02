@@ -78,7 +78,7 @@ SCHED_FEAT(WARN_DOUBLE_CLOCK, false)
 SCHED_FEAT(RT_PUSH_IPI, true)
 #endif
 
-SCHED_FEAT(RT_RUNTIME_SHARE, true)
+SCHED_FEAT(RT_RUNTIME_SHARE, false)
 SCHED_FEAT(LB_MIN, false)
 SCHED_FEAT(ATTACH_AGE_LOAD, true)
 
@@ -90,6 +90,16 @@ SCHED_FEAT(WA_BIAS, true)
  * UtilEstimation. Use estimated CPU utilization.
  */
 SCHED_FEAT(UTIL_EST, true)
+
+/*
+ * HMP scheduling. Use dynamic threshold depends on system load and
+ * CPU capacity to make schedule decisions.
+ */
+#ifdef CONFIG_SCHED_HMP
+SCHED_FEAT(SCHED_HMP, true)
+#else
+SCHED_FEAT(SCHED_HMP, false)
+#endif
 
 /*
  * Energy aware scheduling. Use platform energy model to guide scheduling
@@ -119,6 +129,8 @@ SCHED_FEAT(EAS_PREFER_IDLE, true)
 SCHED_FEAT(FIND_BEST_TARGET, true)
 SCHED_FEAT(FBT_STRICT_ORDER, true)
 
+SCHED_FEAT(SCHED_MTK_EAS, true)
+
 /*
  * Apply schedtune boost hold to tasks of all sched classes.
  * If enabled, schedtune will hold the boost applied to a CPU
@@ -129,3 +141,8 @@ SCHED_FEAT(FBT_STRICT_ORDER, true)
  * RT class.
  */
 SCHED_FEAT(SCHEDTUNE_BOOST_HOLD_ALL, false)
+
+/*
+ * Utilization clamping lazy update.
+ */
+SCHED_FEAT(UCLAMP_LAZY_UPDATE, false)

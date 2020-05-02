@@ -3,6 +3,7 @@
  *  linux/fs/ext4/sysfs.c
  *
  * Copyright (C) 1992, 1993, 1994, 1995
+ * Copyright (C) 2020 XiaoMi, Inc.
  * Remy Card (card@masi.ibp.fr)
  * Theodore Ts'o (tytso@mit.edu)
  *
@@ -27,6 +28,7 @@ typedef enum {
 	attr_feature,
 	attr_pointer_ui,
 	attr_pointer_atomic,
+	attr_temp_disable_barrier,
 } attr_id_t;
 
 typedef enum {
@@ -167,6 +169,7 @@ EXT4_ATTR_FUNC(delayed_allocation_blocks, 0444);
 EXT4_ATTR_FUNC(session_write_kbytes, 0444);
 EXT4_ATTR_FUNC(lifetime_write_kbytes, 0444);
 EXT4_ATTR_FUNC(reserved_clusters, 0644);
+EXT4_ATTR_FUNC(temp_disable_barrier, 0644);
 
 EXT4_ATTR_OFFSET(inode_readahead_blks, 0644, inode_readahead,
 		 ext4_sb_info, s_inode_readahead_blks);
@@ -217,6 +220,7 @@ static struct attribute *ext4_attrs[] = {
 	ATTR_LIST(errors_count),
 	ATTR_LIST(first_error_time),
 	ATTR_LIST(last_error_time),
+	ATTR_LIST(temp_disable_barrier),
 	NULL,
 };
 
@@ -291,6 +295,9 @@ static ssize_t ext4_attr_show(struct kobject *kobj,
 				atomic_read((atomic_t *) ptr));
 	case attr_feature:
 		return snprintf(buf, PAGE_SIZE, "supported\n");
+	case attr_temp_disable_barrier:
+		return snprintf(buf, PAGE_SIZE, "%u\n",
+				sbi->temp_disable_barrier);
 	}
 
 	return 0;
@@ -325,6 +332,24 @@ static ssize_t ext4_attr_store(struct kobject *kobj,
 		return inode_readahead_blks_store(a, sbi, buf, len);
 	case attr_trigger_test_error:
 		return trigger_test_error(a, sbi, buf, len);
+	case attr_temp_disable_barrier:
+		if ((len == 1 && buf[0] == '0')
+		 || (len == 2 && buf[0] == '0' && buf[1] == 0xa)) {
+			sbi->temp_disable_barrier = 0;
+			if (sbi->s_journal) {
+				write_lock(&sbi->s_journal->j_state_lock);
+				sbi->s_journal->j_flags &= ~JBD2_TEMP_NOBARRIER;
+				write_unlock(&sbi->s_journal->j_state_lock);
+			}
+		} else {
+			sbi->temp_disable_barrier = 1;
+			if (sbi->s_journal) {
+				write_lock(&sbi->s_journal->j_state_lock);
+				sbi->s_journal->j_flags |= JBD2_TEMP_NOBARRIER;
+				write_unlock(&sbi->s_journal->j_state_lock);
+			}
+		}
+		return len;
 	}
 	return 0;
 }
