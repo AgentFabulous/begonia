@@ -276,6 +276,13 @@ struct held_lock {
 	 */
 	unsigned int gen_id;
 #endif
+
+	/* MTK_LOCK_DEBUG_HELD_LOCK */
+#define HELD_LOCK_STACK_TRACE_DEPTH 24
+	struct stack_trace trace;
+	unsigned long entries[HELD_LOCK_STACK_TRACE_DEPTH];
+	/* MTK_LOCK_MONITOR */
+	unsigned long long timestamp;
 };
 
 #ifdef CONFIG_LOCKDEP_CROSSRELEASE
@@ -714,6 +721,21 @@ do {									\
 	lock_acquire(&(lock)->dep_map, 0, 0, 0, 1, NULL, _THIS_IP_);	\
 	lock_release(&(lock)->dep_map, 0, _THIS_IP_);			\
 } while (0)
+
+/*
+ * might_lock_read() is only invoked by might_fault() and the
+ * problem is might_fault() generates a new lock dependency.
+ *
+ *     (&sb->s_type->i_mutex_key#2) --> (&mm->mmap_sem).
+ *
+ * The new lock dependency brings several kinds of false alarm on
+ * lockdep. When lockdep catches a possible problem, the debug
+ * function will be disabled at the same time. Lockdep would be
+ * unable to help other function to debug lock issue. So we remove
+ * might_lock_read() until we find a better solution to resolve
+ * the false alarms caused by the new lock dependency.
+ */
+#if 0
 # define might_lock_read(lock) 						\
 do {									\
 	typecheck(struct lockdep_map *, &(lock)->dep_map);		\
@@ -721,15 +743,33 @@ do {									\
 	lock_release(&(lock)->dep_map, 0, _THIS_IP_);			\
 } while (0)
 #else
+# define might_lock_read(lock) do { } while (0)
+#endif
+#else
 # define might_lock(lock) do { } while (0)
 # define might_lock_read(lock) do { } while (0)
 #endif
 
 #ifdef CONFIG_LOCKDEP
 void lockdep_rcu_suspicious(const char *file, const int line, const char *s);
+extern unsigned long long debug_locks_off_ts;
 #else
 static inline void
 lockdep_rcu_suspicious(const char *file, const int line, const char *s)
+{
+}
+#endif
+
+#ifdef CONFIG_PROVE_LOCKING
+void check_held_locks(int force);
+void mt_aee_dump_held_locks(void);
+#else
+static inline void
+check_held_locks(int force)
+{
+}
+static inline void
+mt_aee_dump_held_locks(void)
 {
 }
 #endif

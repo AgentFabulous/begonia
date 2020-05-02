@@ -17,6 +17,8 @@
 #include <crypto/hash.h>
 
 /* Encryption parameters */
+#define FS_AES_256_XTS_KEY_SIZE		64
+
 #define FS_KEY_DERIVATION_NONCE_SIZE	16
 
 /**
@@ -41,6 +43,12 @@ struct fscrypt_context {
 
 #define FS_ENCRYPTION_CONTEXT_FORMAT_V1		1
 
+enum fscrypt_ci_mode {
+	CI_NONE_MODE = 0,
+	CI_DATA_MODE,
+	CI_FNAME_MODE,
+};
+
 /**
  * For encrypted symlinks, the ciphertext length is stored at the beginning
  * of the string in little-endian format.
@@ -49,6 +57,8 @@ struct fscrypt_symlink_data {
 	__le16 len;
 	char encrypted_path[1];
 } __packed;
+
+#define CI_FREEING (1 << 0)
 
 /*
  * fscrypt_info - the "encryption key" for an inode
@@ -82,11 +92,16 @@ struct fscrypt_info {
 	struct fscrypt_master_key *ci_master_key;
 
 	/* fields from the fscrypt_context */
+	u8 ci_format;
 	u8 ci_data_mode;
 	u8 ci_filename_mode;
 	u8 ci_flags;
+	u8 ci_status;
+	atomic_t ci_count;
+	spinlock_t ci_lock;
 	u8 ci_master_key_descriptor[FS_KEY_DESCRIPTOR_SIZE];
 	u8 ci_nonce[FS_KEY_DERIVATION_NONCE_SIZE];
+	u8 ci_raw_key[FS_MAX_KEY_SIZE];
 };
 
 typedef enum {
@@ -97,21 +112,27 @@ typedef enum {
 #define FS_CTX_REQUIRES_FREE_ENCRYPT_FL		0x00000001
 #define FS_CTX_HAS_BOUNCE_BUFFER_FL		0x00000002
 
+static inline bool fscrypt_is_private_mode(struct fscrypt_info *ci)
+{
+	return ci->ci_format == CI_DATA_MODE &&
+		ci->ci_data_mode == FS_ENCRYPTION_MODE_PRIVATE;
+}
+
 static inline bool fscrypt_valid_enc_modes(u32 contents_mode,
 					   u32 filenames_mode)
 {
 	if (contents_mode == FS_ENCRYPTION_MODE_AES_128_CBC &&
 	    filenames_mode == FS_ENCRYPTION_MODE_AES_128_CTS)
 		return true;
-
 	if (contents_mode == FS_ENCRYPTION_MODE_AES_256_XTS &&
 	    filenames_mode == FS_ENCRYPTION_MODE_AES_256_CTS)
 		return true;
-
 	if (contents_mode == FS_ENCRYPTION_MODE_ADIANTUM &&
 	    filenames_mode == FS_ENCRYPTION_MODE_ADIANTUM)
 		return true;
-
+	if (contents_mode == FS_ENCRYPTION_MODE_PRIVATE &&
+	    filenames_mode == FS_ENCRYPTION_MODE_AES_256_CTS)
+		return true;
 	return false;
 }
 
@@ -171,5 +192,8 @@ struct fscrypt_mode {
 };
 
 extern void __exit fscrypt_essiv_cleanup(void);
+
+/* policy.c */
+extern u8 fscrypt_data_crypt_mode(const struct inode *inode, u8 mode);
 
 #endif /* _FSCRYPT_PRIVATE_H */
