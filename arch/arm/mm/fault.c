@@ -2,6 +2,7 @@
  *  linux/arch/arm/mm/fault.c
  *
  *  Copyright (C) 1995  Linus Torvalds
+ *  Copyright (C) 2020 XiaoMi, Inc.
  *  Modifications for ARM processor (c) 1995-2004 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
@@ -26,6 +27,7 @@
 #include <asm/system_misc.h>
 #include <asm/system_info.h>
 #include <asm/tlbflush.h>
+#include <mt-plat/aee.h>
 
 #include "fault.h"
 
@@ -206,6 +208,20 @@ void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 #define VM_FAULT_BADMAP		0x010000
 #define VM_FAULT_BADACCESS	0x020000
 
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+bool __access_error(unsigned long fsr, unsigned long vma_flags)
+{
+	unsigned int mask = VM_READ | VM_WRITE | VM_EXEC;
+
+	if ((fsr & FSR_WRITE) && !(fsr & FSR_CM))
+		mask = VM_WRITE;
+	if (fsr & FSR_LNX_PF)
+		mask = VM_EXEC;
+
+	return vma_flags & mask ? false : true;
+}
+#endif
+
 /*
  * Check that the permissions on the VMA allow for the fault which occurred.
  * If we encountered a write fault, we must have write permission, otherwise
@@ -215,7 +231,7 @@ static inline bool access_error(unsigned int fsr, struct vm_area_struct *vma)
 {
 	unsigned int mask = VM_READ | VM_WRITE | VM_EXEC;
 
-	if (fsr & FSR_WRITE)
+	if ((fsr & FSR_WRITE) && !(fsr & FSR_CM))
 		mask = VM_WRITE;
 	if (fsr & FSR_LNX_PF)
 		mask = VM_EXEC;
@@ -285,8 +301,16 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 
 	if (user_mode(regs))
 		flags |= FAULT_FLAG_USER;
-	if (fsr & FSR_WRITE)
+	if ((fsr & FSR_WRITE) && !(fsr & FSR_CM))
 		flags |= FAULT_FLAG_WRITE;
+
+	/*
+	 * let's try a speculative page fault without grabbing the
+	 * mmap_sem.
+	 */
+	fault = handle_speculative_fault(mm, addr, flags, (unsigned long)fsr);
+	if (fault != VM_FAULT_RETRY)
+		goto done;
 
 	/*
 	 * As per x86, we may deadlock here.  However, since the kernel only
@@ -352,6 +376,7 @@ retry:
 
 	up_read(&mm->mmap_sem);
 
+done:
 	/*
 	 * Handle the "normal" case first - VM_FAULT_MAJOR
 	 */
@@ -551,11 +576,33 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
 asmlinkage void __exception
 do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
+	struct thread_info *thread = current_thread_info();
 	const struct fsr_info *inf = fsr_info + fsr_fs(fsr);
 	struct siginfo info;
 
-	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
+	if (!user_mode(regs)) {
+		thread->cpu_excp++;
+		if (thread->cpu_excp == 1) {
+			thread->regs_on_excp = (void *)regs;
+			aee_excp_regs = (void *)regs;
+		}
+		/*
+		 * NoteXXX: The data abort exception may happen twice
+		 *          when calling probe_kernel_address() in which.
+		 *          __copy_from_user_inatomic() is used and the
+		 *          fixup table lookup may be performed.
+		 *          Check if the nested panic happens via
+		 *          (cpu_excp >= 3).
+		 */
+		if (thread->cpu_excp >= 3)
+			aee_stop_nested_panic(regs);
+	}
+
+	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs)) {
+		if (!user_mode(regs))
+			thread->cpu_excp--;
 		return;
+	}
 
 	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
 		inf->name, fsr, addr);
@@ -584,11 +631,31 @@ hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *
 asmlinkage void __exception
 do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
 {
+	struct thread_info *thread = current_thread_info();
 	const struct fsr_info *inf = ifsr_info + fsr_fs(ifsr);
 	struct siginfo info;
 
-	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
+	if (!user_mode(regs)) {
+		thread->cpu_excp++;
+		if (thread->cpu_excp == 1)
+			thread->regs_on_excp = (void *)regs;
+		/*
+		 * NoteXXX: The data abort exception may happen twice
+		 *          when calling probe_kernel_address() in which.
+		 *          __copy_from_user_inatomic() is used and the
+		 *          fixup table lookup may be performed.
+		 *          Check if the nested panic happens via
+		 *          (cpu_excp >= 3).
+		 */
+		if (thread->cpu_excp >= 3)
+			aee_stop_nested_panic(regs);
+	}
+
+	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs)) {
+		if (!user_mode(regs))
+			thread->cpu_excp--;
 		return;
+	}
 
 	pr_alert("Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
 		inf->name, ifsr, addr);
