@@ -1640,7 +1640,7 @@ static int disp_aal_write_init_regs(enum DISP_MODULE_ENUM module, void *cmdq)
 void disp_aal_flip_sram(void *cmdq, const char *caller)
 {
 #ifdef CONFIG_MTK_DRE30_SUPPORT
-	u32 hist_apb, hist_int, sram_cfg;
+	u32 hist_apb = 0, hist_int = 0, sram_cfg;
 
 	if (aal_sram_method != AAL_SRAM_SOF)
 		return;
