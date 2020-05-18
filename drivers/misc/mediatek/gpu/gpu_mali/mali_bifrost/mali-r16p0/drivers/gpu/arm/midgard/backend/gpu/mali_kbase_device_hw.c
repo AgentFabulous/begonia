@@ -336,7 +336,7 @@ void kbase_gpu_interrupt(struct kbase_device *kbdev, u32 val)
 	 * be re-invoked to proceed with the GPU power down.
 	 */
 	if (val & POWER_CHANGED_ALL ||
-			((platform_power_down_only || l2_always_on) && (val & CLEAN_CACHES_COMPLETED)))
+			(platform_power_down_only && (val & CLEAN_CACHES_COMPLETED)))
 		kbase_pm_power_changed(kbdev);
 
 	KBASE_TRACE_ADD(kbdev, CORE_GPU_IRQ_DONE, NULL, NULL, 0u, val);

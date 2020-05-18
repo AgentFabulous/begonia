@@ -130,18 +130,6 @@ struct v1_data *gpu_info_ref;
 #endif
 #endif
 
-#if defined(MTK_GPU_BM_2)
-#include <gpu_bm.h>
-#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
-#include <sspm_reservedmem_define.h>
-
-static phys_addr_t rec_phys_addr, rec_virt_addr;
-static unsigned long long rec_size;
-
-struct v1_data *gpu_info_ref;
-#endif
-#endif
-
 #ifdef ENABLE_COMMON_DVFS
 /* MTK GPU DVFS */
 #include <mali_kbase_pm_internal.h>
@@ -4464,10 +4452,6 @@ static int kbase_platform_device_probe(struct platform_device *pdev)
 	ged_dvfs_cal_gpu_utilization_fp = MTKCalGpuUtilization;
 	ged_dvfs_gpu_freq_commit_fp = mtk_gpu_dvfs_commit;
 #endif /* ENABLE_COMMON_DVFS */
-
-#if defined(MTK_GPU_BM_2)
-        mtk_bandwith_resource_init(kbdev);
-#endif
 
 #if defined(MTK_GPU_BM_2)
         mtk_bandwith_resource_init(kbdev);

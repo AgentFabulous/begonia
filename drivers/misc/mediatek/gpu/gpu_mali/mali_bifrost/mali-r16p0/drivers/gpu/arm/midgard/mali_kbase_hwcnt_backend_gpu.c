@@ -25,7 +25,6 @@
 #include "mali_kbase_hwcnt_types.h"
 #include "mali_kbase.h"
 #include "mali_kbase_pm_policy.h"
-#include "mali_kbase_pm_ca.h"
 #include "mali_kbase_hwaccess_instr.h"
 #include "mali_kbase_tlstream.h"
 #ifdef CONFIG_MALI_NO_MALI
@@ -59,7 +58,6 @@ struct kbase_hwcnt_backend_gpu_info {
  * @cpu_dump_va:  CPU mapping of gpu_dump_va.
  * @vmap:         Dump buffer vmap.
  * @enabled:      True if dumping has been enabled, else false.
- * @pm_core_mask:  PM state sync-ed shaders core mask for the enabled dumping.
  */
 struct kbase_hwcnt_backend_gpu {
 	const struct kbase_hwcnt_backend_gpu_info *info;
@@ -69,7 +67,6 @@ struct kbase_hwcnt_backend_gpu {
 	void *cpu_dump_va;
 	struct kbase_vmap_struct *vmap;
 	bool enabled;
-	u64 pm_core_mask;
 };
 
 /* GPU backend implementation of kbase_hwcnt_backend_timestamp_ns_fn */
@@ -119,7 +116,6 @@ static int kbasep_hwcnt_backend_gpu_dump_enable_nolock(
 	if (errcode)
 		goto error;
 
-	backend_gpu->pm_core_mask = kbase_pm_ca_get_instr_core_mask(kbdev);
 	backend_gpu->enabled = true;
 
 	return 0;
@@ -229,8 +225,7 @@ static int kbasep_hwcnt_backend_gpu_dump_get(
 		backend_gpu->kctx, backend_gpu->vmap, KBASE_SYNC_TO_CPU);
 
 	return kbase_hwcnt_gpu_dump_get(
-		dst, backend_gpu->cpu_dump_va, dst_enable_map,
-		backend_gpu->pm_core_mask, accumulate);
+		dst, backend_gpu->cpu_dump_va, dst_enable_map, accumulate);
 }
 
 /**

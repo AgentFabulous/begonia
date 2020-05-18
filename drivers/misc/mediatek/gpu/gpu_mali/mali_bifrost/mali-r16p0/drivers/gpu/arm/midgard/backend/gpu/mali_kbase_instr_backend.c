@@ -48,6 +48,10 @@ int kbase_instr_hwcnt_enable_internal(struct kbase_device *kbdev,
 	if ((enable->dump_buffer == 0ULL) || (enable->dump_buffer & (2048 - 1)))
 		goto out_err;
 
+	/* Override core availability policy to ensure all cores are available
+	 */
+	kbase_pm_ca_instr_enable(kbdev);
+
 	spin_lock_irqsave(&kbdev->hwcnt.lock, flags);
 
 	if (kbdev->hwcnt.backend.state != KBASE_INSTR_STATE_DISABLED) {
@@ -178,6 +182,8 @@ int kbase_instr_hwcnt_disable_internal(struct kbase_context *kctx)
 	kbdev->hwcnt.kctx = NULL;
 	kbdev->hwcnt.addr = 0ULL;
 	kbdev->hwcnt.addr_bytes = 0ULL;
+
+	kbase_pm_ca_instr_disable(kbdev);
 
 	spin_unlock_irqrestore(&kbdev->hwcnt.lock, flags);
 	spin_unlock_irqrestore(&kbdev->hwaccess_lock, pm_flags);

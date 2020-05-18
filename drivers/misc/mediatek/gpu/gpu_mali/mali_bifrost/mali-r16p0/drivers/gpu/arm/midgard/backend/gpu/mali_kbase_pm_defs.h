@@ -94,16 +94,10 @@ enum kbase_l2_core_state {
  *
  * @KBASE_SHADERS_OFF_CORESTACK_OFF: The shaders and core stacks are off
  * @KBASE_SHADERS_OFF_CORESTACK_PEND_ON: The shaders are off, core stacks have
- *                                       been requested to power on and hwcnt
- *                                       is being disabled
+ *                                       been requested to power on
  * @KBASE_SHADERS_PEND_ON_CORESTACK_ON: Core stacks are on, shaders have been
- *                                      requested to power on.
- * @KBASE_SHADERS_ON_CORESTACK_ON: The shaders and core stacks are on, and hwcnt
- *					already enabled.
- * @KBASE_SHADERS_ON_CORESTACK_ON_RECHECK: The shaders and core stacks
- *                                      are on, hwcnt disabled, and checks
- *                                      to powering down or re-enabling
- *                                      hwcnt.
+ *                                      requested to power on
+ * @KBASE_SHADERS_ON_CORESTACK_ON: The shaders and core stacks are on
  * @KBASE_SHADERS_WAIT_OFF_CORESTACK_ON: The shaders have been requested to
  *                                       power off, but they remain on for the
  *                                       duration of the hysteresis timer
@@ -124,7 +118,6 @@ enum kbase_shader_core_state {
 	KBASE_SHADERS_OFF_CORESTACK_PEND_ON,
 	KBASE_SHADERS_PEND_ON_CORESTACK_ON,
 	KBASE_SHADERS_ON_CORESTACK_ON,
-	KBASE_SHADERS_ON_CORESTACK_ON_RECHECK,
 	KBASE_SHADERS_WAIT_OFF_CORESTACK_ON,
 	KBASE_SHADERS_WAIT_FINISHED_CORESTACK_ON,
 	KBASE_SHADERS_PEND_OFF_CORESTACK_ON,
@@ -252,10 +245,8 @@ union kbase_pm_policy_data {
  *                             machines
  * @gpu_powered:       Set to true when the GPU is powered and register
  *                     accesses are possible, false otherwise
- * @pm_shaders_core_mask: Shader PM state synchronised shaders core mask. It
- *                     holds the cores enabled in a hardware counters dump,
- *                     and may differ from @shaders_avail when under different
- *                     states and transitions.
+ * @instr_enabled:     Set to true when instrumentation is enabled,
+ *                     false otherwise
  * @cg1_disabled:      Set if the policy wants to keep the second core group
  *                     powered off
  * @driver_ready_for_irqs: Debug state indicating whether sufficient
@@ -341,7 +332,7 @@ struct kbase_pm_backend_data {
 
 	bool gpu_powered;
 
-	u64 pm_shaders_core_mask;
+	bool instr_enabled;
 
 	bool cg1_disabled;
 
