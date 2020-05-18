@@ -323,7 +323,6 @@ static void kbase_pm_hwcnt_disable_worker(struct work_struct *data)
 		 */
 		backend->hwcnt_disabled = true;
 		kbase_pm_update_state(kbdev);
-		kbase_backend_slot_update(kbdev);
 	} else {
 		/* PM state was updated while we were doing the disable,
 		 * so we need to undo the disable we just performed.

@@ -75,15 +75,23 @@ void kbase_pm_ca_update_core_status(struct kbase_device *kbdev, u64 cores_ready,
 						u64 cores_transitioning);
 
 /**
- * kbase_pm_ca_get_instr_core_mask - Get the PM state sync-ed shaders core mask
+ * kbase_pm_ca_instr_enable - Enable override for instrumentation
  *
  * @kbdev: The kbase device structure for the device (must be a valid pointer)
  *
- * Returns a mask of the PM state synchronised shader cores for arranging
- * HW performance counter dumps
- *
- * Return: The bit mask of PM state synchronised cores
+ * This overrides the output of the core availability policy, ensuring that all
+ * cores are available
  */
-u64 kbase_pm_ca_get_instr_core_mask(struct kbase_device *kbdev);
+void kbase_pm_ca_instr_enable(struct kbase_device *kbdev);
+
+/**
+ * kbase_pm_ca_instr_disable - Disable override for instrumentation
+ *
+ * @kbdev: The kbase device structure for the device (must be a valid pointer)
+ *
+ * This disables any previously enabled override, and resumes normal policy
+ * functionality
+ */
+void kbase_pm_ca_instr_disable(struct kbase_device *kbdev);
 
 #endif /* _KBASE_PM_CA_H_ */

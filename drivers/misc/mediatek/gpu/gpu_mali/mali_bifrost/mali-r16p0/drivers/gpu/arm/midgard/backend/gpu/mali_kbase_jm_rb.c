@@ -775,7 +775,8 @@ static int kbase_jm_exit_protected_mode(struct kbase_device *kbdev,
 
 		/* ***FALLTHROUGH: TRANSITION TO HIGHER STATE*** */
 	case KBASE_ATOM_EXIT_PROTECTED_IDLE_L2:
-		if (kbdev->pm.backend.l2_state != KBASE_L2_OFF) {
+		if (kbase_pm_get_ready_cores(kbdev, KBASE_PM_CORE_L2) ||
+				kbase_pm_get_trans_cores(kbdev, KBASE_PM_CORE_L2)) {
 			/*
 			 * The L2 is still powered, wait for all the users to
 			 * finish with it before doing the actual reset.
@@ -1283,14 +1284,6 @@ void kbase_gpu_complete_hw(struct kbase_device *kbdev, int js,
 						next_katom->work_id);
 			kbdev->hwaccess.backend.slot_rb[js].last_context =
 							next_katom->kctx;
-#if defined(MTK_GPU_BM_2)
-                        if(js == 0) {
-                                kbdev->v1->ctx = (u32)next_katom->kctx->id;
-                                kbdev->v1->job = next_katom->work_id;
-                                kbdev->v1->freq = js;
-                                kbdev->v1->frame = (u32)next_katom->frame_nr;
-                        }
-#endif
 		} else {
 			char js_string[16];
 

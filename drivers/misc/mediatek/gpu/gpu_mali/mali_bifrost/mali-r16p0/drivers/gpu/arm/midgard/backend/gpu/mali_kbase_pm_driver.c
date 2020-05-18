@@ -62,11 +62,6 @@ module_param(platform_power_down_only, bool, 0000);
 MODULE_PARM_DESC(platform_power_down_only,
 		"Disable power down of individual cores.");
 
-bool l2_always_on = true;
-module_param(l2_always_on, bool, 0444);
-MODULE_PARM_DESC(l2_always_on,
-		"Always keep L2 powered up.");
-
 /**
  * enum kbasep_pm_action - Actions that can be performed on a core.
  *
@@ -438,28 +433,6 @@ u64 kbase_pm_get_ready_cores(struct kbase_device *kbdev,
 
 KBASE_EXPORT_TEST_API(kbase_pm_get_ready_cores);
 
-static void kbase_pm_trigger_hwcnt_disable(struct kbase_device *kbdev)
-{
-	struct kbase_pm_backend_data *backend = &kbdev->pm.backend;
-
-	lockdep_assert_held(&kbdev->hwaccess_lock);
-
-	/* See if we can get away with disabling hwcnt
-	 * atomically, otherwise kick off a worker.
-	 */
-	if (kbase_hwcnt_context_disable_atomic(kbdev->hwcnt_gpu_ctx)) {
-		backend->hwcnt_disabled = true;
-	} else {
-#if KERNEL_VERSION(3, 16, 0) > LINUX_VERSION_CODE
-		queue_work(system_wq,
-			&backend->hwcnt_disable_work);
-#else
-		queue_work(system_highpri_wq,
-			&backend->hwcnt_disable_work);
-#endif
-	}
-}
-
 static u64 kbase_pm_l2_update_state(struct kbase_device *kbdev)
 {
 	struct kbase_pm_backend_data *backend = &kbdev->pm.backend;
@@ -602,9 +575,22 @@ static u64 kbase_pm_l2_update_state(struct kbase_device *kbdev)
 				break;
 			}
 
+			/* See if we can get away with disabling hwcnt
+			 * atomically, otherwise kick off a worker.
+			 */
 			backend->hwcnt_desired = false;
 			if (!backend->hwcnt_disabled) {
-				kbase_pm_trigger_hwcnt_disable(kbdev);
+				if (kbase_hwcnt_context_disable_atomic(
+					kbdev->hwcnt_gpu_ctx))
+					backend->hwcnt_disabled = true;
+				else
+#if KERNEL_VERSION(3, 16, 0) > LINUX_VERSION_CODE
+					queue_work(system_wq,
+						&backend->hwcnt_disable_work);
+#else
+					queue_work(system_highpri_wq,
+						&backend->hwcnt_disable_work);
+#endif
 			}
 
 			if (backend->hwcnt_disabled)
@@ -612,7 +598,7 @@ static u64 kbase_pm_l2_update_state(struct kbase_device *kbdev)
 			break;
 
 		case KBASE_L2_POWER_DOWN:
-			if (!platform_power_down_only && !l2_always_on)
+			if (!platform_power_down_only)
 				/* Powering off the L2 will also power off the
 				 * tiler.
 				 */
@@ -635,7 +621,7 @@ static u64 kbase_pm_l2_update_state(struct kbase_device *kbdev)
 			break;
 
 		case KBASE_L2_PEND_OFF:
-			if (!platform_power_down_only && !l2_always_on) {
+			if (!platform_power_down_only) {
 				/* We only need to check the L2 here - if the L2
 				 * is off then the tiler is definitely also off.
 				 */
@@ -649,9 +635,10 @@ static u64 kbase_pm_l2_update_state(struct kbase_device *kbdev)
 			break;
 
 		case KBASE_L2_RESET_WAIT:
-			/* Reset complete  */
-			if (!backend->in_reset)
+			if (!backend->in_reset) {
+				/* Reset complete */
 				backend->l2_state = KBASE_L2_OFF;
+			}
 			break;
 
 		default:
@@ -774,27 +761,13 @@ static void kbase_pm_shaders_update_state(struct kbase_device *kbdev)
 			 * i.e. off and SHADERS_ON_CORESTACK_ON.
 			 */
 			backend->shaders_avail = kbase_pm_ca_get_core_mask(kbdev);
-			backend->pm_shaders_core_mask = 0;
 
-			if (backend->shaders_desired &&
-				backend->l2_state == KBASE_L2_ON) {
-				if (backend->hwcnt_desired &&
-					!backend->hwcnt_disabled) {
-					/* Trigger a hwcounter dump */
-					backend->hwcnt_desired = false;
-					kbase_pm_trigger_hwcnt_disable(kbdev);
-				}
+			if (backend->shaders_desired && backend->l2_state == KBASE_L2_ON) {
+				if (corestack_driver_control)
+					kbase_pm_invoke(kbdev, KBASE_PM_CORE_STACK,
+							stacks_avail, ACTION_PWRON);
 
-				if (backend->hwcnt_disabled) {
-					if (corestack_driver_control) {
-						kbase_pm_invoke(kbdev,
-							KBASE_PM_CORE_STACK,
-							stacks_avail,
-							ACTION_PWRON);
-					}
-					backend->shaders_state =
-						KBASE_SHADERS_OFF_CORESTACK_PEND_ON;
-				}
+				backend->shaders_state = KBASE_SHADERS_OFF_CORESTACK_PEND_ON;
 			}
 			break;
 
@@ -804,6 +777,7 @@ static void kbase_pm_shaders_update_state(struct kbase_device *kbdev)
 						backend->shaders_avail, ACTION_PWRON);
 
 				backend->shaders_state = KBASE_SHADERS_PEND_ON_CORESTACK_ON;
+
 			}
 			break;
 
@@ -812,13 +786,6 @@ static void kbase_pm_shaders_update_state(struct kbase_device *kbdev)
 				KBASE_TRACE_ADD(kbdev,
 						PM_CORES_CHANGE_AVAILABLE,
 						NULL, NULL, 0u, (u32)shaders_ready);
-				backend->pm_shaders_core_mask = shaders_ready;
-				backend->hwcnt_desired = true;
-				if (backend->hwcnt_disabled) {
-					kbase_hwcnt_context_enable(
-						kbdev->hwcnt_gpu_ctx);
-					backend->hwcnt_disabled = false;
-				}
 				backend->shaders_state = KBASE_SHADERS_ON_CORESTACK_ON;
 			}
 			break;
@@ -826,25 +793,7 @@ static void kbase_pm_shaders_update_state(struct kbase_device *kbdev)
 		case KBASE_SHADERS_ON_CORESTACK_ON:
 			backend->shaders_avail = kbase_pm_ca_get_core_mask(kbdev);
 
-			/* If shaders to change state, trigger a counter dump */
-			if (!backend->shaders_desired ||
-				(backend->shaders_avail & ~shaders_ready)) {
-				backend->hwcnt_desired = false;
-				if (!backend->hwcnt_disabled)
-					kbase_pm_trigger_hwcnt_disable(kbdev);
-				backend->shaders_state =
-					KBASE_SHADERS_ON_CORESTACK_ON_RECHECK;
-			}
-			break;
-
-		case KBASE_SHADERS_ON_CORESTACK_ON_RECHECK:
-			backend->shaders_avail =
-				kbase_pm_ca_get_core_mask(kbdev);
-
-			if (!backend->hwcnt_disabled) {
-				/* Wait for being disabled */
-				;
-			} else if (!backend->shaders_desired) {
+			if (!backend->shaders_desired) {
 				if (kbdev->pm.backend.protected_transition_override ||
 						!stt->configured_ticks ||
 						WARN_ON(stt->cancel_queued)) {
@@ -872,15 +821,16 @@ static void kbase_pm_shaders_update_state(struct kbase_device *kbdev)
 
 					backend->shaders_state = KBASE_SHADERS_WAIT_OFF_CORESTACK_ON;
 				}
-			} else {
+			} else if (!platform_power_down_only) {
 				if (backend->shaders_avail & ~shaders_ready) {
 					backend->shaders_avail |= shaders_ready;
 
 					kbase_pm_invoke(kbdev, KBASE_PM_CORE_SHADER,
 							backend->shaders_avail & ~shaders_ready,
 							ACTION_PWRON);
+					backend->shaders_state = KBASE_SHADERS_PEND_ON_CORESTACK_ON;
+
 				}
-				backend->shaders_state = KBASE_SHADERS_PEND_ON_CORESTACK_ON;
 			}
 			break;
 
@@ -892,7 +842,7 @@ static void kbase_pm_shaders_update_state(struct kbase_device *kbdev)
 
 			if (backend->shaders_desired) {
 				stt->remaining_ticks = 0;
-				backend->shaders_state = KBASE_SHADERS_ON_CORESTACK_ON_RECHECK;
+				backend->shaders_state = KBASE_SHADERS_ON_CORESTACK_ON;
 			} else if (stt->remaining_ticks == 0) {
 				backend->shaders_state = KBASE_SHADERS_WAIT_FINISHED_CORESTACK_ON;
 			}
@@ -923,18 +873,8 @@ static void kbase_pm_shaders_update_state(struct kbase_device *kbdev)
 			break;
 
 		case KBASE_SHADERS_OFF_CORESTACK_PEND_OFF:
-			if ((!stacks_trans && !stacks_ready) ||
-				platform_power_down_only) {
-				/* On powered off, re-enable the hwcnt */
-				backend->pm_shaders_core_mask = 0;
-				backend->hwcnt_desired = true;
-				if (backend->hwcnt_disabled) {
-					kbase_hwcnt_context_enable(
-						kbdev->hwcnt_gpu_ctx);
-					backend->hwcnt_disabled = false;
-				}
+			if ((!stacks_trans && !stacks_ready) || platform_power_down_only)
 				backend->shaders_state = KBASE_SHADERS_OFF_CORESTACK_OFF_TIMER_PEND_OFF;
-			}
 			break;
 
 		case KBASE_SHADERS_OFF_CORESTACK_OFF_TIMER_PEND_OFF:
@@ -1486,6 +1426,9 @@ static void kbase_pm_hw_issues_detect(struct kbase_device *kbdev)
 		GPU_ID_VERSION_MAJOR_SHIFT;
 
 	kbdev->hw_quirks_sc = 0;
+
+	/* GPU2017-1360: Disable CRC on AFBC compression data */
+	kbdev->hw_quirks_sc |= SC_DISABLE_CRC_AFBC_COMPRESSED;
 
 	/* Needed due to MIDBASE-1494: LS_PAUSEBUFFER_DISABLE. See PRLAM-8443.
 	 * and needed due to MIDGLES-3539. See PRLAM-11035 */
