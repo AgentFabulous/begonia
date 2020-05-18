@@ -178,7 +178,6 @@ void kbase_hwcnt_gpu_metadata_destroy(
  *                  as returned in out_dump_bytes parameter of
  *                  kbase_hwcnt_gpu_metadata_create.
  * @dst_enable_map: Non-NULL pointer to enable map specifying enabled values.
- * @pm_core_mask:   PM state synchronized shaders core mask with the dump.
  * @accumulate:     True if counters in src should be accumulated into dst,
  *                  rather than copied.
  *
@@ -192,7 +191,6 @@ int kbase_hwcnt_gpu_dump_get(
 	struct kbase_hwcnt_dump_buffer *dst,
 	void *src,
 	const struct kbase_hwcnt_enable_map *dst_enable_map,
-	const u64 pm_core_mask,
 	bool accumulate);
 
 /**

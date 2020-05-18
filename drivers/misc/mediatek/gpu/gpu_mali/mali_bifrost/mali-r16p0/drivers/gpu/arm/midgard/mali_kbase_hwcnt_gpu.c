@@ -367,50 +367,15 @@ void kbase_hwcnt_gpu_metadata_destroy(
 }
 KBASE_EXPORT_TEST_API(kbase_hwcnt_gpu_metadata_destroy);
 
-static bool is_block_type_shader(
-	const u64 grp_type,
-	const u64 blk_type,
-	const size_t blk)
-{
-	bool is_shader = false;
-
-	switch (grp_type) {
-	case KBASE_HWCNT_GPU_GROUP_TYPE_V4:
-		/* blk-value in [0, KBASE_HWCNT_V4_SC_BLOCKS_PER_GROUP-1]
-		 * corresponds to a shader, or its implementation
-		 * reserved. As such, here we use the blk index value to
-		 * tell the reserved case.
-		 */
-		if (blk_type == KBASE_HWCNT_GPU_V4_BLOCK_TYPE_SHADER ||
-		    (blk < KBASE_HWCNT_V4_SC_BLOCKS_PER_GROUP &&
-		     blk_type == KBASE_HWCNT_GPU_V4_BLOCK_TYPE_RESERVED))
-			is_shader = true;
-		break;
-	case KBASE_HWCNT_GPU_GROUP_TYPE_V5:
-		if (blk_type == KBASE_HWCNT_GPU_V5_BLOCK_TYPE_PERF_SC ||
-		    blk_type == KBASE_HWCNT_GPU_V5_BLOCK_TYPE_PERF_SC2)
-			is_shader = true;
-		break;
-	default:
-		/* Warn on unknown group type */
-		WARN_ON(true);
-	}
-
-	return is_shader;
-}
-
 int kbase_hwcnt_gpu_dump_get(
 	struct kbase_hwcnt_dump_buffer *dst,
 	void *src,
 	const struct kbase_hwcnt_enable_map *dst_enable_map,
-	u64 pm_core_mask,
 	bool accumulate)
 {
 	const struct kbase_hwcnt_metadata *metadata;
 	const u32 *dump_src;
 	size_t src_offset, grp, blk, blk_inst;
-	size_t grp_prev = 0;
-	u64 core_mask = pm_core_mask;
 
 	if (!dst || !src || !dst_enable_map ||
 	    (dst_enable_map->metadata != dst->metadata))
@@ -428,23 +393,6 @@ int kbase_hwcnt_gpu_dump_get(
 		const size_t ctr_cnt =
 			kbase_hwcnt_metadata_block_counters_count(
 				metadata, grp, blk);
-		const u64 blk_type = kbase_hwcnt_metadata_block_type(
-			metadata, grp, blk);
-		const bool is_shader_core = is_block_type_shader(
-			kbase_hwcnt_metadata_group_type(metadata, grp),
-			blk_type, blk);
-
-		if (grp != grp_prev) {
-			/* grp change would only happen with V4. V5 and
-			 * further are envisaged to be single group
-			 * scenario only. Here needs to drop the lower
-			 * group core-mask by shifting right with
-			 * KBASE_HWCNT_V4_SC_BLOCKS_PER_GROUP.
-			 */
-			core_mask = pm_core_mask >>
-				KBASE_HWCNT_V4_SC_BLOCKS_PER_GROUP;
-			grp_prev = grp;
-		}
 
 		/* Early out if no values in the dest block are enabled */
 		if (kbase_hwcnt_enable_map_block_enabled(
@@ -453,25 +401,16 @@ int kbase_hwcnt_gpu_dump_get(
 				dst, grp, blk, blk_inst);
 			const u32 *src_blk = dump_src + src_offset;
 
-			if (!is_shader_core || (core_mask & 1)) {
-				if (accumulate) {
-					kbase_hwcnt_dump_buffer_block_accumulate(
-						dst_blk, src_blk, hdr_cnt,
-						ctr_cnt);
-				} else {
-					kbase_hwcnt_dump_buffer_block_copy(
-						dst_blk, src_blk,
-						(hdr_cnt + ctr_cnt));
-				}
-			} else if (!accumulate) {
-				kbase_hwcnt_dump_buffer_block_zero(
-					dst_blk, (hdr_cnt + ctr_cnt));
+			if (accumulate) {
+				kbase_hwcnt_dump_buffer_block_accumulate(
+					dst_blk, src_blk, hdr_cnt, ctr_cnt);
+			} else {
+				kbase_hwcnt_dump_buffer_block_copy(
+					dst_blk, src_blk, (hdr_cnt + ctr_cnt));
 			}
 		}
 
 		src_offset += (hdr_cnt + ctr_cnt);
-		if (is_shader_core)
-			core_mask = core_mask >> 1;
 	}
 
 	return 0;

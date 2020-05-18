@@ -93,14 +93,12 @@ static inline bool kbase_pm_cores_requested(struct kbase_device *kbdev,
 	 * available, and shaders are definitely not powered.
 	 */
 	if (kbdev->pm.backend.l2_state != KBASE_L2_PEND_ON &&
-			kbdev->pm.backend.l2_state != KBASE_L2_ON &&
-			kbdev->pm.backend.l2_state != KBASE_L2_ON_HWCNT_ENABLE)
+			kbdev->pm.backend.l2_state != KBASE_L2_ON)
 		return false;
 
 	if (shader_required &&
 			kbdev->pm.backend.shaders_state != KBASE_SHADERS_PEND_ON_CORESTACK_ON &&
-			kbdev->pm.backend.shaders_state != KBASE_SHADERS_ON_CORESTACK_ON &&
-			kbdev->pm.backend.shaders_state != KBASE_SHADERS_ON_CORESTACK_ON_RECHECK)
+			kbdev->pm.backend.shaders_state != KBASE_SHADERS_ON_CORESTACK_ON)
 		return false;
 
 	return true;
