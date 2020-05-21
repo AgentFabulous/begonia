@@ -23,8 +23,8 @@
 #include "ion_priv.h"
 #include <linux/slab.h>
 #include <linux/mutex.h>
-#include <mmprofile.h>
-#include <mmprofile_function.h>
+//#include <mmprofile.h>
+//#include <mmprofile_function.h>
 #include <linux/debugfs.h>
 #include <linux/kthread.h>
 #include <linux/sched/signal.h>
@@ -597,6 +597,7 @@ static int ion_history_record(void *data)
 	size_t old_total_size = 0;
 	size_t total_size = 0;
 	int heap_id = 0;
+	int ret = 0;
 
 	while (1) {
 		if (kthread_should_stop()) {
@@ -604,8 +605,12 @@ static int ion_history_record(void *data)
 			break;
 		}
 
-		wait_event_interruptible(ion_history_wq,
-					 atomic_read(&ion_history_event));
+		ret = wait_event_interruptible(ion_history_wq,
+					       atomic_read(&ion_history_event));
+		if (ret) {
+			IONMSG("%s wait event error:%d\n", __func__, ret);
+			continue;
+		}
 		msleep(500);
 		atomic_set(&ion_history_event, 0);
 
