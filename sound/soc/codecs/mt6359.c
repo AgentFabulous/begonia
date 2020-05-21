@@ -3,7 +3,6 @@
 // mt6359.c  --  mt6359 ALSA SoC audio codec driver
 //
 // Copyright (c) 2018 MediaTek Inc.
-//   Copyright (C) 2019 XiaoMi, Inc.
 // Author: KaiChieh Chuang <kaichieh.chuang@mediatek.com>
 
 #include <linux/platform_device.h>
@@ -22,8 +21,10 @@
 #include "accdet.h"
 #endif
 
+#if !defined(CONFIG_FPGA_EARLY_PORTING)
 #include <mach/mtk_pmic.h>
 #include <mt-plat/mtk_auxadc_intf.h>
+#endif
 
 #ifndef CONFIG_MTK_PMIC_WRAP	/* y: use regmap, else use legacy api */
 #ifdef CONFIG_MTK_PMIC_WRAP_HAL
@@ -318,11 +319,11 @@ static void gpio_driving_set(struct mt6359_priv *priv)
 {
 	/* 8:4mA(default), a:8mA, c:12mA, e:16mA */
 	regmap_update_bits(priv->regmap, MT6359_DRV_CON2,
-			   0xffff, 0xaaaa);
+			   0xffff, 0x8888);
 	regmap_update_bits(priv->regmap, MT6359_DRV_CON3,
-			   0xffff, 0xaaaa);
+			   0xffff, 0x8888);
 	regmap_update_bits(priv->regmap, MT6359_DRV_CON4,
-			   0x00ff, 0xaa);
+			   0x00ff, 0x88);
 }
 
 static void playback_gpio_set(struct mt6359_priv *priv)
@@ -594,12 +595,20 @@ int mt6359_set_mtkaif_calibration_phase(struct snd_soc_component *cmpnt,
 
 static int get_auxadc_audio(void)
 {
+#if !defined(CONFIG_FPGA_EARLY_PORTING)
 	return pmic_get_auxadc_value(AUXADC_LIST_HPOFS_CAL);
+#else
+	return 0;
+#endif
 }
 
 static int get_accdet_auxadc(void)
 {
+#if !defined(CONFIG_FPGA_EARLY_PORTING)
 	return pmic_get_auxadc_value(AUXADC_LIST_ACCDET);
+#else
+	return 0;
+#endif
 }
 
 /* dl pga gain */
@@ -1366,22 +1375,22 @@ static SOC_VALUE_ENUM_SINGLE_DECL(dmic0_mux_map_enum,
 static const struct snd_kcontrol_new dmic0_mux_control =
 	SOC_DAPM_ENUM("DMIC_MUX Select", dmic0_mux_map_enum);
 
-/* ul1 ch2 use RG_DMIC_ADC3_SOURCE_SEL */
+/* ul2 ch1 use RG_DMIC_ADC2_SOURCE_SEL */
 static SOC_VALUE_ENUM_SINGLE_DECL(dmic1_mux_map_enum,
 				  MT6359_AFE_MIC_ARRAY_CFG,
-				  RG_DMIC_ADC3_SOURCE_SEL_SFT,
-				  RG_DMIC_ADC3_SOURCE_SEL_MASK,
+				  RG_DMIC_ADC2_SOURCE_SEL_SFT,
+				  RG_DMIC_ADC2_SOURCE_SEL_MASK,
 				  dmic_mux_map,
 				  dmic_mux_map_value);
 
 static const struct snd_kcontrol_new dmic1_mux_control =
 	SOC_DAPM_ENUM("DMIC_MUX Select", dmic1_mux_map_enum);
 
-/* ul2 ch1 use RG_DMIC_ADC2_SOURCE_SEL */
+/* ul1 ch2 use RG_DMIC_ADC3_SOURCE_SEL */
 static SOC_VALUE_ENUM_SINGLE_DECL(dmic2_mux_map_enum,
 				  MT6359_AFE_MIC_ARRAY_CFG,
-				  RG_DMIC_ADC2_SOURCE_SEL_SFT,
-				  RG_DMIC_ADC2_SOURCE_SEL_MASK,
+				  RG_DMIC_ADC3_SOURCE_SEL_SFT,
+				  RG_DMIC_ADC3_SOURCE_SEL_MASK,
 				  dmic_mux_map,
 				  dmic_mux_map_value);
 
@@ -2331,6 +2340,8 @@ static int mt_vow_aud_lpw_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+		/* add delay for RC Calibration */
+		usleep_range(1000, 1200);
 		/* Enable audio uplink LPW mode */
 		/* Enable Audio ADC 1st Stage LPW */
 		/* Enable Audio ADC 2nd & 3rd LPW */
@@ -6056,7 +6067,6 @@ static int mt6359_codec_debug_set(struct snd_kcontrol *kcontrol,
 	regmap_read(priv->regmap, MT6359_ZCD_CON5, &value);
 	dev_info(priv->dev, "MT6359_ZCD_CON5 = 0x%x\n", value);
 
-
 	regmap_read(priv->regmap, MT6359_SMT_CON1, &value);
 	dev_info(priv->dev, "MT6359_SMT_CON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6359_GPIO_DIR0, &value);
@@ -6374,7 +6384,19 @@ static int mt6359_codec_init_reg(struct mt6359_priv *priv)
 static int get_hp_current_calibrate_val(struct mt6359_priv *priv)
 {
 	int ret = 0;
-	int value, sign;
+	int value, sign, hpdet_efuse_addr;
+
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6359P)
+	/* HPDET_COMP[6:0] @ efuse bit 1904 ~ 1910 */
+	/* HPDET_COMP_SIGN @ efuse bit 1911 */
+	/* 1904 / 8 = 238 --> 0xee */
+	hpdet_efuse_addr = 0xee;
+#else
+	/* HPDET_COMP[6:0] @ efuse bit 1792 ~ 1798 */
+	/* HPDET_COMP_SIGN @ efuse bit 1799 */
+	/* 1792 / 8 = 224 --> 0xe0 */
+	hpdet_efuse_addr = 0xe0;
+#endif
 
 	/* 1. enable efuse ctrl engine clock */
 	regmap_update_bits(priv->regmap, MT6359_TOP_CKHWEN_CON0, 0x1 << 2, 0x0);
@@ -6384,10 +6406,8 @@ static int get_hp_current_calibrate_val(struct mt6359_priv *priv)
 	regmap_update_bits(priv->regmap, MT6359_OTP_CON11, 0x0001, 0x0001);
 
 	/* 3. set EFUSE addr */
-	/* HPDET_COMP[6:0] @ efuse bit 1792 ~ 1798 */
-	/* HPDET_COMP_SIGN @ efuse bit 1799 */
-	/* 1792 / 8 = 224 --> 0xE0 */
-	regmap_update_bits(priv->regmap, MT6359_OTP_CON0, 0xff, 0xe0);
+	regmap_update_bits(priv->regmap, MT6359_OTP_CON0,
+			   0xff, hpdet_efuse_addr);
 
 	/* 4. Toggle RG_OTP_RD_TRIG */
 	regmap_read(priv->regmap, MT6359_OTP_CON8, &ret);

@@ -2,7 +2,6 @@
  * mtk-afe-platform-driver.c  --  Mediatek afe platform driver
  *
  * Copyright (c) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
  *
  * This program is free software; you can redistribute it and/or modify

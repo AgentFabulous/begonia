@@ -1712,15 +1712,14 @@ static int dpcm_apply_symmetry(struct snd_pcm_substream *fe_substream,
 
 		/* Symmetry only applies if we've got an active stream. */
 		if (rtd->cpu_dai->active) {
-			err = soc_pcm_apply_symmetry(fe_substream,
-						     rtd->cpu_dai);
+			err = soc_pcm_apply_symmetry(be_substream, rtd->cpu_dai);
 			if (err < 0)
 				return err;
 		}
 
 		for (i = 0; i < rtd->num_codecs; i++) {
 			if (rtd->codec_dais[i]->active) {
-				err = soc_pcm_apply_symmetry(fe_substream,
+				err = soc_pcm_apply_symmetry(be_substream,
 							     rtd->codec_dais[i]);
 				if (err < 0)
 					return err;
@@ -2440,6 +2439,7 @@ disconnect:
 				dpcm->state = SND_SOC_DPCM_LINK_STATE_FREE;
 	}
 	spin_unlock_irqrestore(&fe->card->dpcm_lock, flags);
+
 	return ret;
 }
 
@@ -2873,8 +2873,8 @@ int snd_soc_dpcm_can_be_free_stop(struct snd_soc_pcm_runtime *fe,
 			break;
 		}
 	}
-	spin_unlock_irqrestore(&fe->card->dpcm_lock, flags);
 
+	spin_unlock_irqrestore(&fe->card->dpcm_lock, flags);
 	/* it's safe to free/stop this BE DAI */
 	return ret;
 }
@@ -2908,6 +2908,7 @@ int snd_soc_dpcm_can_be_params(struct snd_soc_pcm_runtime *fe,
 		}
 	}
 	spin_unlock_irqrestore(&fe->card->dpcm_lock, flags);
+
 	/* it's safe to change hw_params */
 	return ret;
 }
@@ -2997,6 +2998,7 @@ static ssize_t dpcm_show_state(struct snd_soc_pcm_runtime *fe,
 				params_channels(params),
 				params_rate(params));
 	}
+
 	spin_unlock_irqrestore(&fe->card->dpcm_lock, flags);
 out:
 	return offset;

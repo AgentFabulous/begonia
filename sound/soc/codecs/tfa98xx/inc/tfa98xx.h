@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2014 NXP Semiconductors, All Rights Reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -68,7 +68,7 @@ struct tfa98xx_miscdevice_info {
 	struct file_operations operations;
 };
 
-enum TFA_DEVICE_TYPE{
+enum TFA_DEVICE_TYPE {
 	TFA_DEVICE_TYPE_9894,
 	TFA_DEVICE_TYPE_9874_PRIMARY,
 	TFA_DEVICE_TYPE_9874_SECONDARY,
@@ -101,15 +101,15 @@ struct livedata_cfg {
 struct tfa98xx_firmware {
 	void *base;
 	struct tfa98xx_device *dev;
-	char name[9];
+	char name[9]; // TODO get length from tfa parameter defs
 };
 
 struct tfa98xx_baseprofile {
 	char basename[MAX_CONTROL_NAME];    /* profile basename */
 	int len;			    /* profile length */
 	int item_id;			    /* profile id */
-	int sr_rate_sup[TFA98XX_NUM_RATES];
-
+	int sr_rate_sup[TFA98XX_NUM_RATES]; // sample rates supported by this
+					    // profile
 	struct list_head list; /* list of all profiles */
 };
 
@@ -155,8 +155,8 @@ struct tfa98xx {
 	struct tfa_device *tfa;
 	int vstep;
 	int profile;
-	int prof_vsteps[TFACONT_MAXPROFS];
-
+	int prof_vsteps[TFACONT_MAXPROFS]; // store vstep per profile (single
+					   // device)
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dbg_dir;

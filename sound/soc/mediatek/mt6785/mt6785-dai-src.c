@@ -3,6 +3,7 @@
 // MediaTek ALSA SoC Audio DAI SRC Control
 //
 // Copyright (c) 2018 MediaTek Inc.
+// Copyright (C) 2020 XiaoMi, Inc.
 // Author: Eason Yen <eason.yen@mediatek.com>
 
 #include <linux/regmap.h>
@@ -381,8 +382,12 @@ static int mtk_hw_src_event(struct snd_soc_dapm_widget *w,
 
 	src_priv = afe_priv->dai_priv[id];
 
-	dev_info(afe->dev, "%s(), name %s, event 0x%x, id %d, src_priv %p\n",
-		 __func__, w->name, event, id, src_priv);
+	dev_info(afe->dev, "%s(), name %s, event 0x%x, id %d, src_priv %p, dl_rate %d, ul_rate %d\n",
+		 __func__,
+		 w->name, event,
+		 id, src_priv,
+		 src_priv->dl_rate,
+		 src_priv->ul_rate);
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -523,6 +528,9 @@ static int mtk_afe_src_en_connect(struct snd_soc_dapm_widget *source,
 		src_priv = afe_priv->dai_priv[MT6785_DAI_SRC_1];
 	else
 		src_priv = afe_priv->dai_priv[MT6785_DAI_SRC_2];
+
+	dev_info(afe->dev, "%s(), dl_rate %d,ul_rate %d\n",
+		 __func__, src_priv->dl_rate, src_priv->ul_rate);
 
 	return (src_priv->dl_rate > 0 && src_priv->ul_rate > 0) ? 1 : 0;
 }

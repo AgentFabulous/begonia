@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 //
 // Copyright (c) 2018 MediaTek Inc.
-//   Copyright (C) 2019 XiaoMi, Inc.
 
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
@@ -1065,7 +1064,7 @@ static int mtk_dsp_pcm_copy_ul(struct snd_pcm_substream *substream,
 	Ringbuf_Bridge_Check(
 			&dsp_mem->adsp_buf.aud_buffer.buf_bridge);
 
-	availsize = RingBuf_getFreeSpace(ringbuf);
+	availsize = RingBuf_getDataCount(ringbuf);
 
 	if (availsize < copy_size) {
 		pr_info("%s fail copy_size = %d availsize = %d\n", __func__,
@@ -1115,7 +1114,7 @@ static int mtk_dsp_pcm_copy(struct snd_pcm_substream *substream,
 		return -1;
 	}
 
-	if (audio_opendsp_ready(get_dspscene_by_dspdaiid(id)) == false) {
+	if (is_audio_task_dsp_ready(get_dspscene_by_dspdaiid(id)) == false) {
 		pr_info("%s(), dsp not ready", __func__);
 		return -1;
 	}

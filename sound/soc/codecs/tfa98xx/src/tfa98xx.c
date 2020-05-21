@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2014 NXP Semiconductors, All Rights Reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1059,7 +1059,6 @@ static int is_profile_in_list(char *profile, int len)
 			return err;
 		}
 	}
-
 	return err;
 }
 
@@ -1576,7 +1575,7 @@ static int tfa98xx_create_controls(struct tfa98xx *tfa98xx)
 	 */
 	nr_controls = 2;
 
-	/* kcontrol for mute. (Xiaomi's requirement
+	/* kcontrol for mute. (XM requirement
 	 * for production line testing)
 	 */
 	if (tfa98xx->tfa->tfa_family == 2)
@@ -2960,12 +2959,15 @@ static int tfa98xx_parse_dt(struct device *dev,
 {
 
 	tfa98xx->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+	//tfa98xx->reset_gpio = 24;
 	if (tfa98xx->reset_gpio < 0)
-		pr_err("[NXP] No reset GPIO provided, will not HW reset device\n");
+		pr_debug("[NXP] martin No reset GPIO provided, will not HW reset device\n");
 
 	tfa98xx->irq_gpio =  of_get_named_gpio(np, "irq-gpio", 0);
+	//tfa98xx->irq_gpio =  69;
 	if (tfa98xx->irq_gpio < 0)
-		pr_err("[NXP] No IRQ GPIO provided.\n");
+		pr_debug("[NXP] martin No IRQ GPIO provided.\n");
+	pr_debug("[NXP] martin GPIO provided.\n");
 
 	return 0;
 }
@@ -3088,7 +3090,7 @@ static int tfa98xx_misc_device_profile_open(
 		container_of(file->private_data,
 			struct tfa98xx, tfa98xx_profile);
 
-
+	//pr_info("entry  tfa98xx=%p\n", tfa98xx);
 	if (tfa98xx) {
 		file->private_data = tfa98xx;
 		return 0;
@@ -3106,14 +3108,14 @@ static ssize_t tfa98xx_misc_device_profile_write(struct file *file,
 	int ret = 0;
 	int profileID = 0;
 
-
+	//pr_info("entry count=%d\n", (int)count);
 
 	if (tfa98xx == NULL)
 		return -EINVAL;
 
 	memset(name, 0x00, sizeof(name));
 	ret = copy_from_user(name, user_buf, count);
-
+	//pr_info("profile name=%s\n", name);
 
 	/* search profile name and return ID. */
 	profileID = get_profile_id_by_name(name, strlen(name));
@@ -3128,8 +3130,8 @@ static ssize_t tfa98xx_misc_device_profile_write(struct file *file,
 		tfa98xx_mixer_profile = profileID;
 		tfa98xx->profile = prof_idx;
 		tfa98xx->vstep = tfa98xx->prof_vsteps[prof_idx];
-
-
+		// pr_info("update profile index (%d:%d) succeeded\n",
+		// profileID, prof_idx);
 	} else {
 		pr_err("didn't find profile from list.\n");
 		count = 0;
@@ -3159,7 +3161,7 @@ static ssize_t tfa98xx_misc_device_reg_write(struct file *file,
 	u8 address = 0;
 	int ret = 0;
 
-
+	//pr_info("entry    count=%d\n", (int)count);
 
 	if (tfa98xx == NULL)
 		return -EINVAL;
@@ -3174,7 +3176,7 @@ static ssize_t tfa98xx_misc_device_reg_write(struct file *file,
 		pr_err("copy data from user space failed.\n");
 
 	tfa98xx->reg = address;
-
+	//pr_info("tfa98xx->reg=0x%x\n", tfa98xx->reg);
 
 	return count;
 }
@@ -3218,7 +3220,7 @@ static ssize_t tfa98xx_misc_device_rw_read(struct file *file,
 	int ret;
 	int retries = I2C_RETRIES;
 
-
+	//pr_info("entry    count=%d\n", (int)count);
 
 	data = kmalloc(count+1, GFP_KERNEL);
 	if (data == NULL)
@@ -3228,7 +3230,7 @@ static ssize_t tfa98xx_misc_device_rw_read(struct file *file,
 
 retry:
 	ret = i2c_transfer(tfa98xx->i2c->adapter, msgs, ARRAY_SIZE(msgs));
-
+	//pr_info("i2c_transfer  ret=%d\n", ret);
 
 	if (ret < 0) {
 		pr_warn("i2c error, retries left: %d\n", retries);
@@ -3261,13 +3263,13 @@ static ssize_t tfa98xx_misc_device_rw_write(struct file *file,
 	u8 *data;
 	int ret;
 	int retries = I2C_RETRIES;
-
+	//pr_info("entry    count=%d\n", (int)count);
 
 	data = kmalloc(count+1, GFP_KERNEL);
 	if (data == NULL)
 		return  -ENOMEM;
 
-
+	//pr_info("tfa98xx->reg=0x%x\n", tfa98xx->reg);
 
 	data[0] = tfa98xx->reg;
 	if (copy_from_user(&data[1], user_buf, count))
@@ -3619,7 +3621,7 @@ static long tfa98xx_misc_device_control_ioctl(struct file *file,
 	struct tfa98xx *tfa98xx = NULL;
 	int result = 0;
 
-
+	//pr_info("entry  cmd=%d    arg=%p\n", cmd, (void*)arg);
 	if (!arg) {
 		pr_err("arg is NULL!\n");
 		return -EINVAL;
@@ -3703,7 +3705,7 @@ static long tfa98xx_misc_device_control_ioctl(struct file *file,
 		break;
 	}
 
-
+	//pr_info("exit  result=%d\n", result);
 	return result;
 }
 
@@ -3711,7 +3713,7 @@ static long tfa98xx_misc_device_control_ioctl(struct file *file,
 static long tfa98xx_misc_device_control_compat_ioctl(struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
-
+	//pr_info("entry  cmd=%d    arg=%p\n", cmd, (void*)arg);
 
 	if (!arg) {
 		pr_err("%s No data send to driver!\n", __func__);
@@ -3930,20 +3932,23 @@ int tfa98xx_i2c_probe(struct i2c_client *i2c,
 		tfa98xx->irq_gpio = -1;
 	}
 
-	ret = gpio_request(tfa98xx->reset_gpio, "TFA98XX_RST");
-	if (ret) {
-		pr_info("gpio_request  TFA98XX_RST ret=%d\n", ret);
-		return ret;
+	if (gpio_is_valid(tfa98xx->reset_gpio)) {
+		ret = gpio_request(tfa98xx->reset_gpio, "TFA98XX_RST");
+		if (ret) {
+			pr_debug("gpio_request  TFA98XX_RST ret=%d\n", ret);
+			return ret;
+		}
+		pr_debug("gpio_request  TFA98XX_RST succeeded!!\n");
 	}
-	pr_info("gpio_request  TFA98XX_RST succeeded!!\n");
 
-	ret = gpio_request(tfa98xx->irq_gpio, "TFA98XX_INT");
-	if (ret) {
-		pr_info("gpio_request  TFA98XX_INT ret=%d\n", ret);
-		return ret;
+	if (gpio_is_valid(tfa98xx->irq_gpio)) {
+		ret = gpio_request(tfa98xx->irq_gpio, "TFA98XX_INT");
+		if (ret) {
+			pr_debug("gpio_request  TFA98XX_INT ret=%d\n", ret);
+			return ret;
+		}
+		pr_debug("gpio_request  TFA98XX_INT succeeded!!\n");
 	}
-	pr_info("gpio_request  TFA98XX_INT succeeded!!\n");
-
 	/* Power up! */
 	tfa98xx_ext_reset(tfa98xx);
 

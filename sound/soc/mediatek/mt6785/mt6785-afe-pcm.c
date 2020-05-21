@@ -3,7 +3,6 @@
 // Mediatek ALSA SoC AFE platform driver for 6785
 //
 // Copyright (c) 2018 MediaTek Inc.
-//   Copyright (C) 2019 XiaoMi, Inc.
 // Author: Eason Yen <eason.yen@mediatek.com>
 
 #include <linux/delay.h>
@@ -5485,7 +5484,7 @@ static int mt6785_afe_pcm_dev_probe(struct platform_device *pdev)
 	/* request irq */
 	irq_id = platform_get_irq(pdev, 0);
 	if (irq_id <= 0) {
-		dev_err(dev, "%s no irq found\n", dev->of_node->name);
+		dev_err(dev, "%pOFn no irq found\n", dev->of_node);
 		return irq_id < 0 ? irq_id : -ENXIO;
 	}
 	ret = devm_request_irq(dev, irq_id, mt6785_afe_irq_handler,
