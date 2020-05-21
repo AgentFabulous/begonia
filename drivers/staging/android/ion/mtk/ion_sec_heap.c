@@ -22,8 +22,8 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/fdtable.h>
-#include <mmprofile.h>
-#include <mmprofile_function.h>
+//#include <mmprofile.h>
+//#include <mmprofile_function.h>
 #include <linux/debugfs.h>
 #include <linux/kthread.h>
 #include <linux/sched/task.h>
@@ -75,6 +75,16 @@ static unsigned int caller_tid;
 static KREE_SESSION_HANDLE ion_session;
 KREE_SESSION_HANDLE ion_session_handle(void)
 {
+	if (ion_session == KREE_SESSION_HANDLE_NULL) {
+		int ret;
+
+		ret = KREE_CreateSession(TZ_TA_MEM_UUID, &ion_session);//hc2
+		if (ret != TZ_RESULT_SUCCESS) {
+			IONMSG("KREE_CreateSession fail, ret=%d\n", ret);
+			return KREE_SESSION_HANDLE_NULL;
+		}
+	}
+
 	return ion_session;
 }
 #endif
@@ -159,6 +169,7 @@ static int ion_sec_heap_allocate(struct ion_heap *heap,
 		unsigned long flags)
 {
 	u32 sec_handle = 0;
+	int ret = 0;
 	struct ion_sec_buffer_info *pbufferinfo = NULL;
 	u32 refcount = 0;
 #ifdef CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM
@@ -187,19 +198,48 @@ static int ion_sec_heap_allocate(struct ion_heap *heap,
 #ifdef CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM
 	tmem_type = get_trusted_mem_type(heap->id);
 	if (flags & ION_FLAG_MM_HEAP_INIT_ZERO)
-		trusted_mem_api_alloc_zero(tmem_type, align, size, &refcount,
-					   &sec_handle, (uint8_t *)heap->name,
-					   heap->id);
+		ret = trusted_mem_api_alloc_zero(
+				tmem_type, align, size, &refcount,
+				&sec_handle, (uint8_t *)heap->name,
+				heap->id);
 	else
-		trusted_mem_api_alloc(tmem_type, align, size, &refcount,
-				      &sec_handle, (uint8_t *)heap->name,
-				      heap->id);
+		ret = trusted_mem_api_alloc(
+				tmem_type, align, size, &refcount,
+				&sec_handle, (uint8_t *)heap->name,
+				heap->id);
 #elif defined(MTK_IN_HOUSE_SEC_ION_SUPPORT)
+	{
+		int ret = 0;
+
+		if (flags & ION_FLAG_MM_HEAP_INIT_ZERO)
+			ret = KREE_ZallocSecurechunkmemWithTag(
+				ion_session_handle(), &sec_handle,
+				align, size, heap->name);
+		else
+			ret = KREE_AllocSecurechunkmemWithTag(
+				ion_session_handle(), &sec_handle,
+				align, size, heap->name);
+		if (ret != TZ_RESULT_SUCCESS) {
+			IONMSG(
+			"KREE_AllocSecurechunkmemWithTag failed, ret 0x%x\n",
+				ret);
+			kfree(pbufferinfo);
+			caller_pid = 0;
+			caller_tid = 0;
+			return -ENOMEM;
+		}
+	}
 	refcount = 0;
 #else
 	refcount = 0;
 #endif
 
+	if (ret == -ENOMEM) {
+		IONMSG(
+			"%s security out of memory, heap:%d\n",
+			__func__, heap->id);
+		heap->debug_show(heap, NULL, NULL);
+	}
 	if (sec_handle <= 0) {
 		IONMSG(
 			"%s alloc security memory failed, total size %zu\n",
@@ -229,7 +269,10 @@ static int ion_sec_heap_allocate(struct ion_heap *heap,
 	buffer->flags &= ~ION_FLAG_CACHED;
 	buffer->size = size;
 	buffer->sg_table = ion_sec_heap_map_dma(heap, buffer);
-
+#ifdef CONFIG_MTK_IOMMU_V2
+	sg_dma_address(buffer->sg_table->sgl) = (dma_addr_t)sec_handle;
+	sg_dma_len(buffer->sg_table->sgl) = size;
+#endif
 	sec_heap_total_memory += size;
 	caller_pid = 0;
 	caller_tid = 0;
@@ -261,10 +304,21 @@ void ion_sec_heap_free(struct ion_buffer *buffer)
 	trusted_mem_api_unref(tmem_type, sec_handle,
 			      (uint8_t *)buffer->heap->name,
 			      buffer->heap->id);
+#elif defined(MTK_IN_HOUSE_SEC_ION_SUPPORT)
+	{
+		int ret = 0;
+
+		ret = KREE_UnreferenceSecurechunkmem(
+			ion_session_handle(),
+			sec_handle);
+		if (ret != TZ_RESULT_SUCCESS)
+			IONMSG(
+			"KREE_UnreferenceSecurechunkmem failed, ret is 0x%x\n",
+				ret);
+	}
 #endif
 
 	ion_sec_heap_unmap_dma(heap, buffer);
-
 	kfree(table);
 	buffer->priv_virt = NULL;
 	kfree(pbufferinfo);
@@ -305,7 +359,7 @@ int ion_sec_heap_pool_total(struct ion_heap *heap)
 }
 
 void *ion_sec_heap_map_kernel(struct ion_heap *heap,
-		struct ion_buffer *buffer)
+			      struct ion_buffer *buffer)
 {
 #if ION_RUNTIME_DEBUGGER
 	void *vaddr = ion_heap_map_kernel(heap, buffer);
@@ -698,8 +752,8 @@ static int ion_sec_heap_debug_show(
 struct ion_heap *ion_sec_heap_create(struct ion_platform_heap *heap_data)
 {
 #if (defined(CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM) || \
-	 defined(CONFIG_MTK_SECURE_MEM_SUPPORT)) || \
-	(defined(MTK_IN_HOUSE_SEC_ION_SUPPORT))
+	defined(CONFIG_MTK_SECURE_MEM_SUPPORT) || \
+	defined(MTK_IN_HOUSE_SEC_ION_SUPPORT))
 
 	struct ion_sec_heap *heap;
 
@@ -730,15 +784,16 @@ struct ion_heap *ion_sec_heap_create(struct ion_platform_heap *heap_data)
 void ion_sec_heap_destroy(struct ion_heap *heap)
 {
 #if (defined(CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM) || \
-	 defined(CONFIG_MTK_SECURE_MEM_SUPPORT)) || \
-	(defined(MTK_IN_HOUSE_SEC_ION_SUPPORT))
+	defined(CONFIG_MTK_SECURE_MEM_SUPPORT) || \
+	defined(MTK_IN_HOUSE_SEC_ION_SUPPORT))
 
-	struct ion_sec_heap *sec_heap;
+		struct ion_sec_heap *sec_heap;
 
-	IONMSG("%s enter\n", __func__);
-	sec_heap = container_of(heap, struct ion_sec_heap, heap);
-	kfree(sec_heap);
+		IONMSG("%s enter\n", __func__);
+		sec_heap = container_of(heap, struct ion_sec_heap, heap);
+		kfree(sec_heap);
 #else
-	IONMSG("%s error: not support\n", __func__);
+		IONMSG("%s error: not support\n", __func__);
 #endif
 }
+

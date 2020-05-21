@@ -98,12 +98,13 @@ enum ION_DMA_DIR {
 	ION_DMA_BIDIRECTIONAL,
 };
 
+#ifndef CONFIG_MTK_IOMMU_V2
+#define DOMAIN_NUM (2)
 enum ION_M4U_DOMAIN {
 	MM_DOMAIN,
 	VPU_DOMAIN,
-
-	DOMAIN_NUM
 };
+#endif
 
 struct ion_dma_param {
 	union {
@@ -261,7 +262,6 @@ int ion_mm_heap_register_buf_destroy_cb(struct ion_buffer *buffer,
 					ion_mm_buf_destroy_callback_t *fn);
 
 int ion_cache_sync_flush_all(int fd);
-int __is_user_va(struct ion_client *client, unsigned long va, unsigned long sz);
 int ion_dma_map_area(int fd, int handle, int dir);
 int ion_dma_unmap_area(int fd, int handle, int dir);
 void ion_dma_map_area_va(void *start, size_t size, enum ION_DMA_DIR dir);
