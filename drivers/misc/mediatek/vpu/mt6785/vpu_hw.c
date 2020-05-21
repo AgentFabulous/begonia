@@ -6122,7 +6122,7 @@ unlock_core:
 	}
 
 	vpu_print_seq(s, LINE_BAR);
-	m4u_dump_reg_for_hang_issue(1);
+	// m4u_dump_reg_for_hang_issue(1);
 
 #undef LINE_BAR
 
