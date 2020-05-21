@@ -223,7 +223,7 @@ int m4u_get_pte_info(struct m4u_domain_t *domain,
 	pte_info->pa = pa;
 	pte_info->size = size;
 	pte_info->valid = valid;
-	return 0;
+	return valid;
 }
 
 typedef void *(m4u_pte_fn_t) (struct m4u_pte_info_t *pte_info, void *data);
@@ -272,12 +272,13 @@ void *m4u_for_each_pte(struct m4u_domain_t *domain,
 
 /* dump pte info for mva, no matter it's valid or not */
 /* this function doesn't lock pgtable lock. */
-void m4u_dump_pte_nolock(struct m4u_domain_t *domain,
+int m4u_dump_pte_nolock(struct m4u_domain_t *domain,
 		unsigned int mva)
 {
 	struct m4u_pte_info_t pte_info;
+	int valid = 0;
 
-	m4u_get_pte_info(domain, mva, &pte_info);
+	valid = m4u_get_pte_info(domain, mva, &pte_info);
 
 	__m4u_print_pte(&pte_info, NULL);
 
@@ -288,6 +289,8 @@ void m4u_dump_pte_nolock(struct m4u_domain_t *domain,
 		m4u_get_pte_info(domain, mva, &pte_info);
 		__m4u_print_pte(&pte_info, NULL);
 	}
+
+	return valid;
 }
 
 void m4u_dump_pte(struct m4u_domain_t *domain, unsigned int mva)
@@ -306,6 +309,17 @@ unsigned long m4u_get_pte(struct m4u_domain_t *domain, unsigned int mva)
 	read_unlock_domain(domain);
 
 	return pte_info.pa;
+}
+
+int _m4u_get_pte(struct m4u_domain_t *domain, unsigned int mva)
+{
+	struct m4u_pte_info_t pte_info;
+
+	read_lock_domain(domain);
+	m4u_get_pte_info(domain, mva, &pte_info);
+	read_unlock_domain(domain);
+
+	return pte_info.valid;
 }
 
 /***********************************************************/
@@ -752,16 +766,16 @@ int m4u_map_64K(struct m4u_domain_t *m4u_domain,
 		else
 			pte_new = 1;
 	} else {
-	/*
-	 *	if (unlikely((imu_pgd_val(*pgd) &
-	 *			(~F_PGD_PA_PAGETABLE_MSK)) != pgprot)) {
-	 *		write_unlock_domain(m4u_domain);
-	 *		m4u_aee_print("%s: mva=0x%x, pgd=0x%x, pgprot=0x%x\n",
-	 *				__func__, mva,
-	 *				imu_pgd_val(*pgd), pgprot);
-	 *		return -1;
-	 *	}
-	 */
+#if 0
+		if (unlikely((imu_pgd_val(*pgd) &
+				(~F_PGD_PA_PAGETABLE_MSK)) != pgprot)) {
+			write_unlock_domain(m4u_domain);
+			m4u_aee_print("%s: mva=0x%x, pgd=0x%x, pgprot=0x%x\n",
+					__func__, mva,
+					imu_pgd_val(*pgd), pgprot);
+			return -1;
+		}
+#endif
 		pte_new = 0;
 	}
 
@@ -843,17 +857,17 @@ int m4u_map_4K(struct m4u_domain_t *m4u_domain,
 		else
 			pte_new = 1;
 	} else {
-	/*
-	 *	if (unlikely((imu_pgd_val(*pgd) &
-	 *		(~F_PGD_PA_PAGETABLE_MSK)) != pgprot)) {
-	 *		write_unlock_domain(m4u_domain);
-	 *		m4u_aee_print
-	 *			("%s: mva=0x%x, pgd=0x%x, pgprot=0x%x\n",
-	 *				__func__, mva,
-	 *				imu_pgd_val(*pgd), pgprot);
-	 *		return -1;
-	 *	}
-	 */
+#if 0
+		if (unlikely((imu_pgd_val(*pgd) &
+			(~F_PGD_PA_PAGETABLE_MSK)) != pgprot)) {
+			write_unlock_domain(m4u_domain);
+			m4u_aee_print
+				("%s: mva=0x%x, pgd=0x%x, pgprot=0x%x\n",
+					__func__, mva,
+					imu_pgd_val(*pgd), pgprot);
+			return -1;
+		}
+#endif
 		pte_new = 0;
 	}
 
@@ -1030,6 +1044,9 @@ int m4u_map_sgtable(struct m4u_domain_t *m4u_domain,
 	unsigned long long map_mva = (unsigned long long)mva;
 	unsigned long long map_end = map_mva + (unsigned long long)size;
 
+	if (unlikely(g_translation_fault_debug))
+		return 0;
+
 	prot = m4u_prot_fixup(prot);
 
 	/*write_lock_domain(m4u_domain);*/
@@ -1103,7 +1120,7 @@ int m4u_check_free_pte(struct m4u_domain_t *domain,
 
 	pte = imu_pte_map(pgd);
 	for (i = 0; i < IMU_PTRS_PER_PTE; i++) {
-		if (imu_pte_val(*pte) != 0)
+		if (imu_pte_val(pte[i]) != 0)
 			break;
 	}
 	if (i == IMU_PTRS_PER_PTE) {

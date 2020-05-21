@@ -62,7 +62,7 @@ static DEFINE_MUTEX(gM4u_prog_pfh_mutex);
 
 int gM4U_L2_enable = 1;
 int gM4U_4G_DRAM_Mode;
-
+unsigned int g_translation_fault_debug;
 
 static spinlock_t gM4u_reg_lock[TOTAL_M4U_NUM];
 int gM4u_port_num = M4U_PORT_UNKNOWN;
@@ -124,8 +124,8 @@ void m4u_invalid_tlb_by_range(struct m4u_domain_t *m4u_domain,
 		0, mva_start, mva_end);
 }
 
-#if 0
-static int __m4u_dump_rs_info(unsigned int va[],
+#if 1
+int __m4u_dump_rs_info(unsigned int va[],
 	unsigned int pa[], unsigned int st[], unsigned int pte[])
 {
 	int i;
@@ -146,7 +146,7 @@ static int __m4u_dump_rs_info(unsigned int va[],
 	return 0;
 }
 
-static int m4u_dump_rs_info(int m4u_index, int m4u_slave_id)
+int m4u_dump_rs_info(unsigned int m4u_index, int m4u_slave_id)
 {
 	unsigned long m4u_base = gM4UBaseAddr[m4u_index];
 	int i;
@@ -1048,6 +1048,12 @@ int m4u_config_prog_dist(int port,
 
 	larb = m4u_port_2_larbid(port);
 	larb_port = m4u_port_2_larb_port(port);
+
+	if (unlikely(larb >= SMI_LARB_NR)) {
+		M4ULOG_HIGH("%d port id errror port %d\n", __LINE__, port);
+		return -1;
+	}
+
 	larb_base = gLarbBaseAddr[larb];
 
 	pProgPfh = gM4UProgPfh[m4u_index];
@@ -1314,6 +1320,14 @@ static int _m4u_config_port(int port, int virt, int sec, int dis, int dir)
 
 		larb = m4u_port_2_larbid(port);
 		larb_port = m4u_port_2_larb_port(port);
+
+		if (unlikely(larb >= SMI_LARB_NR)) {
+			M4ULOG_HIGH("%d port id errror port %d\n",
+				    __LINE__, port);
+			spin_unlock(&gM4u_reg_lock[m4u_index]);
+			return -1;
+		}
+
 		larb_base = gLarbBaseAddr[larb];
 		m4uHw_set_field_by_mask(larb_base,
 			SMI_LARB_NON_SEC_CONx(larb_port),
@@ -1432,7 +1446,7 @@ void m4u_port_array_init(struct m4u_port_array *port_array)
 }
 
 int m4u_port_array_add(
-		struct m4u_port_array *port_array, int port,
+		struct m4u_port_array *port_array, unsigned int port,
 		int m4u_en, int secure)
 {
 	if (port >= M4U_PORT_NR) {
@@ -1635,7 +1649,8 @@ void m4u_print_perf_counter(int m4u_index, int m4u_slave_id, const char *msg)
 }
 
 
-#define M4U_REG_BACKUP_SIZE     (100*sizeof(unsigned int))
+#define M4U_REG_BACKUP_CNT      (110)
+#define M4U_REG_BACKUP_SIZE     (M4U_REG_BACKUP_CNT*sizeof(unsigned int))
 static unsigned int *pM4URegBackUp;
 static unsigned int gM4u_reg_backup_real_size;
 
@@ -1710,11 +1725,14 @@ int m4u_reg_backup(void)
 		}
 	}
 
-	/* check register size (to prevent overflow) */
+	/* check register size (to prevent overflow)
+	 * Notice: real_size equals to count,
+	 *         NOT "count*sizeof(unsigned int)" !!
+	 */
 	real_size = (pReg - pM4URegBackUp);
-	if (real_size > M4U_REG_BACKUP_SIZE)
+	if (real_size > M4U_REG_BACKUP_CNT)
 		m4u_aee_print("m4u_reg overflow! %d>%d\n",
-			real_size, (int)M4U_REG_BACKUP_SIZE);
+			real_size, (int)M4U_REG_BACKUP_CNT);
 
 	gM4u_reg_backup_real_size = real_size;
 
@@ -2064,7 +2082,7 @@ int m4u_unregister_fault_callback(int port)
 	return 0;
 }
 
-int m4u_enable_tf(int port, bool fgenable)
+int m4u_enable_tf(unsigned int port, bool fgenable)
 {
 	if (port < 0 || port >= M4U_PORT_UNKNOWN) {
 		M4UMSG("%s fail,m port=%d\n", __func__, port);
@@ -2220,11 +2238,9 @@ irqreturn_t MTK_M4U_isr(int irq, void *dev_id)
 		M4UMSG("m4u main interrupt happened: sta=0x%x\n", IntrSrc);
 
 		if (m4u_index == 0)
-			M4UMSG(" port normal 0x%x, sec 0x%x\n",
+			M4UMSG("normal world port trans control reg: 0x%x\n",
 				M4U_ReadReg32(gLarbBaseAddr[0],
-					SMI_LARB_NON_SEC_CONx(0)),
-				M4U_ReadReg32(gLarbBaseAddr[0],
-				SMI_LARB_SEC_CONx(0))
+					SMI_LARB_NON_SEC_CONx(0))
 				);
 
 		if (IntrSrc & (F_INT_MMU0_MAIN_MSK | F_INT_MMU0_MAU_MSK))
@@ -2275,7 +2291,7 @@ irqreturn_t MTK_M4U_isr(int irq, void *dev_id)
 				unsigned int valid_size = 0;
 				unsigned int valid_mva_end = 0;
 
-				m4u_query_mva_info(m4u_index, fault_mva - 1,
+				__m4u_query_mva_info(m4u_index, fault_mva - 1,
 					0, &valid_mva, &valid_size);
 				if (valid_mva != 0 && valid_size != 0)
 					valid_mva_end = valid_mva + valid_size;
@@ -2296,7 +2312,6 @@ irqreturn_t MTK_M4U_isr(int irq, void *dev_id)
 				m4u_dump_pte_nolock(
 					m4u_get_domain_by_port(m4u_port),
 							fault_mva);
-				m4u_print_port_status_ext(NULL, m4u_port);
 
 				/*call user's callback to dump user registers*/
 				if (m4u_port < M4U_PORT_UNKNOWN &&
@@ -2419,11 +2434,8 @@ irqreturn_t MTK_M4U_isr_sec(int irq, void *dev_id)
 					m4u_get_port_name(tf_port));
 			larb_id = m4u_port_2_larbid(tf_port);
 			larb_port = m4u_port_2_larb_port(tf_port);
-			M4UMSG("port[%s] sec(%d), larb_id(%d)\n",
-				m4u_get_port_name(tf_port),
-				M4U_ReadReg32(gLarbBaseAddr[larb_id],
-				SMI_LARB_SEC_CONx(larb_port)),
-				larb_id);
+			M4UMSG("port[%s] larb_id(%d) larb_port(%d)\n",
+				m4u_get_port_name(tf_port), larb_id, larb_port);
 	} else {
 		M4UMSG(
 			"%s(), Invalid irq number %d\n",
@@ -2718,6 +2730,7 @@ int m4u_hw_init(struct m4u_device *m4u_dev, int m4u_id)
 	mau_start_monitor(0, 0, 1, 0, 1, 0, 0, 0x0,
 			0xfffff, 0xffffffff, 0xffffffff);
 #endif
+	g_translation_fault_debug = 0;
 
 	return 0;
 }
@@ -2727,7 +2740,8 @@ int m4u_hw_deinit(struct m4u_device *m4u_dev, int m4u_id)
 	free_irq(m4u_dev->irq_num[m4u_id], NULL);
 	return 0;
 }
-#if 0
+#if 1
+extern int m4u_dump_reg_for_hang_issue(int m4u_id);
 /* to compact kernel-4.9, use old api name */
 int m4u_dump_reg_for_smi_hang_issue(void)
 {
