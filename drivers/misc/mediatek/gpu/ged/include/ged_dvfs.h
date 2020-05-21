@@ -67,6 +67,7 @@ typedef enum GED_DVFS_TUNING_MODE_TAG {
 #define GED_EVENT_VILTE_VID      (1 << 9)
 #define GED_EVENT_LCD            (1 << 10)
 #define GED_EVENT_LOW_LATENCY_MODE (1 << 13)
+#define GED_EVENT_DHWC             (1 << 14)
 
 typedef void (*ged_event_change_fp)(void *private_data, int events);
 
@@ -92,17 +93,6 @@ struct GED_DVFS_BW_DATA {
 };
 
 #define MAX_BW_PROFILE 5
-
-#if (defined(GED_ENABLE_FB_DVFS) && defined(GED_ENABLE_FB_DVFS_CWAITG))
-struct GED_DVFS_CWAITG {
-	int i32CpuWallTime;
-	int i32GpuRealTime;
-	int i32GpuTargetTime;
-	int i32GpuRealTime_Modify;
-	unsigned int ui32GpuLoading;
-	unsigned long long ullGpuPipeTime;
-};
-#endif
 
 bool ged_dvfs_cal_gpu_utilization(unsigned int *pui32Loading,
 	unsigned int *pui32Block, unsigned int *pui32Idle);
@@ -170,12 +160,6 @@ extern int (*mtk_get_loading_base_dvfs_step_fp)(void);
 #ifdef GED_ENABLE_TIMER_BASED_DVFS_MARGIN
 extern void (*mtk_timer_base_dvfs_margin_fp)(int i32MarginValue);
 extern int (*mtk_get_timer_base_dvfs_margin_fp)(void);
-#endif
-
-#if (defined(GED_ENABLE_FB_DVFS) && defined(GED_ENABLE_FB_DVFS_CWAITG))
-extern void (*mtk_dvfs_cwaitg_fp)(unsigned int ui32DvfsCWaitG);
-extern unsigned int (*mtk_get_dvfs_cwaitg_fp)(void);
-extern unsigned int ged_dvfs_cwaitg_check(struct GED_DVFS_CWAITG *pInfo);
 #endif
 
 #endif
