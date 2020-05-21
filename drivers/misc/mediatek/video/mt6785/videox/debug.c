@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,7 +24,9 @@
 #include <linux/time.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
+#ifdef CONFIG_MTK_M4U
 #include "m4u.h"
+#endif
 #include "ddp_m4u.h"
 #include "disp_drv_log.h"
 #include "mtkfb.h"
@@ -57,9 +59,9 @@
 #include "disp_recovery.h"
 #include "disp_partial.h"
 #if defined(MTK_FB_ION_SUPPORT)
-#  include "mtk_ion.h"
-#  include "ion_drv.h"
-#  include "ion.h"
+#include "mtk_ion.h"
+#include "ion_drv.h"
+#include "ion.h"
 #endif
 #include "layering_rule.h"
 #include "ddp_clkmgr.h"
@@ -303,7 +305,7 @@ static int alloc_buffer_from_ion(size_t size, struct test_buf_info *buf_info)
 	struct ion_mm_data mm_data;
 	struct ion_handle *handle;
 	size_t mva_size;
-	ion_phys_addr_t phy_addr;
+	ion_phys_addr_t phy_addr = 0;
 
 	client = ion_client_create(g_ion_device, "disp_test");
 	buf_info->ion_client = client;
@@ -353,7 +355,7 @@ static int alloc_buffer_from_dma(size_t size, struct test_buf_info *buf_info)
 {
 	int ret = 0;
 	unsigned long size_align;
-	unsigned int mva  = 0;
+	unsigned int mva = 0;
 
 #ifndef CONFIG_MTK_IOMMU_V2
 	size_align = round_up(size, PAGE_SIZE);
@@ -373,7 +375,11 @@ static int alloc_buffer_from_dma(size_t size, struct test_buf_info *buf_info)
 		struct sg_table *sg_table = &table;
 		unsigned int mva;
 
-		sg_alloc_table(sg_table, 1, GFP_KERNEL);
+		ret = sg_alloc_table(sg_table, 1, GFP_KERNEL);
+		if (ret) {
+			DISP_PR_INFO("sg alloc table failed!\n");
+			return ret;
+		}
 
 		sg_dma_address(sg_table->sgl) = buf_info->buf_pa;
 		sg_dma_len(sg_table->sgl) = size_align;
@@ -410,7 +416,7 @@ static int alloc_buffer_from_dma(size_t size, struct test_buf_info *buf_info)
 		goto out;
 	}
 	disp_ion_get_mva(ion_display_client, ion_display_handle,
-			 (unsigned int *)&mva, DISP_M4U_PORT_DISP_WDMA0);
+			 (unsigned int *)&mva, 0, DISP_M4U_PORT_DISP_WDMA0);
 
 out:
 #endif /* CONFIG_MTK_IOMMU */
@@ -841,7 +847,7 @@ static void process_dbg_opt(const char *opt)
 		primary_display_diagnose_oneshot(__func__, __LINE__);
 		return;
 	} else if (strncmp(opt, "diagnose", 8) == 0) {
-		primary_display_diagnose();
+		primary_display_diagnose(__func__, __LINE__);
 		return;
 	} else if (strncmp(opt, "_efuse_test", 11) == 0) {
 		primary_display_check_test();
@@ -1222,19 +1228,19 @@ static void process_dbg_opt(const char *opt)
 		pan_display_test(frame_num, bpp);
 	} else if (strncmp(opt, "dsi_ut:restart_vdo_mode", 23) == 0) {
 		dpmgr_path_stop(primary_get_dpmgr_handle(), CMDQ_DISABLE);
-		primary_display_diagnose();
+		primary_display_diagnose(__func__, __LINE__);
 		dpmgr_path_start(primary_get_dpmgr_handle(), CMDQ_DISABLE);
 		dpmgr_path_trigger(primary_get_dpmgr_handle(), NULL,
 				   CMDQ_DISABLE);
 	} else if (strncmp(opt, "dsi_ut:restart_cmd_mode", 23) == 0) {
 		dpmgr_path_stop(primary_get_dpmgr_handle(), CMDQ_DISABLE);
-		primary_display_diagnose();
+		primary_display_diagnose(__func__, __LINE__);
 
 		dpmgr_path_start(primary_get_dpmgr_handle(), CMDQ_DISABLE);
 		dpmgr_path_trigger(primary_get_dpmgr_handle(), NULL,
 				   CMDQ_DISABLE);
 		dpmgr_path_stop(primary_get_dpmgr_handle(), CMDQ_DISABLE);
-		primary_display_diagnose();
+		primary_display_diagnose(__func__, __LINE__);
 
 		dpmgr_path_start(primary_get_dpmgr_handle(), CMDQ_DISABLE);
 		dpmgr_path_trigger(primary_get_dpmgr_handle(), NULL,

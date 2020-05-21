@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1681,31 +1681,6 @@ int disp_lcm_validate_roi(struct disp_lcm_handle *plcm, int *x, int *y,
 	return -1;
 }
 
-int disp_lcm_set_param(struct disp_lcm_handle *plcm, unsigned int param)
-{
-	/*DISPFUNC(); */
-	struct LCM_DRIVER *lcm_drv = NULL;
-	int ret = 0;
-
-	DISPFUNC();
-
-	if (_is_lcm_inited(plcm)) {
-		lcm_drv = plcm->drv;
-		if (lcm_drv->set_disp_param) {
-			lcm_drv->set_disp_param(param);
-			ret = 0;
-		} else {
-			DISP_PR_ERR("FATAL ERROR, lcm_drv->set_backlight is null\n");
-			ret = -1;
-		}
-	} else {
-		DISP_PR_ERR("lcm_drv is null\n");
-		ret = -1;
-	}
-
-	return ret;
-}
-
 /*for ARR*/
 int disp_lcm_is_arr_support(struct disp_lcm_handle *plcm)
 {
@@ -1799,4 +1774,28 @@ done:
 	DISPCHECK("%s,add done\n", __func__);
 }
 
+int disp_lcm_set_param(struct disp_lcm_handle *plcm, unsigned int param)
+{
+	/*DISPFUNC(); */
+	struct LCM_DRIVER *lcm_drv = NULL;
+	int ret = 0;
+
+	DISPFUNC();
+
+	if (_is_lcm_inited(plcm)) {
+		lcm_drv = plcm->drv;
+		if (lcm_drv->set_disp_param) {
+			lcm_drv->set_disp_param(param);
+			ret = 0;
+		} else {
+			DISP_PR_ERR("FATAL ERROR, lcm_drv->set_backlight is null\n");
+			ret = -1;
+		}
+	} else {
+		DISP_PR_ERR("lcm_drv is null\n");
+		ret = -1;
+	}
+
+	return ret;
+}
 

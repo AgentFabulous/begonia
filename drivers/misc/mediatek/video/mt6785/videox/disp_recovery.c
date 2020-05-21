@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -29,8 +29,9 @@
 #include <linux/interrupt.h>
 #include "ion_drv.h"
 #include "mtk_ion.h"
+#ifdef CONFIG_MTK_M4U
 #include "m4u.h"
-
+#endif
 #include "disp_drv_platform.h"
 #include "debug.h"
 #include "ddp_debug.h"
@@ -75,6 +76,7 @@
 
 /* For abnormal check */
 static struct task_struct *primary_display_check_task;
+static struct task_struct *primary_display_esd_check_task;
 static struct task_struct *primary_display_recovery_thread;
 /* used for blocking check task  */
 static wait_queue_head_t _check_task_wq;
@@ -83,8 +85,10 @@ static atomic_t _check_task_wakeup = ATOMIC_INIT(0);
 
 /* For EXT TE EINT Check */
 static wait_queue_head_t esd_ext_te_wq;
+static wait_queue_head_t esd_ext_error_wq;
 /* For EXT TE EINT Check */
 static atomic_t esd_ext_te_event = ATOMIC_INIT(0);
+static atomic_t esd_ext_error_event = ATOMIC_INIT(0);
 static unsigned int esd_check_mode;
 static unsigned int esd_check_enable;
 static int te_irq;
@@ -254,6 +258,19 @@ static irqreturn_t _esd_check_ext_te_irq_handler(int irq, void *data)
 			 MMPROFILE_FLAG_PULSE, 0, 0);
 	atomic_set(&esd_ext_te_event, 1);
 	wake_up_interruptible(&esd_ext_te_wq);
+	DISPINFO("[%s][ESD]: esd check irq report PANEL_DEAD\n", __func__);
+
+	return IRQ_HANDLED;
+}
+
+/* For EXT ESD ERROR_INT_N Pin Check */
+static irqreturn_t _esd_check_ext_error_irq_handler(int irq, void *data)
+{
+	mmprofile_log_ex(ddp_mmp_get_events()->esd_vdo_eint,
+			 MMPROFILE_FLAG_PULSE, 0, 0);
+
+	atomic_set(&esd_ext_error_event, 1);
+	wake_up_interruptible(&esd_ext_error_wq);
 	DISPINFO("[%s][ESD]: esd check irq report PANEL_DEAD\n", __func__);
 
 	return IRQ_HANDLED;
@@ -1163,6 +1180,41 @@ static int primary_display_check_recovery_worker_kthread(void *data)
 	return 0;
 }
 
+static int primary_display_check_esd_recovery_worker_kthread(void *data)
+{
+	struct sched_param param = { .sched_priority = 87 };
+	int ret = 0;
+
+	DISPFUNC();
+	sched_setscheduler(current, SCHED_RR, &param);
+
+	while (1) {
+		msleep(10); /* 10ms */
+		ret = wait_event_interruptible(esd_ext_error_wq,
+					atomic_read(&esd_ext_error_event));
+		if (ret < 0) {
+			DISPINFO("[ESD]check thread waked up accidently\n");
+			continue;
+		}
+
+		_primary_path_switch_dst_lock();
+
+		/* 1.esd recovery */
+		primary_display_esd_recovery();
+
+		/* 2.clear atomic  esd_ext_error_event */
+		atomic_set(&esd_ext_error_event, 0);
+
+		_primary_path_switch_dst_unlock();
+
+		/* 3.other check & recovery */
+		if (kthread_should_stop())
+			break;
+	}
+	return 0;
+}
+
+
 /* ESD RECOVERY */
 int primary_display_esd_recovery(void)
 {
@@ -1453,6 +1505,28 @@ static int primary_display_recovery_kthread(void *data)
 	return 0;
 }
 
+void primary_display_requset_esd_error_eint(void)
+{
+	struct device_node *node;
+
+	node = of_find_compatible_node(NULL, NULL,
+			"mediatek, DSI_TE-eint");
+	if (!node) {
+		DISP_PR_ERR(
+			"[ESD][%s] can't find DSI_TE eint compatible node\n",
+			    __func__);
+		return;
+	}
+
+	/* 1.register irq handler */
+	te_irq = irq_of_parse_and_map(node, 0);
+	if (request_irq(te_irq, _esd_check_ext_error_irq_handler,
+			IRQF_TRIGGER_RISING, "DSI_TE-eint", NULL)) {
+		DISP_PR_ERR("[ESD]EINT IRQ LINE NOT AVAILABLE!\n");
+		return;
+	}
+}
+
 void primary_display_requset_eint(void)
 {
 	struct LCM_PARAMS *params;
@@ -1513,7 +1587,14 @@ void primary_display_check_recovery_init(void)
 				    NULL, "primary_display_path_recovery");
 			wake_up_process(primary_display_recovery_thread);
 		}
-	} 
+	} else {
+		primary_display_esd_check_task =
+		kthread_create(primary_display_check_esd_recovery_worker_kthread,
+			       NULL, "disp_esd_check");
+		wake_up_process(primary_display_esd_check_task);
+		init_waitqueue_head(&esd_ext_error_wq);
+		primary_display_requset_esd_error_eint();
+	}
 }
 
 void primary_display_esd_check_enable(int enable)

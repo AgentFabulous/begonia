@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -47,7 +47,7 @@
 #include "ddp_clkmgr.h"
 #include "primary_display.h"
 #include "disp_recovery.h"
-
+//#include "lcm_drv.h"
 /*****************************************************************************/
 enum MIPITX_PAD_VALUE {
 	PAD_D2P_V = 0,
@@ -492,7 +492,7 @@ static void _DSI_INTERNAL_IRQ_Handler(enum DISP_MODULE_ENUM module,
 
 	if (status.BUFFER_UNDERRUN_INT_EN) {
 		DDP_PR_ERR("%s:buffer underrun\n", ddp_get_module_name(module));
-		primary_display_diagnose();
+		primary_display_diagnose(__func__, __LINE__);
 	}
 
 	if (status.INP_UNFINISH_INT_EN)
@@ -2601,8 +2601,8 @@ void DSI_DPHY_TIMCONFIG(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq
 	timcon0.HS_TRAIL = (hs_trail_m > hs_trail_n) ? hs_trail_m : hs_trail_n;
 
 	timcon0.HS_PRPR = (dsi_params->HS_PRPR == 0) ?
-				(NS_TO_CYCLE((0x40 + 0x5 * ui), cycle_time) + 0x1) :
-				dsi_params->HS_PRPR;
+			(NS_TO_CYCLE((0x40 + 0x5 * ui), cycle_time) + 0x1) :
+			dsi_params->HS_PRPR;
 	/* HS_PRPR can't be 1. */
 	if (timcon0.HS_PRPR < 1)
 		timcon0.HS_PRPR = 1;
@@ -2616,7 +2616,7 @@ void DSI_DPHY_TIMCONFIG(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq
 
 	timcon0.LPX = (dsi_params->LPX == 0) ?
 		(NS_TO_CYCLE(dsi_params->PLL_CLOCK * 2 * 0x4B, 0x1F40)  + 0x1) :
-		dsi_params->LPX;
+								dsi_params->LPX;
 	if (timcon0.LPX < 1)
 		timcon0.LPX = 1;
 
@@ -2636,8 +2636,8 @@ void DSI_DPHY_TIMCONFIG(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq
 				(0x2 * timcon0.LPX) : dsi_params->DA_HS_EXIT;
 
 	timcon2.CLK_TRAIL = ((dsi_params->CLK_TRAIL == 0) ?
-						NS_TO_CYCLE(0x64 * dsi_params->PLL_CLOCK * 2,
-						0x1F40) : dsi_params->CLK_TRAIL) + 0x01;
+				NS_TO_CYCLE(0x64 * dsi_params->PLL_CLOCK * 2,
+				0x1F40) : dsi_params->CLK_TRAIL) + 0x01;
 	/* CLK_TRAIL can't be 1. */
 	if (timcon2.CLK_TRAIL < 2)
 		timcon2.CLK_TRAIL = 2;
@@ -2648,8 +2648,8 @@ void DSI_DPHY_TIMCONFIG(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq
 						dsi_params->CLK_ZERO;
 
 	timcon3.CLK_HS_PRPR = (dsi_params->CLK_HS_PRPR == 0) ?
-						NS_TO_CYCLE(0x50 * dsi_params->PLL_CLOCK * 2,
-						0x1F40) : dsi_params->CLK_HS_PRPR;
+				NS_TO_CYCLE(0x50 * dsi_params->PLL_CLOCK * 2,
+				0x1F40) : dsi_params->CLK_HS_PRPR;
 
 	if (timcon3.CLK_HS_PRPR < 1)
 		timcon3.CLK_HS_PRPR = 1;
@@ -3686,6 +3686,270 @@ static void lcm_mdelay(UINT32 ms)
 		usleep_range(ms*1000, (ms+1)*1000);
 	else
 		msleep(ms);
+}
+
+struct LCM_setting_table {
+	unsigned int cmd;
+	unsigned char count;
+	unsigned char para_list[64];
+};
+
+struct LCM_mipi_read_write {
+	unsigned int read_enable;
+	unsigned int read_count;
+	unsigned char read_buffer[64];
+	struct LCM_setting_table lcm_setting_table;
+};
+
+struct LCM_led_i2c_read_write {
+	unsigned int read_enable;
+	unsigned int read_count;
+	unsigned char buffer[64];
+};
+
+static struct LCM_mipi_read_write lcm_mipi_read_write ={0};
+static struct LCM_led_i2c_read_write lcm_led_i2c_read_write = {0};
+
+static char string_to_hex(const char *str)
+{
+	char val_l = 0;
+	char val_h = 0;
+
+	if (str[0] >= '0' && str[0] <= '9')
+		val_h = str[0] - '0';
+	else if (str[0] <= 'f' && str[0] >= 'a')
+		val_h = 10 + str[0] - 'a';
+	else if (str[0] <= 'F' && str[0] >= 'A')
+		val_h = 10 + str[0] - 'A';
+
+	if (str[1] >= '0' && str[1] <= '9')
+		val_l = str[1]-'0';
+	else if (str[1] <= 'f' && str[1] >= 'a')
+		val_l = 10 + str[1] - 'a';
+	else if (str[1] <= 'F' && str[1] >= 'A')
+		val_l = 10 + str[1] - 'A';
+
+	return (val_h << 4) | val_l;
+}
+
+static int string_merge_into_buf(const char *str, int len, char *buf)
+{
+	int buf_size = 0;
+	int i = 0;
+	const char *p = str;
+
+	while (i < len) {
+		if (((p[0] >= '0' && p[0] <= '9') ||
+			(p[0] <= 'f' && p[0] >= 'a') ||
+			(p[0] <= 'F' && p[0] >= 'A'))
+			&& ((i + 1) < len)) {
+			buf[buf_size] = string_to_hex(p);
+			pr_debug("0x%02x ", buf[buf_size]);
+			buf_size++;
+			i += 2;
+			p += 2;
+		} else {
+			i++;
+			p++;
+		}
+	}
+	return buf_size;
+}
+
+long  lcm_mipi_reg_write(char *buf, unsigned long  count)
+{
+	int retval = 0;
+	int dlen = 0;
+	unsigned int read_enable = 0;
+	unsigned int packet_count = 0;
+	unsigned int register_value = 0;
+	char *input = NULL;
+	char *data = NULL;
+	unsigned char pbuf[3] = {0};
+	unsigned int  i = 0;
+	struct dsi_cmd_desc cmd_tab;
+
+	pr_debug("[%s]: lcm_mipi_reg_write source: count  = %ld,buf = %s ", __func__, count, buf);
+
+	input = buf;
+	memcpy(pbuf, input, 2);
+	pbuf[2] = '\0';
+	retval = kstrtou32(pbuf, 10, &read_enable);
+	if (retval)
+		goto exit;
+	lcm_mipi_read_write.read_enable = !!read_enable;
+	input = input + 3;
+	memcpy(pbuf, input, 2);
+	pbuf[2] = '\0';
+	packet_count = (unsigned int)string_to_hex(pbuf);
+	if (lcm_mipi_read_write.read_enable && !packet_count) {
+		retval = -EINVAL;
+		goto exit;
+	}
+	input = input + 3;
+	memcpy(pbuf, input, 2);
+	pbuf[2] = '\0';
+	register_value = (unsigned int)string_to_hex(pbuf);
+	lcm_mipi_read_write.lcm_setting_table.cmd = register_value;
+
+	if(lcm_mipi_read_write.read_enable) {
+		lcm_mipi_read_write.read_count = packet_count;
+		memset(&cmd_tab, 0, sizeof(struct dsi_cmd_desc));
+		cmd_tab.dtype = lcm_mipi_read_write.lcm_setting_table.cmd;
+		cmd_tab.payload = lcm_mipi_read_write.read_buffer;
+		cmd_tab.dlen = lcm_mipi_read_write.read_count;
+
+		do_lcm_vdo_lp_read(&cmd_tab, 1);
+		pr_debug("read lcm addr:0x%x, len:%d, val:0x%x\n",
+				cmd_tab.dtype, cmd_tab.dlen, *cmd_tab.payload);
+		goto exit;
+	} else {
+		lcm_mipi_read_write.lcm_setting_table.count = (unsigned char)packet_count;
+		memcpy(lcm_mipi_read_write.lcm_setting_table.para_list, "",64);
+		if(count > 11)
+		{
+			data = kzalloc(count - 9, GFP_KERNEL);
+			if (!data) {
+				retval = -ENOMEM;
+				goto exit;
+			}
+			 data[count-9-1] = '\0';
+			input = input + 3;
+			dlen = string_merge_into_buf(input,count -9,data);
+			memcpy(lcm_mipi_read_write.lcm_setting_table.para_list, data,dlen);
+		}
+		if(NULL != utils->dsi_set_cmdq_V22)
+			utils->dsi_set_cmdq_V22(NULL,lcm_mipi_read_write.lcm_setting_table.cmd,lcm_mipi_read_write.lcm_setting_table.count,lcm_mipi_read_write.lcm_setting_table.para_list, 1);
+	}
+
+	pr_debug("[%s]: mipi_write done!\n", __func__);
+	pr_debug("[%s]: write cmd = %d,len = %d\n", __func__,lcm_mipi_read_write.lcm_setting_table.cmd,lcm_mipi_read_write.lcm_setting_table.count);
+	pr_debug("[%s]: mipi_write data: ", __func__);
+	for(i=0;i<count-3;i++)
+	{
+		pr_debug("0x%x ", lcm_mipi_read_write.lcm_setting_table.para_list[i]);
+	}
+	pr_debug("\n ");
+
+	if(count > 11)
+	{
+		kfree(data);
+	}
+exit:
+	retval = count;
+	return retval;
+}
+
+long  lcm_mipi_reg_read(char *buf)
+{
+	int i = 0;
+	ssize_t count = 0;
+
+	if (lcm_mipi_read_write.read_enable) {
+		for (i = 0; i < lcm_mipi_read_write.read_count; i++) {
+			if (i ==  lcm_mipi_read_write.read_count - 1) {
+				count += snprintf(buf + count, PAGE_SIZE - count, "0x%02x\n",
+				     lcm_mipi_read_write.read_buffer[i]);
+			} else {
+				count += snprintf(buf + count, PAGE_SIZE - count, "0x%02x ",
+				     lcm_mipi_read_write.read_buffer[i]);
+			}
+		}
+	}
+	return count;
+}
+
+long  led_i2c_reg_write(char *buf, unsigned long  count)
+{
+	int retval = -EINVAL;
+	unsigned int read_enable = 0;
+	unsigned int packet_count = 0;
+	char register_addr = 0;
+	char *input = NULL;
+	unsigned char pbuf[3] = {0};
+
+	pr_info("[%s], count  = %ld, buf = %s ", __func__, count, buf);
+
+	if (count < 9 || buf == NULL) {
+		/* 01 01 01      -- read 0x01 register, len:1*/
+		/* 00 01 08 17 -- write 0x17 to 0x08 register,*/
+		pr_info("[%s], command is invalid, count  = %ld,buf = %s ", __func__, count, buf);
+		return retval;
+	}
+
+	input = buf;
+	memcpy(pbuf, input, 2);
+	pbuf[2] = '\0';
+	retval = kstrtou32(pbuf, 10, &read_enable);
+	if (retval)
+		return retval;
+	lcm_led_i2c_read_write.read_enable = !!read_enable;
+	input = input + 3;
+	memcpy(pbuf, input, 2);
+	pbuf[2] = '\0';
+	packet_count = (unsigned int)string_to_hex(pbuf);
+	if (lcm_led_i2c_read_write.read_enable && !packet_count) {
+		retval = -EINVAL;
+		return retval;
+	}
+	input = input + 3;
+	memcpy(pbuf, input, 2);
+	pbuf[2] = '\0';
+	register_addr = string_to_hex(pbuf);
+	if (lcm_led_i2c_read_write.read_enable) {
+		lcm_led_i2c_read_write.read_count = packet_count;
+		memset(lcm_led_i2c_read_write.buffer, 0, sizeof(lcm_led_i2c_read_write.buffer));
+		lcm_led_i2c_read_write.buffer[0] = (unsigned char)register_addr;
+		if (g_lcm_drv->led_i2c_reg_op)
+			retval = g_lcm_drv->led_i2c_reg_op(lcm_led_i2c_read_write.buffer,
+							LM36273_REG_READ, lcm_led_i2c_read_write.read_count);
+	} else {
+		if (count < 12)
+			return retval;
+
+		memset(lcm_led_i2c_read_write.buffer, 0, sizeof(lcm_led_i2c_read_write.buffer));
+		lcm_led_i2c_read_write.buffer[0] = (unsigned char)register_addr;
+		input = input + 3;
+		memcpy(pbuf, input, 2);
+		pbuf[2] = '\0';
+		lcm_led_i2c_read_write.buffer[1] = (unsigned char)string_to_hex(pbuf);
+
+		if (g_lcm_drv->led_i2c_reg_op)
+			retval = g_lcm_drv->led_i2c_reg_op(lcm_led_i2c_read_write.buffer, LM36273_REG_WRITE, 0);
+	}
+
+	return retval;
+}
+
+long  led_i2c_reg_read(char *buf)
+{
+	int i = 0;
+	ssize_t count = 0;
+
+	if (lcm_led_i2c_read_write.read_enable) {
+		for (i = 0; i < lcm_led_i2c_read_write.read_count; i++) {
+			if (i ==  lcm_led_i2c_read_write.read_count - 1) {
+				count += snprintf(buf + count, PAGE_SIZE - count, "0x%02x\n",
+				     lcm_led_i2c_read_write.buffer[i]);
+			} else {
+				count += snprintf(buf + count, PAGE_SIZE - count, "0x%02x ",
+				     lcm_led_i2c_read_write.buffer[i]);
+			}
+		}
+	}
+	return count;
+}
+
+void  lcm_get_lockdown_info(char *buf)
+{
+	int i = 0;
+
+	if (lcm_mipi_read_write.read_enable) {
+		for (i = 0; i < lcm_mipi_read_write.read_count; i++)
+			buf[i] = lcm_mipi_read_write.read_buffer[i];
+	}
+
+	return;
 }
 
 int nvt_touch_get_lockdown_from_display(unsigned char *plockdowninfo)
@@ -5294,31 +5558,46 @@ static void keep_LP11_in_sw_ctrl(enum DISP_MODULE_ENUM module,
 	for (i = DSI_MODULE_BEGIN(module); i <= DSI_MODULE_END(module); i++) {
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
 					MIPITX_D2_SW_LPTX_PRE_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
+					MIPITX_D2C_SW_LPTX_PRE_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D2_SW_LPTX_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D2C_SW_LPTX_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D2_SW_LPTX_DP, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D2_SW_LPTX_DN, 1);
 
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
 					MIPITX_D0_SW_LPTX_PRE_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
+					MIPITX_D0C_SW_LPTX_PRE_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D0_SW_LPTX_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D0C_SW_LPTX_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D0_SW_LPTX_DP, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D0_SW_LPTX_DN, 1);
 
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
 					MIPITX_CK_SW_LPTX_PRE_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
+					MIPITX_CKC_SW_LPTX_PRE_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_CK_SW_LPTX_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_CKC_SW_LPTX_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_CK_SW_LPTX_DP, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_CK_SW_LPTX_DN, 1);
 
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
 					MIPITX_D1_SW_LPTX_PRE_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
+					MIPITX_D1C_SW_LPTX_PRE_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D1_SW_LPTX_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D1C_SW_LPTX_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D1_SW_LPTX_DP, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D1_SW_LPTX_DN, 1);
 
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
 					MIPITX_D3_SW_LPTX_PRE_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] +
+					MIPITX_D3C_SW_LPTX_PRE_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D3_SW_LPTX_OE, 1);
+		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D3C_SW_LPTX_OE, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D3_SW_LPTX_DP, 1);
 		DISP_REG_SET(cmdq, DSI_PHY_REG[i] + MIPITX_D3_SW_LPTX_DN, 1);
 	}
