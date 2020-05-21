@@ -27,10 +27,17 @@
 #include "mtk/ion_drv.h"
 #include "mtk/mtk_ion.h"
 
-#ifdef CONFIG_MTK_PSEUDO_M4U
-#include <mach/pseudo_m4u.h>
-#elif defined(CONFIG_MTK_M4U)
+//tablet
+#ifdef CONFIG_MTK_IOMMU
+#include "pseudo_m4u.h"
+#endif
+//smart phone m4u
+#ifdef CONFIG_MTK_M4U
 #include <m4u.h>
+#endif
+//smart phone iommu
+#ifdef CONFIG_MTK_IOMMU_V2
+#include <mach/pseudo_m4u.h>
 #endif
 
 #define ION_FB_ALLOCATE_FAIL	-1
@@ -119,7 +126,7 @@ static int ion_fb_heap_phys(struct ion_heap *heap, struct ion_buffer *buffer,
 	}
 
 	memset((void *)&port_info, 0, sizeof(port_info));
-	port_info.module_id = buffer_info->module_id;
+	port_info.emoduleid = buffer_info->module_id;
 	port_info.cache_coherent = buffer_info->coherent;
 	port_info.security = buffer_info->security;
 	port_info.buf_size = buffer->size;
@@ -155,12 +162,7 @@ static int ion_fb_heap_allocate(struct ion_heap *heap,
 {
 	struct ion_fb_buffer_info *buffer_info = NULL;
 	ion_phys_addr_t paddr;
-#ifdef CONFIG_MTK_PSEUDO_M4U
-	ion_phys_addr_t iova = 0;
-	dma_addr_t offset = 0;
-	struct scatterlist *sg;
-	int i = 0;
-#endif
+
 	if (align > PAGE_SIZE)
 		return -EINVAL;
 
@@ -192,18 +194,6 @@ static int ion_fb_heap_allocate(struct ion_heap *heap,
 	buffer->size = size;
 	buffer->sg_table = ion_fb_heap_map_dma(heap, buffer);
 
-#ifdef CONFIG_MTK_PSEUDO_M4U
-	buffer_info->module_id = 0;
-	ion_fb_heap_phys(heap, buffer, &iova, &size);
-
-	sg = buffer->sg_table->sgl;
-	for_each_sg(buffer->sg_table->sgl, sg, buffer->sg_table->nents, i) {
-		sg_dma_address(sg) = iova + offset;
-		sg_dma_len(sg) = sg->length;
-		offset += sg->length;
-	}
-	buffer->priv_virt = buffer_info;
-#endif
 	return buffer_info->priv_phys == ION_FB_ALLOCATE_FAIL ? -ENOMEM : 0;
 }
 
@@ -249,7 +239,7 @@ do {\
 	if (file)\
 		seq_printf(file, fmat, ##args);\
 	else\
-		printk(fmat, ##args);\
+		pr_info(fmat, ##args);\
 } while (0)
 
 static void ion_fb_chunk_show(struct gen_pool *pool,
