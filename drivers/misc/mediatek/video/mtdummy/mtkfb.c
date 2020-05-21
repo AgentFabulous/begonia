@@ -620,7 +620,7 @@ int __parse_tag_videolfb(struct device_node *node)
 }
 
 
-static int _parse_tag_videolfb(void)
+int _parse_tag_videolfb(void)
 {
 	int ret;
 	struct device_node *chosen_node;
@@ -718,12 +718,14 @@ static int mtkfb_probe(struct platform_device *pdev)
 			(unsigned int *)&fbdev->fb_va_base, &fb_pa);
 		fbdev->fb_pa_base = (dma_addr_t) fb_base;
 #else
+#ifdef CONFIG_MTK_M4U
 		struct resource *res =
 			platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
 		disp_hal_allocate_framebuffer(res->start, res->end,
 			(unsigned int *)&fbdev->fb_va_base, &fb_pa);
 		fbdev->fb_pa_base = res->start;
+#endif
 #endif
 	}
 

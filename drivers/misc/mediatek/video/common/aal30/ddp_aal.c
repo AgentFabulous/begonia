@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/time.h>
 #include <linux/wait.h>
@@ -25,8 +26,12 @@
 #include <linux/atomic.h>
 #include <linux/delay.h>
 #if defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT3967) || \
-	defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6885) || \
+	defined(CONFIG_MACH_MT6785) || defined(CONFIG_MACH_MT8168) || \
+	defined(CONFIG_MACH_MT8167)
+
 #include <mtk_leds_drv.h>
 #else
 #define backlight_brightness_set(x) do { } while (0)
@@ -39,6 +44,7 @@
 #include <ddp_path.h>
 #include <primary_display.h>
 #include <disp_drv_platform.h>
+#include <disp_lowpower.h>
 #ifdef CONFIG_MTK_SMI_EXT
 #include <mtk_smi.h>
 #include <smi_public.h>
@@ -51,12 +57,13 @@
 	defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6739) || \
 	defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761) || \
-	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT3967) || \
+	defined(CONFIG_MACH_MT8168) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6785)
 #include <ddp_clkmgr.h>
 #endif
 #endif
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
-#include <disp_lowpower.h>
 #include <disp_helper.h>
 #endif
 #include <ddp_aal.h>
@@ -71,7 +78,9 @@
 	defined(CONFIG_MACH_KIBOPLUS) || defined(CONFIG_MACH_MT6799) || \
 	defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT3967) || \
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT8168) || defined(CONFIG_MACH_MT6885) || \
 	defined(CONFIG_MACH_MT6785)
 #define AAL0_MODULE_NAMING (DISP_MODULE_AAL0)
 #else
@@ -80,7 +89,9 @@
 
 #if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763) || \
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT3967) || \
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT8168) || defined(CONFIG_MACH_MT6885) || \
 	defined(CONFIG_MACH_MT6785)
 #define AAL0_CLK_NAMING (DISP0_DISP_AAL0)
 #else
@@ -91,7 +102,9 @@
 	defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763) || \
 	defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6739) || \
 	defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761) || \
-	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT3967) || \
+	defined(CONFIG_MACH_MT6768) || defined(CONFIG_MACH_MT8168) || \
+	defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6785)
 #define AAL_SUPPORT_PARTIAL_UPDATE
 #endif
 
@@ -196,6 +209,14 @@ static struct DISP_DRE30_HIST g_aal_dre30_hist_db;
 static DECLARE_WAIT_QUEUE_HEAD(g_aal_size_wq);
 static bool g_aal_get_size_available;
 static struct DISP_AAL_DISPLAY_SIZE g_aal_size;
+
+static atomic_t g_aal_dre_config = ATOMIC_INIT(0);
+#define AAL_SRAM_SOF 1
+#define AAL_SRAM_EOF 0
+static u32 aal_sram_method = AAL_SRAM_SOF;
+module_param(aal_sram_method, uint, 0644);
+MODULE_PARM_DESC(aal_sram_method, "aal config sram method");
+
 #else
 static struct DISP_AAL_HIST g_aal_hist_multi_pipe;
 /* Locked by  g_aal#_hist_lock */
@@ -742,14 +763,69 @@ static bool disp_aal_write_dre3(void *cmq_handle)
 	return true;
 }
 
+static void disp_aal_update_dre3_sram(enum DISP_MODULE_ENUM module,
+	 bool check_sram)
+{
+	bool result = false;
+	unsigned long flags;
+	int dre_blk_x_num, dre_blk_y_num;
+	unsigned int read_value;
+	int hist_apb, hist_int;
+
+	if (check_sram) {
+		result = disp_aal_reg_get(module,
+			DISP_AAL_SRAM_CFG, &read_value);
+
+		if (!result) {
+			AAL_ERR("dre3 error: read SRAM config failed");
+			return;
+		}
+
+		hist_apb = (read_value >> 5) & 0x1;
+		hist_int = (read_value >> 6) & 0x1;
+		AAL_DBG("[SRAM] hist_apb(%d) hist_int(%d) 0x%08x in (SOF)",
+			hist_apb, hist_int, read_value);
+
+		if (hist_int != atomic_read(&g_aal_force_hist_apb))
+			AAL_DBG("dre3[%d]: SRAM config %d != %d CMDQ config?",
+				module, hist_int,
+				atomic_read(&g_aal_force_hist_apb));
+	}
+
+	result = disp_aal_reg_get(module,
+		DISP_AAL_DRE_BLOCK_INFO_01, &read_value);
+	if (!result) {
+		AAL_ERR("dre3 error: read DRE BINFO failed");
+		return;
+	}
+	dre_blk_x_num = aal_min(AAL_DRE_BLK_NUM, read_value & 0x1F);
+	dre_blk_y_num =	aal_min(AAL_BLK_MAX_ALLOWED_NUM/dre_blk_x_num,
+		    (read_value >> 5) & 0x1F);
+
+	if (spin_trylock_irqsave(&g_aal_hist_lock, flags)) {
+		result = disp_aal_read_dre3(dre_blk_x_num, dre_blk_y_num);
+		if (result) {
+			g_aal_dre30_hist.dre_blk_x_num = dre_blk_x_num;
+			g_aal_dre30_hist.dre_blk_y_num = dre_blk_y_num;
+			atomic_set(&g_aal_hist_available, 1);
+		}
+		spin_unlock_irqrestore(&g_aal_hist_lock, flags);
+
+		if (result)
+			wake_up_interruptible(&g_aal_hist_wq);
+	}
+
+	if (spin_trylock_irqsave(&g_aal_dre3_gain_lock, flags)) {
+		/* Write DRE 3.0 gain */
+		disp_aal_write_dre3(NULL);
+		spin_unlock_irqrestore(&g_aal_dre3_gain_lock, flags);
+	}
+}
+
 static void disp_aal_dre3_irq_handle(enum DISP_MODULE_ENUM module,
 	int update_method)
 {
 	bool config_success = false;
-	bool read_success = false;
-	unsigned long flags;
-	int dre_blk_x_num, dre_blk_y_num;
-	unsigned int read_value;
 	int hist_apb, hist_int;
 
 	/* Only process AAL0 in single module state */
@@ -770,7 +846,8 @@ static void disp_aal_dre3_irq_handle(enum DISP_MODULE_ENUM module,
 	if (atomic_read(&g_aal_change_to_dre30) != 0x3)
 		return;
 
-	if (atomic_read(&g_aal_dre_halt) == 0) {
+	if (aal_sram_method == AAL_SRAM_EOF &&
+		atomic_read(&g_aal_dre_halt) == 0) {
 		if (atomic_cmpxchg(&g_aal_force_hist_apb, 0, 1) == 0) {
 			hist_apb = 0;
 			hist_int = 1;
@@ -781,7 +858,7 @@ static void disp_aal_dre3_irq_handle(enum DISP_MODULE_ENUM module,
 			AAL_ERR("Error when get hist_apb irq_handler");
 			return;
 		}
-		AAL_DBG("hist_apb (%d), hist_int (%d) in irq_handler",
+		AAL_DBG("[SRAM] hist_apb (%d) hist_int (%d) in (EOF)",
 			hist_apb, hist_int);
 		config_success = disp_aal_reg_mask(module, NULL,
 			DISP_AAL_SRAM_CFG,
@@ -790,42 +867,15 @@ static void disp_aal_dre3_irq_handle(enum DISP_MODULE_ENUM module,
 			return;
 
 		atomic_set(&g_aal_dre_halt, 1);
-
-		read_success = disp_aal_reg_get(module,
-			DISP_AAL_DRE_BLOCK_INFO_01, &read_value);
-		if (read_success == true) {
-			dre_blk_x_num = aal_min(AAL_DRE_BLK_NUM,
-				read_value & 0x1F);
-			dre_blk_y_num =
-				aal_min(AAL_BLK_MAX_ALLOWED_NUM/dre_blk_x_num,
-				    (read_value >> 5) & 0x1F);
-
-			if (spin_trylock_irqsave(&g_aal_hist_lock, flags)) {
-				read_success = disp_aal_read_dre3(dre_blk_x_num,
-					dre_blk_y_num);
-				if (read_success == true) {
-					g_aal_dre30_hist.dre_blk_x_num =
-						dre_blk_x_num;
-					g_aal_dre30_hist.dre_blk_y_num =
-						dre_blk_y_num;
-					atomic_set(&g_aal_hist_available, 1);
-				}
-				spin_unlock_irqrestore(&g_aal_hist_lock, flags);
-
-				if (read_success == true)
-					wake_up_interruptible(&g_aal_hist_wq);
-			}
-
-			if (spin_trylock_irqsave(&g_aal_dre3_gain_lock,
-				flags)) {
-				/* Write DRE 3.0 gain */
-				config_success = disp_aal_write_dre3(NULL);
-				spin_unlock_irqrestore(&g_aal_dre3_gain_lock,
-					flags);
-			}
-		}
-
+		disp_aal_update_dre3_sram(module, false);
 		atomic_set(&g_aal_dre_halt, 0);
+	} else if (aal_sram_method == AAL_SRAM_SOF) {
+		if (primary_display_is_idle()) {
+			AAL_DBG("[SRAM] when idle, operate SRAM in (EOF)");
+			disp_aal_update_dre3_sram(module, false);
+		}
+		AAL_DBG("[SRAM] clean dre_config in (EOF)");
+		atomic_set(&g_aal_dre_config, 0);
 	}
 }
 
@@ -1268,6 +1318,31 @@ void disp_aal_on_end_of_frame(void)
 	disp_aal_on_end_of_frame_by_module(DISP_AAL0);
 }
 
+void disp_aal_on_start_of_frame(enum disp_aal_id_t id)
+{
+#ifdef CONFIG_MTK_DRE30_SUPPORT
+	enum DISP_MODULE_ENUM module = aal_get_module_from_id(id);
+
+	/* Only process AAL0 in single module state */
+	if (module != AAL0_MODULE_NAMING) {
+		AAL_ERR("dre3 error: Module(%d) in sof_irq_handler",
+			module);
+		return;
+	}
+
+	if (atomic_read(&g_aal_force_relay) == 1)
+		return;
+
+	if (atomic_read(&g_aal_change_to_dre30) != 0x3)
+		return;
+
+	if (aal_sram_method != AAL_SRAM_SOF)
+		return;
+
+	AAL_DBG("[SRAM] g_aal_dre_config(%d) in SOF", g_aal_dre_config);
+	disp_aal_update_dre3_sram(module, true);
+#endif
+}
 
 #define LOG_INTERVAL_TH 200
 #define LOG_BUFFER_SIZE 4
@@ -1499,7 +1574,7 @@ static void disp_aal_dre3_config(void *cmdq,
 	DISP_REG_MASK(cmdq, DISP_AAL_SRAM_CFG,
 		init_regs->hist_bin_type, 0x1);
 
-#if defined(CONFIG_MACH_MT6785)
+#if defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 	DISP_REG_SET(cmdq, DISP_AAL_DUAL_PIPE_INFO_00,
 		(0 << 13) | 0);
 	DISP_REG_SET(cmdq, DISP_AAL_DUAL_PIPE_INFO_01,
@@ -1562,6 +1637,38 @@ static int disp_aal_write_init_regs(enum DISP_MODULE_ENUM module, void *cmdq)
 	return ret;
 }
 
+void disp_aal_flip_sram(void *cmdq, const char *caller)
+{
+#ifdef CONFIG_MTK_DRE30_SUPPORT
+	u32 hist_apb = 0, hist_int = 0, sram_cfg;
+
+	if (aal_sram_method != AAL_SRAM_SOF)
+		return;
+
+	if (atomic_read(&g_aal_dre_config) == 1) {
+		AAL_DBG("[SRAM] g_aal_dre_config not 0 in %s", caller);
+		return;
+	}
+
+	atomic_set(&g_aal_dre_config, 1);
+
+	if (atomic_cmpxchg(&g_aal_force_hist_apb, 0, 1) == 0) {
+		hist_apb = 0;
+		hist_int = 1;
+	} else if (atomic_cmpxchg(&g_aal_force_hist_apb, 1, 0) == 1) {
+		hist_apb = 1;
+		hist_int = 0;
+	} else {
+		AAL_ERR("[SRAM] Error when get hist_apb in %s", caller);
+	}
+	sram_cfg = (hist_int << 6)|(hist_apb << 5)|(1 << 4);
+	AAL_DBG("[SRAM] hist_apb(%d) hist_int(%d) 0x%08x in %s",
+		hist_apb, hist_int, sram_cfg, caller);
+	DISP_REG_MASK(cmdq, DISP_AAL_SRAM_CFG,
+		sram_cfg, (0x7 << 4));
+#endif
+}
+
 int disp_aal_set_param(struct DISP_AAL_PARAM __user *param,
 	enum DISP_MODULE_ENUM module, void *cmdq)
 {
@@ -1597,6 +1704,7 @@ int disp_aal_set_param(struct DISP_AAL_PARAM __user *param,
 #if 0
 	backlight_brightness_set(backlight_value);
 #endif
+	disp_aal_flip_sram(cmdq, __func__);
 	disp_aal_trigger_refresh(g_aal_param.refreshLatency);
 	backlight_brightness_set(backlight_value);
 
@@ -1654,7 +1762,9 @@ static int disp_aal_write_dre_to_reg(enum DISP_MODULE_ENUM module,
 	gain = param->DREGainFltStatus;
 #if defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761)
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT6768) || defined(CONFIG_MACH_MT8168) || \
+	defined(CONFIG_MACH_MT6885)
 	DISP_REG_MASK(cmdq, DISP_AAL_DRE_FLT_FORCE(0) + offset,
 	    DRE_REG_2(gain[0], 0, gain[1], 14), ~0);
 	DISP_REG_MASK(cmdq, DISP_AAL_DRE_FLT_FORCE(1) + offset,
@@ -1682,7 +1792,7 @@ static int disp_aal_write_dre_to_reg(enum DISP_MODULE_ENUM module,
 		DRE_REG_3(gain[25], 0, gain[26], 9, gain[27], 18), ~0);
 	DISP_REG_MASK(cmdq, DISP_AAL_DRE_FLT_FORCE_12 + offset, gain[28], ~0);
 #elif defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT3967) || \
-	defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 	DISP_REG_MASK(cmdq, DISP_AAL_DRE_FLT_FORCE(0) + offset,
 	    DRE_REG_2(gain[0], 0, gain[1], 14), ~0);
 	DISP_REG_MASK(cmdq, DISP_AAL_DRE_FLT_FORCE(1) + offset,
@@ -1802,6 +1912,8 @@ static int aal_config(enum DISP_MODULE_ENUM module,
 #ifdef AAL_HAS_DRE3
 	int dre_alg_mode = 0;
 #endif
+	int width, height;
+	const int offset = aal_get_offset(module);
 
 	if (disp_aal_check_module(module, __func__, __LINE__) == false)
 		return 0;
@@ -1811,13 +1923,10 @@ static int aal_config(enum DISP_MODULE_ENUM module,
 		should_update = true;
 #endif
 
+	width = pConfig->dst_w;
+	height = pConfig->dst_h;
+
 	if (pConfig->dst_dirty) {
-		int width, height;
-		const int offset = aal_get_offset(module);
-
-		width = pConfig->dst_w;
-		height = pConfig->dst_h;
-
 #ifdef DISP_PLATFORM_HAS_SHADOW_REG
 		if (disp_helper_get_option(DISP_OPT_SHADOW_REGISTER)) {
 			unsigned long aal_shadow_ctl;
@@ -1859,7 +1968,7 @@ static int aal_config(enum DISP_MODULE_ENUM module,
 
 		DISP_REG_SET(cmdq, DISP_AAL_SIZE + offset,
 			(width << 16) | height);
-#if defined(CONFIG_MACH_MT6785)
+#if defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 		DISP_REG_SET(cmdq, DISP_AAL_OUTPUT_SIZE + offset,
 			(width << 16) | height);
 		DISP_REG_SET(cmdq, DISP_AAL_OUTPUT_OFFSET + offset,
@@ -1886,10 +1995,12 @@ static int aal_config(enum DISP_MODULE_ENUM module,
 
 		DISP_REG_MASK(cmdq, DISP_AAL_EN + offset, 0x1, 0x1);
 
-		AAL_DBG("module:(%d), AAL_CFG = 0x%x, AAL_SIZE = 0x%x(%d, %d)",
+		AAL_DBG("module:(%d), AAL_CFG=0x%x, AAL_SIZE=0x%x(%d, %d)",
 			module, DISP_REG_GET(DISP_AAL_CFG + offset),
 			DISP_REG_GET(DISP_AAL_SIZE + offset), width, height);
 	}
+
+	disp_aal_flip_sram(cmdq, __func__);
 
 	if ((pConfig->ovl_dirty || pConfig->rdma_dirty) &&
 		should_update == true)
@@ -1904,10 +2015,12 @@ static int aal_config(enum DISP_MODULE_ENUM module,
  *****************************************************************************/
 #if defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT3967) || \
-	defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT6768) || defined(CONFIG_MACH_MT8168) || \
+	defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6785)
 #define DRE_FLT_NUM	(13)
-#elif defined(CONFIG_MACH_MT6799)
+#elif defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT3967) || \
+	defined(CONFIG_MACH_MT6779)
 #define DRE_FLT_NUM	(12)
 #else
 #define DRE_FLT_NUM	(11)
@@ -1931,7 +2044,7 @@ struct aal_backup { /* structure for backup AAL register value */
 	unsigned int DRE_CHROMA_HIST_01;
 	unsigned int DRE_ALPHA_BLEND_00;
 	unsigned int SRAM_CFG;
-#if defined(CONFIG_MACH_MT6785)
+#if defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 	unsigned int DUAL_PIPE_INFO_00;
 	unsigned int DUAL_PIPE_INFO_01;
 #endif
@@ -1962,7 +2075,7 @@ static void ddp_aal_dre3_backup(void)
 	g_aal_backup.DRE_BLOCK_INFO_06 =
 		DISP_REG_GET(DISP_AAL_DRE_BLOCK_INFO_06);
 	g_aal_backup.SRAM_CFG = DISP_REG_GET(DISP_AAL_SRAM_CFG);
-#if defined(CONFIG_MACH_MT6785)
+#if defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 	g_aal_backup.DUAL_PIPE_INFO_00 =
 		DISP_REG_GET(DISP_AAL_DUAL_PIPE_INFO_00);
 	g_aal_backup.DUAL_PIPE_INFO_01 =
@@ -2000,13 +2113,15 @@ static void ddp_aal_dre_backup(void)
 
 #if defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761)
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT6768) || defined(CONFIG_MACH_MT8168) || \
+	defined(CONFIG_MACH_MT6885)
 	g_aal_backup.DRE_FLT_FORCE[11] =
 		DISP_REG_GET(DISP_AAL_DRE_FLT_FORCE_11);
 	g_aal_backup.DRE_FLT_FORCE[12] =
 		DISP_REG_GET(DISP_AAL_DRE_FLT_FORCE_12);
 #elif defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT3967) || \
-		defined(CONFIG_MACH_MT6785)
+		defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 	g_aal_backup.DRE_FLT_FORCE[11] =
 		DISP_REG_GET(DISP_AAL_DRE_FLT_FORCE(11));
 #endif
@@ -2070,7 +2185,7 @@ static void ddp_aal_dre3_restore(void *cmq_handle)
 	DISP_REG_MASK(cmq_handle, DISP_AAL_SRAM_CFG,
 		g_aal_backup.SRAM_CFG, 0x1);
 
-#if defined(CONFIG_MACH_MT6785)
+#if defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 	DISP_REG_SET(cmq_handle, DISP_AAL_DUAL_PIPE_INFO_00,
 		g_aal_backup.DUAL_PIPE_INFO_00);
 	DISP_REG_SET(cmq_handle, DISP_AAL_DUAL_PIPE_INFO_01,
@@ -2113,13 +2228,15 @@ static void ddp_aal_dre_restore(enum DISP_MODULE_ENUM module, void *cmq_handle)
 
 #if defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761)
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT8168)
 	DISP_REG_SET(cmq_handle, DISP_AAL_DRE_FLT_FORCE_11 + offset,
 	    g_aal_backup.DRE_FLT_FORCE[11]);
 	DISP_REG_SET(cmq_handle, DISP_AAL_DRE_FLT_FORCE_12 + offset,
 		g_aal_backup.DRE_FLT_FORCE[12]);
 #elif defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT3967) || \
-	defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 	DISP_REG_SET(cmq_handle, DISP_AAL_DRE_FLT_FORCE(11) + offset,
 	    g_aal_backup.DRE_FLT_FORCE[11]);
 #endif
@@ -2179,7 +2296,10 @@ static int aal_clock_on(enum DISP_MODULE_ENUM module, void *cmq_handle)
 #elif defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6739) || \
 	defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761) || \
-	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT3967) || \
+	defined(CONFIG_MACH_MT6768) || defined(CONFIG_MACH_MT8168) || \
+	defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6785)
+
 	ddp_clk_prepare_enable(ddp_get_module_clk_id(module));
 #else
 #ifdef ENABLE_CLK_MGR
@@ -2227,6 +2347,7 @@ static int aal_clock_off(enum DISP_MODULE_ENUM module, void *cmq_handle)
 #ifdef CONFIG_MTK_DRE30_SUPPORT
 	atomic_set(&g_aal_force_hist_apb, 0);
 	atomic_set(&g_aal_dre_halt, 0);
+	atomic_set(&g_aal_dre_config, 0);
 #endif			/* CONFIG_MTK_DRE30_SUPPORT */
 
 #if defined(CONFIG_MACH_ELBRUS) || defined(CONFIG_MACH_MT6757) || \
@@ -2235,7 +2356,10 @@ static int aal_clock_off(enum DISP_MODULE_ENUM module, void *cmq_handle)
 #elif defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6739) || \
 	defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761) || \
-	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT3967) || \
+	defined(CONFIG_MACH_MT8168) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6785)
+
 	ddp_clk_disable_unprepare(ddp_get_module_clk_id(module));
 #else
 #ifdef ENABLE_CLK_MGR
@@ -2270,24 +2394,6 @@ static int aal_init(enum DISP_MODULE_ENUM module, void *cmq_handle)
 
 #if !defined(CONFIG_MACH_MT6759) && !defined(CONFIG_MACH_MT6739)
 	aal_clock_on(module, cmq_handle);
-#endif
-#ifdef CONFIG_MTK_DRE30_SUPPORT
-	DISP_REG_SET(NULL, DISP_AAL_EN, 0x01);
-	DISP_REG_SET(NULL, DISP_AAL_CFG_MAIN, 0x1a);
-
-	DISP_REG_SET(NULL, DISP_AAL_DRE_BLOCK_INFO_00, 0x86e000);
-	DISP_REG_SET(NULL, DISP_AAL_DRE_BLOCK_INFO_01, 0x208);
-	DISP_REG_SET(NULL, DISP_AAL_DRE_BLOCK_INFO_02, 0x10e087);
-	DISP_REG_SET(NULL, DISP_AAL_DRE_BLOCK_INFO_04, 0x216000);
-	DISP_REG_SET(NULL, DISP_AAL_DRE_CHROMA_HIST_00, 0x2018b030);
-	DISP_REG_SET(NULL, DISP_AAL_DRE_CHROMA_HIST_01, 0x4445858);
-
-	DISP_REG_SET(NULL, DISP_AAL_DRE_ALPHA_BLEND_00, 0xfe50fe5);
-	DISP_REG_SET(NULL, DISP_AAL_DRE_BLOCK_INFO_05, 0x4731);
-	DISP_REG_SET(NULL, DISP_AAL_DRE_BLOCK_INFO_06, 0x8e62);
-	DISP_REG_SET(NULL, DISP_AAL_SRAM_CFG, 0x3f0030);
-	DISP_REG_SET(NULL, DISP_AAL_DUAL_PIPE_INFO_00, 0x0);
-	DISP_REG_SET(NULL, DISP_AAL_DUAL_PIPE_INFO_01, 0xe086);
 #endif
 #if defined(CONFIG_MACH_MT6799)
 	if (mt_get_chip_sw_ver() >= CHIP_SW_VER_02)
@@ -2377,7 +2483,7 @@ static int _aal_partial_update(enum DISP_MODULE_ENUM module, void *arg,
 
 	DISP_REG_SET(cmdq, DISP_AAL_SIZE + aal_get_offset(module),
 		(width << 16) | height);
-#if defined(CONFIG_MACH_MT6785)
+#if defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
 	DISP_REG_SET(cmdq, DISP_AAL_OUTPUT_SIZE + aal_get_offset(module),
 		(width << 16) | height);
 #endif
@@ -2517,8 +2623,11 @@ static int aal_io(enum DISP_MODULE_ENUM module, unsigned int msg,
 		disp_aal_set_interrupt_by_module(module, enabled);
 		spin_unlock_irqrestore(&g_aal_irq_en_lock, flags);
 
-		if (enabled)
+		if (enabled) {
+			AAL_DBG("DISP_IOCTL_AAL_EVENTCTL: enabled");
+			disp_aal_flip_sram(cmdq, __func__);
 			disp_aal_trigger_refresh(AAL_REFRESH_33MS);
+		}
 
 		break;
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -30,7 +30,9 @@
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761) || \
 	defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT3967) || \
-	defined(CONFIG_MACH_MT8168) || defined(CONFIG_MACH_MT6785)
+	defined(CONFIG_MACH_MT6768) || defined(CONFIG_MACH_MT8168) || \
+	defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6785)
+
 #include <ddp_clkmgr.h>
 #endif
 #endif
@@ -39,7 +41,9 @@
 #include <disp_dts_gpio.h> /* DTS GPIO */
 #if defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6765) || \
 	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
-	defined(CONFIG_MACH_MT3967)
+	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6785)
+
 #include <mtk_leds_drv.h>
 #include <mtk_leds_sw.h>
 #else
@@ -642,13 +646,16 @@ static int ddp_pwm_power_on(enum DISP_MODULE_ENUM module, void *handle)
 
 #if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT8168)
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT8168)
+
 	/* pwm ccf api */
 	ddp_clk_prepare_enable(ddp_get_module_clk_id(module));
 #elif defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6771)
 	ddp_clk_prepare_enable(ddp_get_module_clk_id(module));
 	ddp_clk_prepare_enable(TOP_MUX_DISP_PWM);
-#elif defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6785)
+#elif defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6785) || \
+	defined(CONFIG_MACH_MT6885)
 	ddp_clk_prepare_enable(ddp_get_module_clk_id(module));
 	ddp_clk_prepare_enable(CLK_MUX_DISP_PWM);
 #else
@@ -700,13 +707,16 @@ static int ddp_pwm_power_off(enum DISP_MODULE_ENUM module, void *handle)
 
 #if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || \
 	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6765) || \
-	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT8168)
+	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT8168)
+
 	/* pwm ccf api */
 	ddp_clk_disable_unprepare(ddp_get_module_clk_id(module));
 #elif defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6771)
 	ddp_clk_disable_unprepare(ddp_get_module_clk_id(module));
 	ddp_clk_disable_unprepare(TOP_MUX_DISP_PWM);
-#elif defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6785)
+#elif defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6785) || \
+	defined(CONFIG_MACH_MT6885)
 	ddp_clk_disable_unprepare(ddp_get_module_clk_id(module));
 	ddp_clk_disable_unprepare(CLK_MUX_DISP_PWM);
 #else
@@ -781,7 +791,8 @@ bool disp_pwm_is_osc(void)
 	defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6739) || \
 	defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6765) || \
 	defined(CONFIG_MACH_MT6761) || defined(CONFIG_MACH_MT6771) || \
-	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT8168) || \
+	defined(CONFIG_MACH_MT3967) || defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT8168) || defined(CONFIG_MACH_MT6885) || \
 	defined(CONFIG_MACH_MT6785)
 
 	is_osc = disp_pwm_mux_is_osc();
@@ -913,7 +924,8 @@ static int pwm_simple_strtoul(char *ptr, unsigned long *res)
 		strncpy(buffer, ptr, end);
 		buffer[end] = '\0';
 		ret = kstrtoul(buffer, 0, res);
-
+		if (!ret)
+			PWM_ERR("kstrtoul err=%d\n", ret);
 	}
 	return end;
 }

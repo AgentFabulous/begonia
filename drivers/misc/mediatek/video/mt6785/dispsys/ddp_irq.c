@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,7 +29,6 @@
 #include "ddp_irq.h"
 #include "ddp_aal.h"
 #include "ddp_drv.h"
-#include "ddp_manager.h"
 #include "disp_helper.h"
 #include "ddp_dsi.h"
 #include "ddp_postmask.h"
@@ -207,7 +207,6 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 		DISP_LOG_I("disp power off, no irq should be handled\n");
 		return IRQ_NONE;
 	}
-
 	if (irq == ddp_get_module_irq(DISP_MODULE_DSI0)) {
 		if (ddp_get_module_irq(DISP_MODULE_DSI0) == irq) {
 			index = 0;
@@ -217,9 +216,16 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 			module = DISP_MODULE_DSI1;
 		}
 
-		if (module == DISP_MODULE_DSI0)
+		if (module == DISP_MODULE_DSI0) {
 			reg_val = (DISP_REG_GET(DISPSYS_DSI0_BASE + 0xC) &
 				   0xffff);
+			if (reg_val & (1 << 2) &&
+				lcm_fps_ctx.dsi_mode == 0) {
+				unsigned long long ext_te_time = sched_clock();
+
+				lcm_fps_ctx_update(&lcm_fps_ctx, ext_te_time);
+			}
+		}
 		else
 			reg_val = (DISP_REG_GET(DISPSYS_DSI1_BASE + 0xC) &
 				   0xffff);
@@ -382,8 +388,13 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 			DDPIRQ("IRQ: RDMA%d frame done!\n", index);
 			rdma_done_irq_cnt[index]++;
 
-			if (index == 0)
+			if (index == 0) {
 				MMPathTracePrimaryOvl2Dsi();
+				if (lcm_fps_ctx.dsi_mode == 1) {
+					lcm_fps_ctx_update(&lcm_fps_ctx,
+						rdma_end_time[index]);
+				}
+			}
 		}
 		if (reg_val & (1 << 1)) {
 			mmprofile_log_ex(
@@ -464,6 +475,9 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 				mmprofile_log_ex(
 					ddp_mmp_get_events()->MUTEX_IRQ[m_id],
 					MMPROFILE_FLAG_PULSE, reg_val, 0);
+				if (ddp_is_moudule_in_mutex(m_id,
+					DISP_MODULE_AAL0))
+					disp_aal_on_start_of_frame(DISP_AAL0);
 			}
 			if (reg_val & (0x1 << (m_id + DISP_MUTEX_TOTAL))) {
 				DDPIRQ("IRQ: mutex%d eof!\n", m_id);

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,8 +37,10 @@
 #include "disp_pm_qos.h"
 #endif
 #include <mmdvfs_pmqos.h>
-#include "m4u.h"
 
+#ifdef CONFIG_MTK_M4U
+#include "m4u.h"
+#endif
 #include "debug.h"
 #include "disp_drv_log.h"
 #include "disp_lcm.h"
@@ -297,6 +299,7 @@ int _blocking_flush(void)
 
 	return ret;
 }
+#if 0
 static int _vfp_chg_callback(unsigned long userdata);
 
 int _vfp_chg_callback(unsigned long userdata)
@@ -323,6 +326,7 @@ int _vfp_chg_callback(unsigned long userdata)
 	}
 	return 0;
 }
+
 static int primary_display_dsi_vfp_change(int state)
 {
 	int ret = 0;
@@ -383,7 +387,7 @@ static int primary_display_dsi_vfp_change(int state)
 	/*can send cmd here, after change VFP,maybe late?*/
 	return ret;
 }
-
+#endif
 static void _idle_set_golden_setting(void)
 {
 	struct cmdqRecStruct *qhandle = NULL;
@@ -794,7 +798,9 @@ static void _primary_display_enable_mmsys_clk(void)
 /* share WROT SRAM end */
 static void _vdo_mode_enter_idle(void)
 {
+#if 0
 	struct LCM_PARAMS *params;
+#endif
 #ifdef MTK_FB_MMDVFS_SUPPORT
 	unsigned long long bandwidth;
 	unsigned int out_fps = 60;
@@ -826,7 +832,7 @@ static void _vdo_mode_enter_idle(void)
 			set_is_dc(1);
 		}
 	}
-
+#if 0
 	/* disable IRQ & increase VFP */
 	if (!primary_is_sec()) {
 		if (disp_helper_get_option(
@@ -865,6 +871,7 @@ static void _vdo_mode_enter_idle(void)
 			}
 		}
 	}
+#endif
 
 	if (disp_helper_get_option(DISP_OPT_SHARE_SRAM))
 		enter_share_sram(CMDQ_SYNC_RESOURCE_WROT1);
@@ -880,7 +887,7 @@ static void _vdo_mode_enter_idle(void)
 	disp_pm_qos_set_ovl_bw(in_fps, out_fps, &bandwidth);
 	disp_pm_qos_update_bw(bandwidth);
 #endif
-
+	lcm_fps_ctx_reset(&lcm_fps_ctx);
 }
 
 static void _vdo_mode_leave_idle(void)
@@ -900,7 +907,7 @@ static void _vdo_mode_leave_idle(void)
 	set_is_display_idle(0);
 	if (disp_helper_get_option(DISP_OPT_DYNAMIC_RDMA_GOLDEN_SETTING))
 		_idle_set_golden_setting();
-
+#if 0
 	/* enable IRQ & restore VFP */
 	if (!primary_is_sec()) {
 		if (idlemgr_pgc->cur_lp_cust_mode) {
@@ -920,6 +927,7 @@ static void _vdo_mode_leave_idle(void)
 					      DDP_IRQ_LEVEL_ALL);
 		}
 	}
+#endif
 
 	/* DC -> DL */
 	if (disp_helper_get_option(DISP_OPT_IDLEMGR_SWTCH_DECOUPLE) &&
@@ -940,7 +948,7 @@ static void _vdo_mode_leave_idle(void)
 	disp_pm_qos_set_ovl_bw(in_fps, out_fps, &bandwidth);
 	disp_pm_qos_update_bw(bandwidth);
 #endif
-
+	lcm_fps_ctx_reset(&lcm_fps_ctx);
 }
 
 static void _cmd_mode_enter_idle(void)
@@ -966,7 +974,7 @@ static void _cmd_mode_enter_idle(void)
 	prim_disp_request_hrt_bw(HRT_BW_UNREQ,
 			DDP_SCENARIO_PRIMARY_DISP, __func__);
 #endif
-
+	lcm_fps_ctx_reset(&lcm_fps_ctx);
 }
 
 static void _cmd_mode_leave_idle(void)
@@ -1002,6 +1010,7 @@ static void _cmd_mode_leave_idle(void)
 	disp_pm_qos_set_ovl_bw(in_fps, out_fps, &bandwidth);
 	disp_pm_qos_update_bw(bandwidth);
 #endif
+	lcm_fps_ctx_reset(&lcm_fps_ctx);
 }
 
 void primary_display_idlemgr_enter_idle_nolock(void)
