@@ -13,7 +13,6 @@
 
 obj-y += ged/
 obj-y += hal/
-obj-y += gpu_bm/
 
 MTK_GPU_VERSION = $(subst ",,$(CONFIG_MTK_GPU_VERSION))
 $(info MTK_GPU_VERSION 1 = $(word 1,$(MTK_GPU_VERSION)))
@@ -24,4 +23,8 @@ else ifneq ($(word 1,$(MTK_GPU_VERSION)),)
     obj-y += gpu_$(word 1,$(MTK_GPU_VERSION))/
 else
     obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
+endif
+
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6785"))
+    obj-y += gpu_bm/
 endif

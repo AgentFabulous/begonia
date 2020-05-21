@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,7 +18,7 @@
 #include <ged_type.h>
 
 /* Must be the same as region_num in gralloc_extra/ge_config.h */
-#define GE_ALLOC_STRUCT_NUM 9
+#define GE_ALLOC_STRUCT_NUM 10
 
 int ged_ge_init(void);
 int ged_ge_exit(void);

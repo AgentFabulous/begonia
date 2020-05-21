@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -46,6 +47,9 @@ GED_ERROR ged_gpu_get_stauts_by_packagename(char *packagename,
 	struct GED_GPU_TUNER_ITEM *status);
 GED_ERROR ged_gpu_tuner_init(void);
 GED_ERROR ged_gpu_tuner_exit(void);
+
+int ged_bridge_gpu_tuner_status(struct GED_BRIDGE_IN_GPU_TUNER_STATUS *in,
+	struct GED_BRIDGE_OUT_GPU_TUNER_STATUS *out);
 
 #if defined(__cplusplus)
 }

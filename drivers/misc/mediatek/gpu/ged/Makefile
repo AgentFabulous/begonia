@@ -22,28 +22,17 @@ ccflags-y += -DMTK_GED_KPI
 ccflags-y += -DGED_KPI_CPU_BOOST
 endif
 
-ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6775" "mt6771" "mt6765" "mt6761" "mt6768" "mt6785"))
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6775" "mt6771" "mt6765" "mt6761" "mt6768" "mt6785" "mt6739"))
 ifeq ($(CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT),y)
 ccflags-y += -DGED_ENABLE_FB_DVFS
 endif
 endif
 
-ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6779" "mt6768" "mt6785"))
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6779" "mt6768" "mt6771" "mt6785"))
 ifeq ($(CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT),y)
 ccflags-y += -DGED_ENABLE_DYNAMIC_DVFS_MARGIN
-endif
-endif
-
-ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6779" "mt6785"))
-ifeq ($(CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT),y)
 ccflags-y += -DGED_CONFIGURE_LOADING_BASE_DVFS_STEP
-endif
-endif
-
-ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6785"))
-ifeq ($(CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT),y)
 ccflags-y += -DGED_ENABLE_TIMER_BASED_DVFS_MARGIN
-ccflags-y += -DGED_ENABLE_FB_DVFS_CWAITG
 endif
 endif
 
@@ -67,17 +56,15 @@ ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6765"))
 #ccflags-y += -DCONFIG_MTK_QOS_SUPPORT
 endif
 
-ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6768"))
-ccflags-y += -DCONFIG_MTK_QOS_SUPPORT
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6768" "mt6771"))
+ccflags-y += -DCONFIG_MTK_QOS_V1_SUPPORT
 endif
 
-ifneq ($(strip $(CONFIG_MTK_ENG_BUILD )),)
-ifneq ($(strip $(CONFIG_MTK_ENG_BUILD )),eng)
+ifneq ($(CONFIG_MTK_ENG_BUILD),y)
 VER:=user
 ifeq ($(CONFIG_EXTREME_LOW_RAM), y)
 ccflags-y += -DGED_LOG_SIZE_LIMITED
 ccflags-y += -DGED_BUFFER_LOG_DISABLE
-endif
 endif
 endif
 
@@ -88,6 +75,7 @@ ccflags-y += \
 	     -I$(MTK_TOP)/include/ \
 	     -I$(GED_TOP)/include/ \
 	     -I$(MTK_TOP)/base/power/$(MTK_PLATFORM)/ \
+	     -I$(MTK_TOP)/base/power/include/ \
 	     -I$(srctree)/drivers/misc/mediatek/video/include \
 	     -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/videox \
 	     -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/dispsys \
