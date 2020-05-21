@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -300,6 +300,17 @@ struct display_primary_path_context {
 	unsigned int fps_chg_last_notify;
 };
 
+#define LCM_FPS_ARRAY_SIZE	32
+struct lcm_fps_ctx_t {
+	int is_inited;
+	struct mutex lock;
+	unsigned int dsi_mode;
+	unsigned int head_idx;
+	unsigned int num;
+	unsigned long long last_ns;
+	unsigned long long array[LCM_FPS_ARRAY_SIZE];
+};
+
 static inline char *lcm_power_state_to_string(enum lcm_power_state ps)
 {
 	switch (ps) {
@@ -371,7 +382,7 @@ int primary_display_trigger(int blocking, void *callback, int need_merge);
 int primary_display_switch_mode(int sess_mode, unsigned int session, int force);
 int primary_display_switch_mode_blocked(int sess_mode, unsigned int session,
 					int force);
-int primary_display_diagnose(void);
+int primary_display_diagnose(const char *func, int line);
 int primary_display_diagnose_oneshot(const char *func, int line);
 
 int primary_display_get_info(struct disp_session_info *info);
@@ -510,8 +521,6 @@ extern void check_mm0_clk_sts(void);
 int primary_display_get_dvfs_last_req(void);
 #endif
 
-int primary_display_set_panel_param(unsigned int param);
-
 /**************function for ARR start************************/
 unsigned int primary_display_is_support_ARR(void);
 int primary_display_wait_fps_change(unsigned int *new_fps);
@@ -530,13 +539,20 @@ void primary_display_update_vfp_line_slot(
 		struct cmdqRecStruct *handle, unsigned int apply_vfp);
 unsigned int primary_display_current_fps(enum arr_fps_type fps_type,
 		int need_lock);
+bool disp_idle_check_rsz(void);
+int primary_display_is_directlink_mode(void);
+bool disp_input_has_yuv(void);
 void _primary_display_arr_send_lcm_cmd(
 		unsigned int from_fps, unsigned int to_fps);
 
 /**************function for ARR end************************/
 
-bool disp_idle_check_rsz(void);
-int primary_display_is_directlink_mode(void);
-bool disp_input_has_yuv(void);
+int primary_display_set_panel_param(unsigned int param);
+
+extern struct lcm_fps_ctx_t lcm_fps_ctx;
+int lcm_fps_ctx_init(struct lcm_fps_ctx_t *fps_ctx);
+int lcm_fps_ctx_reset(struct lcm_fps_ctx_t *fps_ctx);
+int lcm_fps_ctx_update(struct lcm_fps_ctx_t *fps_ctx,
+		unsigned long long cur_ns);
 
 #endif

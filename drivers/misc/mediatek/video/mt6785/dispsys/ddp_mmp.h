@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -150,10 +150,10 @@ struct DDP_MMP_Events {
 	mmp_event primary_set_cmd;
 	mmp_event primary_hrt_bw;
 	mmp_event primary_pm_qos;
-	mmp_event dsi_wrlcm;
 	mmp_event primary_chg_fps_wait;
 	mmp_event primary_chg_fps_req;
 	mmp_event primary_chg_fps_notify;
+	mmp_event dsi_wrlcm;
 	mmp_event primary_chg_fps_send_lcm_cmd;
 };
 

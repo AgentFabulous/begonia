@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -385,7 +385,7 @@ struct mtkfb_device {
 	/* transformations.*/
 	int xscale, yscale, mirror;
 	/* rotate is stored in fb_info->var */
-	u32 pseudo_palette[64];
+	u32 pseudo_palette[17];
 
 	/* Linux fbdev framework data */
 	struct fb_info *fb_info;

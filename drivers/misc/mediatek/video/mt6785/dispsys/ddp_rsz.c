@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -259,7 +258,7 @@ static int rsz_config(enum DISP_MODULE_ENUM module,
 			    c->dst_x, c->dst_y, c->dst_w, c->dst_h);
 		if (!dump) {
 			dump = true;
-			primary_display_diagnose();
+			primary_display_diagnose(__func__, __LINE__);
 			disp_aee_print("need rsz but input_w(%u) > limit(%u)\n",
 				       rsz_config->frm_in_w, RSZ_TILE_LENGTH);
 		}
@@ -283,7 +282,7 @@ static int rsz_config(enum DISP_MODULE_ENUM module,
 			   in_w, in_h, out_w, out_h);
 		if (!dump) {
 			dump = true;
-			primary_display_diagnose();
+			primary_display_diagnose(__func__, __LINE__);
 			disp_aee_print("NOT scaling-up,(%ux%u)>(%ux%u)\n",
 				       in_w, in_h, out_w, out_h);
 		}

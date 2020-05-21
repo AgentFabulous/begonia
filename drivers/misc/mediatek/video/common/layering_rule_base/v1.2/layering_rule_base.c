@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1926,13 +1926,13 @@ static void handle_for_set_disp_info_fail(struct disp_layer_info *info)
 		for (j = 0; j < l_num; j++) {
 			if (copy_from_user(&tmp, &info->input_config[i][j],
 				sizeof(struct layer_config)))
-				DISP_PR_ERR("%s: copy_from_user fail\n");
+				DISP_PR_ERR("copy_from_user fail\n");
 
 			tmp.ovl_id = 0;
 
 			if (copy_to_user(&info->input_config[i][j], &tmp,
 				sizeof(struct layer_config)))
-				DISP_PR_ERR("%s: copy_to_user fail\n");
+				DISP_PR_ERR("copy_to_user fail\n");
 		}
 	}
 

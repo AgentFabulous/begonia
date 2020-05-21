@@ -46,8 +46,9 @@
 #include <linux/mutex.h>
 #include <linux/compat.h>
 
+#ifdef CONFIG_MTK_M4U
 #include "m4u.h"
-
+#endif
 #include "mtk_sync.h"
 #include "debug.h"
 #include "disp_drv_log.h"
@@ -78,7 +79,6 @@
 #include "external_display.h"
 #include "extd_platform.h"
 
-#include "m4u.h"
 #include "layering_rule.h"
 #include "compat_mtk_disp_mgr.h"
 #include "disp_partial.h"
@@ -469,7 +469,7 @@ int _ioctl_prepare_buffer(unsigned long arg, enum PREPARE_FENCE_TYPE type)
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
 	struct disp_buffer_info disp_buf;
-	struct mtkfb_fence_buf_info *fence_buf, *fence_buf2;
+	struct mtkfb_fence_buf_info *fence_buf = NULL, *fence_buf2 = NULL;
 
 	if (copy_from_user(&disp_buf, (void __user *)arg, sizeof(disp_buf))) {
 		pr_err("[FB Driver] copy_from_user failed! line:%d\n",
@@ -1636,6 +1636,8 @@ const char *_session_ioctl_str(unsigned int cmd)
 		return "DISP_IOCTL_CCORR_EVENTCTL";
 	case DISP_IOCTL_CCORR_GET_IRQ:
 		return "DISP_IOCTL_CCORR_GET_IRQ";
+	case DISP_IOCTL_SUPPORT_COLOR_TRANSFORM:
+		return "DISP_IOCTL_SUPPORT_COLOR_TRANSFORM";
 	case DISP_IOCTL_SET_PQPARAM:
 		return "DISP_IOCTL_SET_PQPARAM";
 	case DISP_IOCTL_GET_PQPARAM:
@@ -1729,6 +1731,7 @@ long mtk_disp_mgr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case DISP_IOCTL_SET_CCORR:
 	case DISP_IOCTL_CCORR_EVENTCTL:
 	case DISP_IOCTL_CCORR_GET_IRQ:
+	case DISP_IOCTL_SUPPORT_COLOR_TRANSFORM:
 	case DISP_IOCTL_SET_PQPARAM:
 	case DISP_IOCTL_GET_PQPARAM:
 	case DISP_IOCTL_SET_PQINDEX:
@@ -1859,6 +1862,7 @@ static long mtk_disp_mgr_compat_ioctl(struct file *file, unsigned int cmd,
 	case DISP_IOCTL_SET_CCORR:
 	case DISP_IOCTL_CCORR_EVENTCTL:
 	case DISP_IOCTL_CCORR_GET_IRQ:
+	case DISP_IOCTL_SUPPORT_COLOR_TRANSFORM:
 	case DISP_IOCTL_SET_PQPARAM:
 	case DISP_IOCTL_GET_PQPARAM:
 	case DISP_IOCTL_SET_PQINDEX:

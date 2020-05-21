@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -13,23 +14,6 @@
 
 #ifndef __DDP_AAL_H__
 #define __DDP_AAL_H__
-
-#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6779) || \
-	defined(CONFIG_MACH_MT6785)
-#define AAL_HAS_DRE3            (1)
-#endif
-
-#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763) || \
-	defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT6775) || \
-	defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761) || \
-	defined(CONFIG_MACH_MT8168) || defined(CONFIG_MACH_MT6779) || \
-	defined(CONFIG_MACH_MT6768) || defined(CONFIG_MACH_MT6785)
-#define AAL_SUPPORT_KERNEL_API            (1)
-#endif
-
-#if defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6785)
-#define AAL_HAS_YHIST           (1)
-#endif
 
 #define AAL_HIST_BIN            33	/* [0..32] */
 #define AAL_DRE_POINT_NUM       29
@@ -81,7 +65,6 @@ struct DISP_AAL_INITREG {
 	int dre_map_bypass;
 	/* ESS */
 	int cabc_gainlmt[33];
-#ifdef AAL_HAS_DRE3
 	/* DRE 3.0 Reg. */
 	int dre_s_lower;
 	int dre_s_upper;
@@ -102,7 +85,6 @@ struct DISP_AAL_INITREG {
 	int dre_blk_area_min;
 	int hist_bin_type;
 	int dre_flat_length_slope;
-#endif
 };
 
 struct DISP_DRE30_INIT {
@@ -127,18 +109,12 @@ struct DISP_AAL_HIST {
 	int colorHist;
 	unsigned int maxHist[AAL_HIST_BIN];
 	int requestPartial;
-#ifdef AAL_HAS_DRE3
 	aal_u32_handle_t dre30_hist;
-#endif
-#ifdef AAL_SUPPORT_KERNEL_API
 	unsigned int panel_type;
 	int essStrengthIndex;
 	int ess_enable;
 	int dre_enable;
-#endif
-#ifdef AAL_HAS_YHIST
 	unsigned int yHist[AAL_HIST_BIN];
-#endif
 };
 
 struct DISP_AAL_HIST_MODULE {
@@ -163,13 +139,12 @@ struct DISP_AAL_PARAM {
 	int FinalBacklight;	/* 10-bit ; [0,1023] */
 	int allowPartial;
 	int refreshLatency;	/* DISP_AAL_REFRESH_LATENCY */
-#ifdef AAL_HAS_DRE3
 	aal_u32_handle_t dre30_gain;
-#endif
 };
 
 void disp_aal_on_end_of_frame(void);
 void disp_aal_on_end_of_frame_by_module(enum disp_aal_id_t id);
+void disp_aal_on_start_of_frame(enum disp_aal_id_t id);
 
 extern int aal_dbg_en;
 void aal_test(const char *cmd, char *debug_output);
