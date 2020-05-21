@@ -353,7 +353,7 @@ s32 smi_debug_bus_hang_detect(const bool gce, const char *user)
 	dump_emi_outstanding();
 #endif
 #if IS_ENABLED(CONFIG_MTK_M4U)
-	m4u_dump_reg_for_hang_issue(0);
+	m4u_dump_reg_for_smi_hang_issue();
 #endif
 	for (i = 0; i < time; i++) {
 		for (j = 0; j < SMI_LARB_NUM; j++)
