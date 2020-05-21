@@ -20,8 +20,7 @@
 #include <mt-plat/mtk_boot.h>
 #include <mtk_gpufreq.h>
 
-#undef CONFIG_MTK_QOS_SUPPORT
-#ifdef CONFIG_MTK_QOS_SUPPORT
+#ifdef CONFIG_MTK_QOS_V1_SUPPORT
 #include <mtk_gpu_bw.h>
 #endif
 
@@ -214,6 +213,10 @@ unsigned long ged_query_info(GED_INFO eType)
 	unsigned int gpu_block;
 	unsigned int gpu_idle;
 
+	gpu_loading = 0;
+	gpu_idle = 0;
+	gpu_block = 0;
+
 	switch (eType) {
 	case GED_LOADING:
 		mtk_get_gpu_loading2(&gpu_loading, 1);
@@ -324,7 +327,7 @@ void ged_dvfs_get_bw_record(unsigned int *pui32MaxBW,
 	/* mt_gpufreq_BW_compute();
 	 * reserve for experiment
 	 */
-#ifdef CONFIG_MTK_QOS_SUPPORT
+#ifdef CONFIG_MTK_QOS_V1_SUPPORT
 	ui32MaxBW = mt_gpu_bw_get_BW(0);
 	ui32AvgBW = 0;/* mt_gpu_bw_get_BW(1); This is reserved for experiment */
 #endif
@@ -629,6 +632,10 @@ GED_ERROR ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_SWITCH_CMD eE
 			(g_ui32EventStatus &= (~GED_EVENT_LOW_LATENCY_MODE));
 			ret = ged_dvfs_probe_signal
 			(GED_LOW_LATENCY_MODE_SIGNAL_EVENT);
+			break;
+		case GED_DVFS_VSYNC_OFFSET_DHWC_EVENT:
+			(bSwitch) ? (g_ui32EventStatus |= GED_EVENT_DHWC) :
+				(g_ui32EventStatus &= (~GED_EVENT_DHWC));
 			break;
 	default:
 		GED_LOGE("%s: not acceptable event:%u\n", __func__, eEvent);
@@ -1019,7 +1026,7 @@ static int ged_dvfs_fb_gpu_dvfs(int t_gpu, int t_gpu_target,
 
 	ret_freq = gpu_freq_tar;
 FB_RET:
-#ifdef CONFIG_MTK_QOS_SUPPORT
+#ifdef CONFIG_MTK_QOS_V1_SUPPORT
 	mt_gpu_bw_qos_vcore(ged_dvfs_vcore(gpu_freq_pre,
 		mt_gpufreq_get_cur_freq(), true));
 #endif
@@ -1196,7 +1203,7 @@ static bool ged_dvfs_policy(
 	g_policy_tar_freq = mt_gpufreq_get_freq_by_idx(i32NewFreqID);
 	g_mode = 2;
 
-#ifdef CONFIG_MTK_QOS_SUPPORT
+#ifdef CONFIG_MTK_QOS_V1_SUPPORT
 	return GED_TRUE;
 #else
 	return *pui32NewFreqID != ui32GPUFreq ? GED_TRUE : GED_FALSE;
@@ -1483,83 +1490,6 @@ static int ged_get_timer_base_dvfs_margin(void)
 	return gx_tb_dvfs_margin_cur;
 }
 #endif
-
-#if (defined(GED_ENABLE_FB_DVFS) && defined(GED_ENABLE_FB_DVFS_CWAITG))
-
-#define DVFS_CEAITG_FACTOR_DEFAULT 100 // 100%
-static unsigned int dvfs_cwaitg_mode;
-
-unsigned int ged_dvfs_cwaitg_check(struct GED_DVFS_CWAITG *pInfo)
-{
-	unsigned int ratio;
-	static int gain_factor = DVFS_CEAITG_FACTOR_DEFAULT;
-	unsigned long long result;
-	unsigned long long loading;
-
-	if (dvfs_cwaitg_mode != 0) {
-		ratio = dvfs_cwaitg_mode;
-		loading = (unsigned long long)pInfo->ui32GpuLoading;
-
-		result = pInfo->ullGpuPipeTime*100;
-		do_div(result, pInfo->i32GpuRealTime);
-
-		//if ((pInfo->ullGpuPipeTime*100/pInfo->i32GpuRealTime)<=
-		// lower gpu hw pipe/real ratio
-		if (result <= (loading * ratio / 100)) {
-			int temp;
-
-			if (pInfo->i32CpuWallTime > pInfo->i32GpuTargetTime) {
-				temp = gain_factor *
-				(pInfo->i32CpuWallTime-pInfo->i32GpuTargetTime)/
-				pInfo->i32GpuTargetTime;
-
-				gain_factor += temp;
-			} else {
-				temp = gain_factor *
-				(pInfo->i32GpuTargetTime-pInfo->i32CpuWallTime)/
-				pInfo->i32GpuTargetTime;
-
-				gain_factor -= temp;
-
-				if (gain_factor < DVFS_CEAITG_FACTOR_DEFAULT)
-					gain_factor =
-					DVFS_CEAITG_FACTOR_DEFAULT;
-			}
-		} else
-			gain_factor = DVFS_CEAITG_FACTOR_DEFAULT;
-
-		//time_spent_modify
-		pInfo->i32GpuRealTime_Modify = (int)
-		(((long long)pInfo->i32GpuRealTime*gain_factor)/
-		DVFS_CEAITG_FACTOR_DEFAULT);
-	}
-
-	return dvfs_cwaitg_mode;
-}
-
-static void ged_dvfs_cwaitg(unsigned int ui32DvfsCWaitG)
-{
-	/* 0:  default: disable CWaitG mode */
-	/* 1:~100: enable CWaitG mode and set GPU Pipe ratio */
-	/* others: don't care */
-
-
-	mutex_lock(&gsDVFSLock);
-
-	if ((ui32DvfsCWaitG >= 0) && (ui32DvfsCWaitG <= 100))
-		dvfs_cwaitg_mode = ui32DvfsCWaitG;
-
-	mutex_unlock(&gsDVFSLock);
-}
-
-static unsigned int ged_get_dvfs_cwaitg(void)
-{
-
-	return dvfs_cwaitg_mode;
-}
-#endif
-
-
 /* Need spinlocked */
 void ged_dvfs_save_loading_page(void)
 {
@@ -1669,7 +1599,7 @@ void ged_dvfs_run(unsigned long t, long phase, unsigned long ul3DFenceDoneTime)
 						mt_gpufreq_get_freq_by_idx(
 						g_ui32FreqIDFromPolicy),
 						GED_DVFS_DEFAULT_COMMIT);
-#ifdef CONFIG_MTK_QOS_SUPPORT
+#ifdef CONFIG_MTK_QOS_V1_SUPPORT
 				mt_gpu_bw_qos_vcore(ged_dvfs_vcore(gpu_freq_pre,
 					mt_gpufreq_get_cur_freq(), false));
 #endif
@@ -1906,7 +1836,7 @@ GED_ERROR ged_dvfs_system_init(void)
 	g_gpu_timer_based_emu = 1;
 #endif
 
-#ifdef CONFIG_MTK_QOS_SUPPORT
+#ifdef CONFIG_MTK_QOS_V1_SUPPORT
 	/* default as %100 */
 	gpu_bw_ratio = 100;
 #endif
@@ -1953,10 +1883,6 @@ GED_ERROR ged_dvfs_system_init(void)
 	mtk_get_timer_base_dvfs_margin_fp = ged_get_timer_base_dvfs_margin;
 #endif
 
-#if (defined(GED_ENABLE_FB_DVFS) && defined(GED_ENABLE_FB_DVFS_CWAITG))
-		mtk_dvfs_cwaitg_fp = ged_dvfs_cwaitg;
-		mtk_get_dvfs_cwaitg_fp = ged_get_dvfs_cwaitg;
-#endif
 	/* CAP query */
 	mtk_get_gpu_dvfs_cal_freq_fp = ged_get_gpu_dvfs_cal_freq;
 
@@ -1974,7 +1900,7 @@ void ged_dvfs_system_exit(void)
 	mutex_destroy(&gsVSyncOffsetLock);
 }
 
-#ifdef CONFIG_MTK_QOS_SUPPORT
+#ifdef CONFIG_MTK_QOS_V1_SUPPORT
 module_param(gpu_bw_ratio, uint, 0644);
 #endif
 
