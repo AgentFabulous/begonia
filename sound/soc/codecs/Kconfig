@@ -149,6 +149,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_TAS2552 if I2C
 	select SND_SOC_TAS5086 if I2C
 	select SND_SOC_TAS571X if I2C
+	select SND_SOC_TAS5782M if I2C
 	select SND_SOC_TAS5720 if I2C
 	select SND_SOC_TFA9879 if I2C
 	select SND_SOC_TLV320AIC23_I2C if I2C
@@ -643,6 +644,9 @@ config SND_SOC_MSM8916_WCD_ANALOG
 config SND_SOC_MSM8916_WCD_DIGITAL
 	tristate "Qualcomm MSM8916 WCD DIGITAL Codec"
 
+config SND_SOC_MT8167_CODEC
+	tristate
+
 config SND_SOC_PCM1681
 	tristate "Texas Instruments PCM1681 CODEC"
 	depends on I2C
@@ -883,6 +887,13 @@ config SND_SOC_TAS5720
 	help
 	  Enable support for Texas Instruments TAS5720L/M high-efficiency mono
 	  Class-D audio power amplifiers.
+
+config SND_SOC_TAS5782M
+	tristate "Ti TAS5782M AMP"
+	depends on I2C
+	help
+	  Enable support for Texas Instruments TAS5782m high-efficiency
+	  stereo closed-loop Class-D audio power amplifiers.
 
 config SND_SOC_TFA9879
 	tristate "NXP Semiconductors TFA9879 amplifier"
@@ -1188,6 +1199,9 @@ config SND_SOC_MT6358
 	tristate
 
 config SND_SOC_MT6359
+	tristate
+
+config SND_SOC_MT6392_CODEC
 	tristate
 
 config SND_SOC_NAU8540

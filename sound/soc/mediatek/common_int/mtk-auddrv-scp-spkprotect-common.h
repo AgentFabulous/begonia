@@ -47,7 +47,7 @@
 #include "mtk-soc-pcm-common.h"
 #include <linux/kernel.h>
 
-#if defined(CONFIG_SND_SOC_MTK_SCP_SMARTPA)
+#ifdef CONFIG_SND_SOC_MTK_SCP_SMARTPA
 #include <audio_dma_buf_control.h>
 #include <audio_ipi_client_spkprotect.h>
 #include <audio_task_manager.h>

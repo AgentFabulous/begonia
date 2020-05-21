@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2014 NXP Semiconductors, All Rights Reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,9 +16,9 @@
 #endif
 
 #ifndef ASSERT
-
+//#define ASSERT
 #endif
-
+// TODO wwwim
 #ifndef _ASSERT
 #define _ASSERT(e)
 #endif
@@ -124,14 +123,14 @@
 				"PrintAssert:%s (%s:%d) error code:%d\n", \
 				__func__, __FILE__, __LINE__, e);          \
 	} while (0)
-
-
+//#	define PRINT_ASSERT(e) if ((e)) fprintf(stderr, "PrintAssert:%s (%s:%d)
+//%s\n",__FUNCTION__,__FILE__,__LINE__, Tfa98xx_GetErrorString(e))
 
 #elif defined(__CODE_RED)
 #include "app_global.h"
 #ifdef DEBUG
 #define _DEBUG(level, fmt, va...) TB_TRACE_INF(TbTracePfx2("tfa", TB_FUNC, va))
-
+// printf(PREFIX "%s:%d: "fmt,__func__,__LINE__,##va);
 #else
 #define _DEBUG(level, fmt, va...) \
 	do {                      \
@@ -139,35 +138,35 @@
 #endif
 
 #define MSG(fmt, ...) TB_TRACE_INF(TbTracePfx2("tfa", TB_FUNC, __VA_ARGS__))
-
-
-
-
-
-
-
-
-
-
+// printf(PREFIX "%s:%s:%d: "fmt,__FILE__,__func__,__LINE__,##va)
+// TB_TRACE_INF(TbTracePfx2(APP_PFX,TB_FUNC,"path=%s, chan=%u, muted=%s,
+// vol=%d\n",
+//                                              path->isRecording ? "recording"
+//                                              : "playback", i,
+//                                              channelVol.currentMuteValue ?
+//                                              "YES" : "NO",
+//                                              channelVol.currentVolumeValue
+//                                              ));
+//#   define _ERRORMSG(fmt,va...) TB_TRACE_INF(TbTracePfx2("tfa",TB_FUNC,va))
 #define ERRORMSG(...) TB_TRACE_INF(TbTracePfx2("tfa", TB_FUNC, __VA_ARGS__))
-
-
+// fprintf(stderr, PREFIX "ERROR %s:%s:%d: "fmt,__FILE__,__func__,__LINE__,
+// ##va)
 
 #define DEBUG0(x...) MSG(x)
 #define DEBUG1(x...) _DEBUG(1, x)
 #define DEBUG2(x...) _DEBUG(2, x)
 #define DEBUG3(x...) _DEBUG(3, x)
-
+//#   define ERRORMSG(x...) _ERRORMSG(x)
 #define PRINT(x...) TB_TRACE_INF(TbTracePfx2("tfa", TB_FUNC, x))
-
+// printf(x)
 #define PRINT_ERROR(x...) TB_TRACE_INF(TbTracePfx2("tfa", TB_FUNC, x))
-
+// fprintf(stderr,__VA_ARGS__)
 #define PRINT_FILE(file, x...) TB_TRACE_INF(TbTracePfx2("tfa", TB_FUNC, x))
-
+// fprintf(file,__VA_ARGS__)
 #define PRINT_ASSERT(e)
-
-
-
+// TB_TRACE_INF(TbTracePfx2("tfa",TB_FUNC,Tfa98xx_GetErrorString(e)))
+// if ((e)) fprintf(stderr, "PrintAssert:%s (%s:%d)
+// %s\n",__FUNCTION__,__FILE__,__LINE__, Tfa98xx_GetErrorString(e))
 #else
 #include <stdio.h>
 /* user mode */
@@ -201,8 +200,8 @@
 				"PrintAssert:%s (%s:%d) error code:%d\n", \
 				__func__, __FILE__, __LINE__, e);         \
 	} while (0)
-
-
+//#	define PRINT_ASSERT(e) if ((e)) fprintf(stderr, "PrintAssert:%s (%s:%d)
+//%s\n",__func__,__FILE__,__LINE__, Tfa98xx_GetErrorString(e))
 
 #endif /* WIN32 */
 

@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2014 NXP Semiconductors, All Rights Reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -108,13 +107,13 @@ extern "C" {
  */
 enum Tfa98xx_Error {
 	Tfa98xx_Error_Ok = 0,
-	Tfa98xx_Error_Device,
-
+	Tfa98xx_Error_Device, // 1. Currently only used to keep in sync with
+			      // tfa_error
 	Tfa98xx_Error_Bad_Parameter, /* 2. */
 	Tfa98xx_Error_Fail,    /* 3. generic failure, avoid mislead message */
 	Tfa98xx_Error_NoClock, /* 4. no clock detected */
 	Tfa98xx_Error_StateTimedOut,    /* 5. */
-	Tfa98xx_Error_DSP_not_running,
+	Tfa98xx_Error_DSP_not_running,  // 6. communication with the DSP failed
 	Tfa98xx_Error_AmpOn,		/* 7. amp is still running */
 	Tfa98xx_Error_NotOpen,		/* 8. the given handle is not open */
 	Tfa98xx_Error_InUse,		/* 9. too many handles */
@@ -144,24 +143,24 @@ enum Tfa98xx_Error {
  */
 enum Tfa98xx_Status_ID {
 	Tfa98xx_DSP_Not_Running = -1, /* No response from DSP */
-	Tfa98xx_I2C_Req_Done = 0,
-
-	Tfa98xx_I2C_Req_Busy = 1,
-
-	Tfa98xx_I2C_Req_Invalid_M_ID = 2,
-
-	Tfa98xx_I2C_Req_Invalid_P_ID = 3,
-
-	Tfa98xx_I2C_Req_Invalid_CC = 4,
-
-	Tfa98xx_I2C_Req_Invalid_Seq = 5,
-
-
+	Tfa98xx_I2C_Req_Done = 0, // Request executed correctly and result, if
+				  // any, is available for download
+	Tfa98xx_I2C_Req_Busy = 1, // Request is being processed, just wait for
+				  // result
+	Tfa98xx_I2C_Req_Invalid_M_ID = 2, // Provided M-ID does not fit in valid
+					  // rang [0..2]
+	Tfa98xx_I2C_Req_Invalid_P_ID = 3, // Provided P-ID isn�t valid in the
+					  // given M-ID context
+	Tfa98xx_I2C_Req_Invalid_CC = 4,   // Invalid channel configuration bits
+					  // (SC|DS|DP|DC) combination
+	Tfa98xx_I2C_Req_Invalid_Seq = 5,  // Invalid sequence of commands, in
+					  // case the DSP expects some commands
+					  // in a specific order
 	Tfa98xx_I2C_Req_Invalid_Param = 6,   /* Generic error */
-	Tfa98xx_I2C_Req_Buffer_Overflow = 7,
-
-
-
+	Tfa98xx_I2C_Req_Buffer_Overflow = 7, // I2C buffer has overflowed: host
+					     // has sent too many parameters,
+					     // memory integrity is not
+					     // guaranteed
 	Tfa98xx_I2C_Req_Calib_Busy = 8,      /* Calibration not finished */
 	Tfa98xx_I2C_Req_Calib_Failed = 9     /* Calibration failed */
 };
@@ -604,7 +603,7 @@ enum Tfa98xx_Error tfa98xx_write_register16(struct tfa_device *tfa,
 					    unsigned short value);
 
 /**
- * Intialise the dsp
+ * Initialise the dsp
  * @param tfa the device struct pointer
  * @return tfa error enum
  */
@@ -757,7 +756,7 @@ enum Tfa98xx_Error tfa98xx_dsp_write_drc(struct tfa_device *tfa, int length,
  * write/read raw msg functions :
  * the buffer is provided in little endian format, each word occupying 3 bytes,
  * length is in bytes. The functions will return immediately and do not not wait
- * for DSP reponse.
+ * for DSP response.
  * @param tfa the device struct pointer
  * @param length length of the character buffer to write
  * @param buf character buffer to write
@@ -772,10 +771,12 @@ enum Tfa98xx_Error tfa_dsp_msg(struct tfa_device *tfa, int length,
 enum Tfa98xx_Error dsp_msg(struct tfa_device *tfa, int length, const char *buf);
 enum Tfa98xx_Error dsp_msg_read(struct tfa_device *tfa, int length,
 				unsigned char *bytes);
-enum Tfa98xx_Error tfa_reg_write(struct tfa_device *tfa, unsigned char subaddress,
-			     unsigned short value);
-enum Tfa98xx_Error tfa_reg_read(struct tfa_device *tfa, unsigned char subaddress,
-			    unsigned short *value);
+enum Tfa98xx_Error tfa_reg_write(struct tfa_device *tfa,
+				 unsigned char subaddress,
+				 unsigned short value);
+enum Tfa98xx_Error tfa_reg_read(struct tfa_device *tfa,
+				unsigned char subaddress,
+				unsigned short *value);
 enum Tfa98xx_Error mem_write(struct tfa_device *tfa, unsigned short address,
 			     int value, int memtype);
 enum Tfa98xx_Error mem_read(struct tfa_device *tfa, unsigned int start_offset,
@@ -788,7 +789,7 @@ int is_94_N2_device(struct tfa_device *tfa);
  * write/read raw msg functions:
  * the buffer is provided in little endian format, each word occupying 3 bytes,
  * length is in bytes. The functions will return immediately and do not not wait
- * for DSP reponse. An ID is added to modify the command-ID
+ * for DSP response. An ID is added to modify the command-ID
  * @param tfa the device struct pointer
  * @param length length of the character buffer to write
  * @param buf character buffer to write
@@ -920,7 +921,7 @@ uint16_t tfaContBfEnumAny(const char *name);
 #define TFA_READ_REG(tfa, fieldname) tfa_read_reg(tfa, TFA_FAM(tfa, fieldname))
 
 /* FOR CALIBRATION RETRIES */
-#define TFA98XX_API_WAITRESULT_NTRIES 3000
+#define TFA98XX_API_WAITRESULT_NTRIES 3000 // defined in API
 
 /**
  * run the startup/init sequence and set ACS bit
@@ -965,7 +966,7 @@ enum Tfa98xx_Error tfaRunStartup(struct tfa_device *tfa, int profile);
  * start the maximus speakerboost algorithm
  * this implies a full system startup when the system was not already started
  * @param tfa the device struct pointer
- * @param force indicates wether a full system startup should be allowed
+ * @param force indicates whether a full system startup should be allowed
  * @param profile the profile that should be loaded
  */
 enum Tfa98xx_Error tfaRunSpeakerBoost(struct tfa_device *tfa, int force,
@@ -974,7 +975,7 @@ enum Tfa98xx_Error tfaRunSpeakerBoost(struct tfa_device *tfa, int force,
 /**
  * Startup the device and write all files from device and profile section
  * @param tfa the device struct pointer
- * @param force indicates wether a full system startup should be allowed
+ * @param force indicates whether a full system startup should be allowed
  * @param profile the profile that should be loaded on speaker startup
  */
 enum Tfa98xx_Error tfaRunSpeakerStartup(struct tfa_device *tfa, int force,

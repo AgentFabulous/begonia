@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2014 NXP Semiconductors, All Rights Reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,8 +19,8 @@
 #include "tfa_service.h"
 
 #if (defined(WIN32) || defined(_X64))
-
-
+// These warnings are disabled because it is only given by Windows and there is
+// no easy fix
 #pragma warning(disable : 4200)
 #pragma warning(disable : 4214)
 #endif
@@ -32,14 +31,14 @@
  */
 #define TFA_MAX_PROFILES (64)
 #define TFA_MAX_VSTEPS (64)
-
+// This marker  is used to indicate if all msgs need to be written to the device
 #define TFA_MAX_VSTEP_MSG_MARKER (100)
 #define TFA_MAX_MSGS (10)
 
-
-
-
-
+// the pack pragma is required to make that the size in memory
+// matches the actual variable lenghts
+// This is to assure that the binary files can be transported between
+// different platforms.
 #pragma pack(push, 1)
 
 struct uint24 {
@@ -51,30 +50,30 @@ struct uint24 {
  */
 struct nxpTfaHeader {
 	uint16_t id;
-	char version[2];
-	char subversion[2];
-	uint16_t size;
-	uint32_t CRC;
-	char customer[8];
-	char application[8];
-	char type[8];
+	char version[2];     // "V_" : V=version, vv=subversion
+	char subversion[2];  // "vv" : vv=subversion
+	uint16_t size;       // data size in bytes following CRC
+	uint32_t CRC;	// 32-bits CRC for following data
+	char customer[8];    // “name of customer”
+	char application[8]; // “application name”
+	char type[8];	// “application type name”
 };
 
 enum nxpTfaSamplerate {
-	fs_8k,
-	fs_11k025,
-	fs_12k,
-	fs_16k,
-	fs_22k05,
-	fs_24k,
-	fs_32k,
-	fs_44k1,
-	fs_48k,
-	fs_96k,
-	fs_count
+	fs_8k,     // 8kHz
+	fs_11k025, // 11.025kHz
+	fs_12k,    // 12kHz
+	fs_16k,    // 16kHz
+	fs_22k05,  // 22.05kHz
+	fs_24k,    // 24kHz
+	fs_32k,    // 32kHz
+	fs_44k1,   // 44.1kHz
+	fs_48k,    // 48kHz
+	fs_96k,    // 96kHz
+	fs_count   // Should always be last item.
 };
 
-
+// Keep in sync with enum nxpTfaSamplerate !
 static const int nxpTfaSamplerateHz[fs_count] = { 8000,  11025, 12000, 16000,
 						  22050, 24000, 32000, 44100,
 						  48000, 96000 };
@@ -124,10 +123,10 @@ struct nxpTfaBiquadFloat {
  * Note: This is not in line with smartstudio (JV: 12/12/2016)
  */
 enum nxpTfaFilterType {
-	fCustom,
-	fFlat,
-	fLowpass,
-	fHighpass,
+	fCustom,   // User defined biquad coefficients
+	fFlat,     // Vary only gain
+	fLowpass,  // 2nd order Butterworth low pass
+	fHighpass, // 2nd order Butterworth high pass
 	fLowshelf,
 	fHighshelf,
 	fNotch,
@@ -144,11 +143,11 @@ enum nxpTfaFilterType {
 struct nxpTfaFilter {
 	struct nxpTfaBiquadOld biquad;
 	uint8_t enabled;
-	uint8_t type;
+	uint8_t type; // (== enum FilterTypes, assure 8bits length)
 	float frequency;
 	float Q;
 	float gain;
-};
+}; // 8 * float + int32 + byte == 37
 
 /*
  * biquad params for calculation
@@ -163,14 +162,14 @@ struct nxpTfaFilter {
  */
 struct nxpTfaLsCompensationFilter {
 	struct nxpTfaBiquad biquad;
-	uint8_t lsCompOn;
-
-
-	uint8_t bwExtOn;
-	float fRes;
-	float Qt;
-	float fBwExt;
-	float samplingFreq;
+	uint8_t lsCompOn;   // Loudspeaker compensation on/off; when 'off', the
+			    // DSP code doesn't apply the bwExt => bwExtOn GUI
+			    // flag should be gray to avoid confusion
+	uint8_t bwExtOn;    // Bandwidth extension on/off
+	float fRes;	 // [Hz] speaker resonance frequency
+	float Qt;	   // Speaker resonance Q-factor
+	float fBwExt;       // [Hz] Band width extension frequency
+	float samplingFreq; // [Hz] Sampling frequency
 };
 
 /*
@@ -179,10 +178,10 @@ struct nxpTfaLsCompensationFilter {
 struct nxpTfaAntiAliasFilter {
 	struct nxpTfaBiquad biquad; /**< Output results fixed point coeffs */
 	uint8_t enabled;
-	float cutOffFreq;
-	float samplingFreq;
-	float rippleDb;
-	float rolloff;
+	float cutOffFreq;   // cut off frequency
+	float samplingFreq; // sampling frequency
+	float rippleDb;     // range: [0.1 3.0]
+	float rolloff;      // range: [-1.0 1.0]
 };
 
 /**
@@ -191,7 +190,7 @@ struct nxpTfaAntiAliasFilter {
 struct nxpTfaIntegratorFilter {
 	struct nxpTfaBiquad biquad; /**< Output results fixed point coeffs */
 	uint8_t type;       /**< Butterworth filter type: high or low pass */
-	float cutOffFreq;
+	float cutOffFreq;   // cut off frequency in Hertz; range: [100.0 4000.0]
 	float samplingFreq; /**< sampling frequency in Hertz */
 	float leakage;      /**< leakage factor; range [0.0 1.0] */
 };
@@ -199,44 +198,44 @@ struct nxpTfaIntegratorFilter {
 struct nxpTfaEqFilter {
 	struct nxpTfaBiquad biquad;
 	uint8_t enabled;
-	uint8_t type;
-	float cutOffFreq;
-	float samplingFreq;
-	float Q;
-	float gainDb;
-};
+	uint8_t type;       // (== enum FilterTypes, assure 8bits length)
+	float cutOffFreq;   // cut off frequency, // range: [100.0 4000.0]
+	float samplingFreq; // sampling frequency
+	float Q;	    // range: [0.5 5.0]
+	float gainDb;       // range: [-10.0 10.0]
+};			    // 8 * float + int32 + byte == 37
 
 struct nxpTfaContAntiAlias {
-	int8_t index;
-
+	int8_t index; // index determines destination type; anti-alias,
+		      // integrator,eq
 	uint8_t type;
-	float cutOffFreq;
+	float cutOffFreq; // cut off frequency
 	float samplingFreq;
-	float rippleDb;
+	float rippleDb; // integrator leakage
 	float rolloff;
-	uint8_t bytes[5 * 3];
+	uint8_t bytes[5 * 3]; // payload 5*24buts coeffs
 };
 
 struct nxpTfaContIntegrator {
-	int8_t index;
-
+	int8_t index; // index determines destination type; anti-alias,
+		      // integrator,eq
 	uint8_t type;
-	float cutOffFreq;
+	float cutOffFreq; // cut off frequency
 	float samplingFreq;
-	float leakage;
+	float leakage; // integrator leakage
 	float reserved;
-	uint8_t bytes[5 * 3];
+	uint8_t bytes[5 * 3]; // payload 5*24buts coeffs
 };
 
 struct nxpTfaContEq {
 	int8_t index;
-	uint8_t type;
-	float cutOffFreq;
-	float samplingFreq;
-	float Q;
-	float gainDb;
-	uint8_t bytes[5 * 3];
-};
+	uint8_t type;	 // (== enum FilterTypes, assure 8bits length)
+	float cutOffFreq;     // cut off frequency, // range: [100.0 4000.0]
+	float samplingFreq;   // sampling frequency
+	float Q;	      // range: [0.5 5.0]
+	float gainDb;	 // range: [-10.0 10.0]
+	uint8_t bytes[5 * 3]; // payload 5*24buts coeffs
+};			      // 8 * float + int32 + byte == 37
 
 union nxpTfaContBiquad {
 	struct nxpTfaContEq eq;
@@ -256,7 +255,7 @@ struct nxpTfaEqualizer {
 /*
  * files
  */
-#define HDR(c1, c2) (c2 << 8 | c1)
+#define HDR(c1, c2) (c2 << 8 | c1) // little endian
 enum nxpTfaHeaderType {
 	paramsHdr = HDR('P', 'M'), /* containter file */
 	volstepHdr = HDR('V', 'P'),
@@ -277,9 +276,9 @@ enum nxpTfaHeaderType {
 #define NXPTFA_EQ_SUBVERSION "00"
 struct nxpTfaEqualizerFile {
 	struct nxpTfaHeader hdr;
-	uint8_t samplerate;
-	struct nxpTfaFilter filter[TFA98XX_MAX_EQ];
-
+	uint8_t samplerate; // ==enum samplerates, assure 8 bits
+	struct nxpTfaFilter filter[TFA98XX_MAX_EQ]; // note: API index counts
+						    // from 1..10
 };
 
 /*
@@ -383,22 +382,22 @@ struct nxpTfaDrcFile2 {
 /*
  * volume step structures
  */
-
+// VP01
 #define NXPTFA_VP1_VERSION '1'
 #define NXPTFA_VP1_SUBVERSION "01"
 struct nxpTfaVolumeStep1 {
-	float attenuation;
+	float attenuation; // IEEE single float
 	uint8_t preset[TFA98XX_PRESET_LENGTH];
 };
 
-
+// VP02
 #define NXPTFA_VP2_VERSION '2'
 #define NXPTFA_VP2_SUBVERSION "01"
 struct nxpTfaVolumeStep2 {
-	float attenuation;
+	float attenuation; // IEEE single float
 	uint8_t preset[TFA98XX_PRESET_LENGTH];
-	struct nxpTfaFilter filter[TFA98XX_MAX_EQ];
-
+	struct nxpTfaFilter filter[TFA98XX_MAX_EQ]; // note: API index counts
+						    // from 1..10
 };
 
 /*
@@ -408,19 +407,19 @@ struct nxpTfaVolumeStep2 {
 #define NXPTFA_VP_SUBVERSION "00"
 struct nxpTfaVolumeStepFile {
 	struct nxpTfaHeader hdr;
-	uint8_t vsteps;
-	uint8_t samplerate;
-	uint8_t payload;
+	uint8_t vsteps;     // can also be calulated from size+type
+	uint8_t samplerate; // ==enum samplerates, assure 8 bits
+	uint8_t payload; // start of variable length contents:N times volsteps
 };
 /*
  * volumestep2 file
  */
 struct nxpTfaVolumeStep2File {
 	struct nxpTfaHeader hdr;
-	uint8_t vsteps;
-	uint8_t samplerate;
-	struct nxpTfaVolumeStep2 vstep[];
-
+	uint8_t vsteps;     // can also be calulated from size+type
+	uint8_t samplerate; // ==enum samplerates, assure 8 bits
+	struct nxpTfaVolumeStep2 vstep[]; // start of variable length contents:N
+					  // times volsteps
 };
 
 /*
@@ -464,10 +463,10 @@ struct nxpTfaVolumeStepMessageInfo {
  */
 struct nxpTfaOldHeader {
 	uint16_t id;
-	char version[2];
-	char subversion[2];
-	uint16_t size;
-	uint32_t CRC;
+	char version[2];    // "V_" : V=version, vv=subversion
+	char subversion[2]; // "vv" : vv=subversion
+	uint16_t size;      // data size in bytes following CRC
+	uint32_t CRC;       // 32-bits CRC for following data
 };
 
 struct nxpOldTfaFilter {
@@ -480,7 +479,7 @@ struct nxpOldTfaFilter {
 };
 
 struct nxpTfaOldVolumeStep2 {
-	float attenuation;
+	float attenuation; // IEEE single float
 	uint8_t preset[TFA98XX_PRESET_LENGTH];
 	struct nxpOldTfaFilter eq[10];
 };
@@ -497,10 +496,10 @@ struct nxpTfaOldVolumeStepFile {
  */
 struct nxpTfaSpkHeader {
 	struct nxpTfaHeader hdr;
-	char name[8];
+	char name[8]; // speaker nick name (e.g. “dumbo”)
 	char vendor[16];
 	char type[8];
-
+	//	dimensions (mm)
 	uint8_t height;
 	uint8_t width;
 	uint8_t depth;
@@ -514,16 +513,16 @@ struct nxpTfaSpkHeader {
 #define NXPTFA_SP_SUBVERSION "00"
 struct nxpTfaSpeakerFile {
 	struct nxpTfaHeader hdr;
-	char name[8];
+	char name[8]; // speaker nick name (e.g. “dumbo”)
 	char vendor[16];
 	char type[8];
-
+	//	dimensions (mm)
 	uint8_t height;
 	uint8_t width;
 	uint8_t depth;
 	uint8_t ohm_primary;
 	uint8_t ohm_secondary;
-	uint8_t data[];
+	uint8_t data[]; // payload TFA98XX_SPEAKERPARAMETER_LENGTH
 };
 
 #define NXPTFA_VP3_VERSION '3'
@@ -552,16 +551,16 @@ struct nxpTfaLiveData {
 #define NXPTFA_SP3_SUBVERSION "00"
 struct nxpTfaSpeakerFileMax2 {
 	struct nxpTfaHeader hdr;
-	char name[8];
+	char name[8]; // speaker nick name (e.g. “dumbo”)
 	char vendor[16];
 	char type[8];
-
+	//	dimensions (mm)
 	uint8_t height;
 	uint8_t width;
 	uint8_t depth;
 	uint8_t ohm_primary;
 	uint8_t ohm_secondary;
-	struct nxpTfaFWMsg FWmsg;
+	struct nxpTfaFWMsg FWmsg; // payload including FW ver and Cmd ID
 };
 
 /*
@@ -573,13 +572,13 @@ struct nxpTfaSpeakerFileMax2 {
  * Note 2: add new descriptors to dsc_name[] in tfaContUtil.c
  */
 enum nxpTfaDescriptorType {
-	dscDevice,
-	dscProfile,
-	dscRegister,
-	dscString,
-	dscFile,
-	dscPatch,
-	dscMarker,
+	dscDevice,   // device list
+	dscProfile,  // profile list
+	dscRegister, // register patch
+	dscString,   // ascii, zero terminated string
+	dscFile,     // filename + file contents
+	dscPatch,    // patch file
+	dscMarker,   // marker to indicate end of a list
 	dscMode,
 	dscSetInputSelect,
 	dscSetOutputSelect,
@@ -590,7 +589,7 @@ enum nxpTfaDescriptorType {
 	dscSetSensesCal,
 	dscSetSensesDelay,
 	dscBitfield,
-	dscDefault,
+	dscDefault, // used to reset bitfields to there default values
 	dscLiveData,
 	dscLiveDataString,
 	dscGroup,
@@ -599,17 +598,17 @@ enum nxpTfaDescriptorType {
 	dscFilter,
 	dscNoInit,
 	dscFeatures,
-	dscCfMem,
+	dscCfMem, // coolflux memory x,y,io
 	dscSetFwkUseCase,
 	dscSetVddpConfig,
-	dsc_last
+	dsc_last // trailer
 };
 
 #define TFA_BITFIELDDSCMSK 0x7fffffff
 struct nxpTfaDescPtr {
 	uint32_t offset : 24;
-	uint32_t type : 8;
-
+	uint32_t type : 8; // (== enum nxpTfaDescriptorType, assure 8bits
+			   // length)
 };
 
 /*
@@ -617,32 +616,32 @@ struct nxpTfaDescPtr {
  */
 struct nxpTfaFileDsc {
 	struct nxpTfaDescPtr name;
-	uint32_t size;
-	uint8_t data[];
+	uint32_t size;  // file data length in bytes
+	uint8_t data[]; // payload
 };
 
 /*
  * device descriptor list
  */
 struct nxpTfaDeviceList {
-	uint8_t length;
-	uint8_t bus;
-	uint8_t dev;
-	uint8_t func;
-	uint32_t devid;
-	struct nxpTfaDescPtr name;
-	struct nxpTfaDescPtr list[];
+	uint8_t length;		     // nr of items in the list
+	uint8_t bus;		     // bus
+	uint8_t dev;		     // device
+	uint8_t func;		     // subfunction or subdevice
+	uint32_t devid;		     // device  hw fw id
+	struct nxpTfaDescPtr name;   // device name
+	struct nxpTfaDescPtr list[]; // items list
 };
 
 /*
  * profile descriptor list
  */
 struct nxpTfaProfileList {
-	uint32_t length : 8;
-	uint32_t group : 8;
-	uint32_t ID : 16;
-	struct nxpTfaDescPtr name;
-	struct nxpTfaDescPtr list[];
+	uint32_t length : 8;	 // nr of items in the list + name
+	uint32_t group : 8;	  // profile group number
+	uint32_t ID : 16;	    // profile ID
+	struct nxpTfaDescPtr name;   // profile name
+	struct nxpTfaDescPtr list[]; // items list (length-1 items)
 };
 #define TFA_PROFID 0x1234
 
@@ -650,10 +649,10 @@ struct nxpTfaProfileList {
  * livedata descriptor list
  */
 struct nxpTfaLiveDataList {
-	uint32_t length : 8;
-	uint32_t ID : 24;
-	struct nxpTfaDescPtr name;
-	struct nxpTfaDescPtr list[];
+	uint32_t length : 8;	 // nr of items in the list
+	uint32_t ID : 24;	    // profile ID
+	struct nxpTfaDescPtr name;   // livedata name
+	struct nxpTfaDescPtr list[]; // items list
 };
 #define TFA_LIVEDATAID 0x5678
 
@@ -662,14 +661,14 @@ struct nxpTfaLiveDataList {
  */
 struct nxpTfaBitfield {
 	uint16_t value;
-	uint16_t field;
+	uint16_t field; // ==datasheet defined, 16 bits
 };
 
 /*
  * Bitfield enumuration bits descriptor
  */
 struct nxpTfaBfEnum {
-	unsigned int len : 4;
+	unsigned int len : 4; // this is the actual length-1
 	unsigned int pos : 4;
 	unsigned int address : 8;
 };
@@ -678,30 +677,30 @@ struct nxpTfaBfEnum {
  * Register patch descriptor
  */
 struct nxpTfaRegpatch {
-	uint8_t address;
-	uint16_t value;
-	uint16_t mask;
+	uint8_t address; // register address
+	uint16_t value;  // value to write
+	uint16_t mask;   // mask of bits to write
 };
 
 /*
  * Mode descriptor
  */
 struct nxpTfaUseCase {
-	int value;
+	int value; // mode value, maps to enum Tfa98xx_Mode
 };
 
 /*
  * NoInit descriptor
  */
 struct nxpTfaNoInit {
-	uint8_t value;
+	uint8_t value; // noInit value
 };
 
 /*
  * Features descriptor
  */
 struct nxpTfaFeatures {
-	uint16_t value[3];
+	uint16_t value[3]; // features value
 };
 
 /*
@@ -713,19 +712,19 @@ struct nxpTfaFeatures {
 #define NXPTFA_PM3_VERSION '3'
 #define NXPTFA_PM_SUBVERSION '1'
 struct nxpTfaContainer {
-	char id[2];
-	char version[2];
-	char subversion[2];
-	uint32_t size;
-	uint32_t CRC;
-	uint16_t rev;
-	char customer[8];
-	char application[8];
-	char type[8];
-	uint16_t ndev;
-	uint16_t nprof;
-	uint16_t nliveData;
-	struct nxpTfaDescPtr index[];
+	char id[2];		      // "XX" : XX=type
+	char version[2];	      // "V_" : V=version, vv=subversion
+	char subversion[2];	   // "vv" : vv=subversion
+	uint32_t size;		      // data size in bytes following CRC
+	uint32_t CRC;		      // 32-bits CRC for following data
+	uint16_t rev;		      // "extra chars for rev nr"
+	char customer[8];	     // “name of customer”
+	char application[8];	  // “application name”
+	char type[8];		      // “application type name”
+	uint16_t ndev;		      // "nr of device lists"
+	uint16_t nprof;		      // "nr of profile lists"
+	uint16_t nliveData;	   // "nr of livedata lists"
+	struct nxpTfaDescPtr index[]; // start of item index table
 };
 
 #pragma pack(pop)

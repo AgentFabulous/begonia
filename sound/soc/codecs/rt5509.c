@@ -511,7 +511,7 @@ static int rt5509_adap_coefficent_fix(struct snd_soc_codec *codec)
 	ret = snd_soc_read(codec, RT5509_REG_CALIB_DCR);
 	ret &= 0xffffff;
 	dev_info(codec->dev, "dcr otp -> 0x%08x\n", ret);
-	if (ret == 0xffffff)
+	if (ret == 0xffffff || ret == 0)
 		ret = 0x800000;
 	/* rspk otp value */
 	w = ret;
@@ -2166,8 +2166,7 @@ int rt5509_i2c_probe(struct i2c_client *client,
 		dev_err(chip->dev, "power off fail\n");
 		goto err_put_sync;
 	}
-	dev_set_name(chip->dev, "%s",
-		     kasprintf(GFP_KERNEL, "RT5509_MT_%d", chip->dev_cnt));
+	dev_set_name(chip->dev, "RT5509_MT_%d", chip->dev_cnt);
 	ret = rt5509_codec_register(chip);
 	if (ret < 0) {
 		dev_err(chip->dev, "codec register fail\n");
@@ -2262,4 +2261,8 @@ module_exit(rt5509_driver_exit);
 MODULE_AUTHOR("CY_Huang <cy_huang@richtek.com>");
 MODULE_DESCRIPTION("RT5509 SPKAMP Driver");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0.14_M");
+MODULE_VERSION("1.0.15_M");
+/*
+ * 1.0.15_M
+ *	fix DCR_VAL = 0, div 0 issue
+ */

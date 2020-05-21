@@ -1,6 +1,5 @@
 /*
  * Copyright 2014-2017 NXP Semiconductors
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,7 +93,7 @@ const char *tfa98xx_get_error_string(enum Tfa98xx_Error error)
  */
 /**
  * lookup bf in table
- * return 'unkown' if not found
+ * return 'unknown' if not found
  */
 static char *tfa_bf2name(tfaBfName_t *table, uint16_t bf)
 {
@@ -105,7 +104,7 @@ static char *tfa_bf2name(tfaBfName_t *table, uint16_t bf)
 			return table[n].bfName;
 	} while (table[n++].bfEnum != 0xffff);
 
-	return table[n-1].bfName; /* last name says unkown */
+	return table[n-1].bfName; /* last name says unknown */
 }
 /**
  * lookup name in table

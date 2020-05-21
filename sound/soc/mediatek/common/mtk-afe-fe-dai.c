@@ -354,9 +354,8 @@ int mtk_afe_fe_hw_free(struct snd_pcm_substream *substream,
 
 #if defined(CONFIG_SND_SOC_MTK_SRAM)
 #if defined(CONFIG_SND_SOC_MTK_SCP_SMARTPA)
-	if (memif->scp_spk_enable) {
+	if (memif->scp_spk_enable)
 		return mtk_scp_spk_free_mem(substream, afe);
-	}
 #endif
 	if (memif->using_sram) {
 		memif->using_sram = 0;
@@ -364,9 +363,8 @@ int mtk_afe_fe_hw_free(struct snd_pcm_substream *substream,
 	}
 
 	// mmap don't free buffer
-	if (memif->use_mmap_share_mem != 0) {
+	if (memif->use_mmap_share_mem != 0)
 		return 0;
-	}
 
 #if defined(CONFIG_SND_SOC_MTK_AUDIO_DSP)
 	if (memif->use_adsp_share_mem == true)

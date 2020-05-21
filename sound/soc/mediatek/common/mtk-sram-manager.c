@@ -3,6 +3,7 @@
 // mtk-sram-manager.c  --  Mediatek afe sram manager
 //
 // Copyright (c) 2017 MediaTek Inc.
+// Copyright (C) 2020 XiaoMi, Inc.
 // Author: Kai Chieh Chuang <kaichieh.chuang@mediatek.com>
 
 #include <linux/module.h>
@@ -173,7 +174,8 @@ int mtk_audio_sram_init(struct device *dev,
 		sram->blocks[i].size = sram->block_size;
 		sram->blocks[i].user = NULL;
 		sram->blocks[i].phys_addr = sram->phys_addr +
-						(sram->block_size * i);
+						(sram->block_size *
+						(dma_addr_t)i);
 		sram->blocks[i].virt_addr = (void *)((char *)sram->virt_addr +
 						     (sram->block_size * i));
 	}
@@ -201,10 +203,10 @@ int mtk_audio_sram_allocate(struct mtk_audio_sram *sram,
 	int ret = 0;
 	int i;
 
-	dev_info(sram->dev, "%s(), size %d, user %p, format %d, force_normal %d\n",
-		 __func__, size, user, format, force_normal);
-
 	spin_lock(&sram->lock);
+
+	dev_info(sram->dev, "%s(), size %d, user %p, format %d, force_normal %d, sram mode %d\n",
+		 __func__, size, user, format, force_normal, sram->sram_mode);
 
 	/* check if sram has user */
 	for (i = 0; i < sram->block_num; i++) {
