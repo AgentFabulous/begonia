@@ -34,7 +34,7 @@ int m4u_power_on(int m4u_index);
 int m4u_power_off(int m4u_index);
 
 int m4u_alloc_mva(struct m4u_client_t *client,
-					int port,
+					unsigned int port,
 					unsigned long va,
 					struct sg_table *sg_table,
 					unsigned int size, unsigned int prot,
@@ -45,11 +45,15 @@ int m4u_dealloc_mva(struct m4u_client_t *client,
 			int port, unsigned int mva);
 
 int m4u_config_port(struct M4U_PORT_STRUCT *pM4uPort);
+void m4u_port_array_init(struct m4u_port_array *port_array);
+int m4u_port_array_add(
+	struct m4u_port_array *port_array,
+	unsigned int port, int m4u_en, int secure);
 //int m4u_config_port_array(struct m4u_port_array *port_array);
 int m4u_monitor_start(int m4u_id);
 int m4u_monitor_stop(int m4u_id);
 
-int m4u_cache_sync(struct m4u_client_t *client, int port,
+int m4u_cache_sync(struct m4u_client_t *client, unsigned int port,
 					unsigned long va, unsigned int size,
 					unsigned int mva,
 					enum M4U_CACHE_SYNC_ENUM sync_type);
@@ -57,9 +61,7 @@ int m4u_cache_sync(struct m4u_client_t *client, int port,
 struct m4u_client_t *m4u_create_client(void);
 int m4u_destroy_client(struct m4u_client_t *client);
 
-/* New hang detect dump api */
-int m4u_dump_reg_for_hang_issue(int m4u_id);
-
+int m4u_dump_reg_for_smi_hang_issue(void);
 int m4u_display_fake_engine_test(unsigned long ulFakeReadAddr,
 				 unsigned long ulFakeWriteAddr);
 
@@ -91,6 +93,9 @@ extern void show_pte(struct mm_struct *mm, unsigned long addr);
 extern mmp_event M4U_MMP_Events[M4U_MMP_MAX];
 #endif
 
+#ifndef M4U_FPGAPORTING
+extern void smp_inner_dcache_flush_all(void);
+#endif
 /* m4u driver internal use ----------- */
 /*  */
 

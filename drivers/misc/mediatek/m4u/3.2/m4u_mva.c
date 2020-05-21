@@ -137,7 +137,7 @@ void m4u_mvaGraph_init(void *priv_reserve, int domain_idx)
 	enum graph_lock_tpye lock_type;
 	spinlock_t *mva_graph_lock;
 
-	int i;
+	int i, idx;
 	unsigned int ccu_fix_block_start = MVAGRAPH_INDEX(CCU_FIX_MVA_START);
 	unsigned int ccu_fix_block_end = MVAGRAPH_INDEX(CCU_FIX_MVA_END);
 	unsigned int ccu_nr;
@@ -165,17 +165,17 @@ void m4u_mvaGraph_init(void *priv_reserve, int domain_idx)
 
 	if (domain_idx == 0) {
 		/* free:[1,1023] */
+		idx = ccu_fix_block_start - 1;
 		mvaGraph[domain_idx][1] = (short)(GET_RANGE_SIZE(1,
-			(ccu_fix_block_start - 1)));
-		mvaGraph[domain_idx][ccu_fix_block_start - 1] =
-			 (short)(GET_RANGE_SIZE(1, (ccu_fix_block_start - 1)));
+			idx));
+		mvaGraph[domain_idx][idx] =
+			 (short)(GET_RANGE_SIZE(1, idx));
 		mvaInfoGraph[domain_idx][1] = priv_reserve;
-		mvaInfoGraph[domain_idx][ccu_fix_block_start - 1] =
-			priv_reserve;
-		M4UINFO("hc6 1 domian:%d, mvaGraph[1]: %u, mvaGraph[%u]: %u\n",
-			domain_idx,
-			mvaGraph[domain_idx][1], (ccu_fix_block_start - 1),
-			mvaGraph[domain_idx][ccu_fix_block_start - 1]);
+		mvaInfoGraph[domain_idx][idx] = priv_reserve;
+		M4UINFO("hc6 1 d:%d, mGraph[1]:0x%x, mGraph[%u]:0x%x\n",
+			 domain_idx,
+			 mvaGraph[domain_idx][1], idx,
+			 mvaGraph[domain_idx][idx]);
 
 		/*ccu:[1024,1152] reserved */
 		ccu_nr = MVA_GRAPH_BLOCK_NR_ALIGNED(
@@ -188,12 +188,12 @@ void m4u_mvaGraph_init(void *priv_reserve, int domain_idx)
 			MVA_RESERVED_MASK | ccu_nr;
 		mvaInfoGraph[domain_idx][ccu_fix_block_start] = priv_reserve;
 		mvaInfoGraph[domain_idx][ccu_fix_block_end] = priv_reserve;
-		M4UINFO("hc6 2 domian:%d, mvaGraph[%u]: %u, mvaGraph[%u]: %u\n",
+		M4UINFO("hc6 2 d:%d, mGraph[%u]:0x%x, mGraph[%u]:0x%x\n",
 			domain_idx,
-				ccu_fix_block_start,
-				mvaGraph[domain_idx][ccu_fix_block_start],
-				ccu_fix_block_end,
-				mvaGraph[domain_idx][ccu_fix_block_end]);
+			ccu_fix_block_start,
+			mvaGraph[domain_idx][ccu_fix_block_start],
+			ccu_fix_block_end,
+			mvaGraph[domain_idx][ccu_fix_block_end]);
 
 		/*free:[1153,4095]*/
 		mvaGraph[domain_idx][ccu_fix_block_end + 1] =
@@ -204,7 +204,7 @@ void m4u_mvaGraph_init(void *priv_reserve, int domain_idx)
 			MVA_MAX_BLOCK_NR);
 		mvaInfoGraph[domain_idx][ccu_fix_block_end + 1] = priv_reserve;
 		mvaInfoGraph[domain_idx][MVA_MAX_BLOCK_NR] = priv_reserve;
-		M4UINFO("hc6 3 domian:%d, mvaGraph[%u]: %u, mvaGraph[%u]: %u\n",
+		M4UINFO("hc6 3 d:%d, mGraph[%u]:0x%x, mGraph[%u]:0x%x\n",
 			domain_idx,
 			(ccu_fix_block_end + 1),
 			mvaGraph[domain_idx][ccu_fix_block_end + 1],
@@ -438,6 +438,47 @@ int mva_foreach_priv(mva_buf_fn_t *fn, void *data,
 	return 0;
 }
 
+int mva_foreach_priv_sync(mva_buf_fn_sync_t *fn, unsigned int type,
+		unsigned int domain_idx)
+{
+	unsigned short index = 1, nr = 0;
+	unsigned int mva;
+	struct m4u_buf_info_t *priv;
+	unsigned long irq_flags;
+	int ret;
+	enum graph_lock_tpye lock_type;
+	spinlock_t *mva_graph_lock;
+
+	if (domain_idx == 0)
+		lock_type = SPINLOCK_MVA_GRAPH0;
+	else if (domain_idx == 1)
+		lock_type = SPINLOCK_MVA_GRAPH1;
+	else {
+		M4UMSG("%s error: invalid m4u domain_idx(%d)!\n",
+				__func__, domain_idx);
+		return -1;
+	}
+	mva_graph_lock = get_mva_graph_lock(lock_type);
+
+	spin_lock_irqsave(mva_graph_lock, irq_flags);
+
+
+	for (index = 1; index < MVA_MAX_BLOCK_NR + 1; index += nr) {
+		mva = index << MVA_BLOCK_SIZE_ORDER;
+		nr = MVA_GET_NR(domain_idx, index);
+		if (MVA_IS_BUSY(domain_idx, index)) {
+			priv = mvaInfoGraph[domain_idx][index];
+			ret = fn(NULL, priv->port, priv->va,
+			  priv->size, priv->mva, type);
+			if (ret)
+				break;
+		}
+	}
+	spin_unlock_irqrestore(mva_graph_lock, irq_flags);
+
+	return 0;
+}
+
 unsigned int get_first_valid_mva(unsigned int domain_idx)
 {
 	unsigned short index = 1, nr = 0;
@@ -485,66 +526,60 @@ static int __check_ccu_mva_region(
 	struct m4u_buf_info_t *pMvaInfo = (struct m4u_buf_info_t *)priv;
 	int is_in = 0, is_interseted = 0;
 	int is_ccu_port = 0;
-	int ret = -1;
 
-//check all of ccu ports
-#define ccu_port_check_value 0
 #if defined(CONFIG_MACH_MT6771)
-#undef ccu_port_check_value
-#define ccu_port_check_value \
-	((pMvaInfo->port == M4U_PORT_CCU0) ||\
-	(pMvaInfo->port == M4U_PORT_CCU1) ||\
-	(pMvaInfo->port == M4U_PORT_CAM_CCUI) ||\
-	(pMvaInfo->port == M4U_PORT_CAM_CCUG) ||\
-	(pMvaInfo->port == M4U_PORT_CAM_CCUO))
+	is_ccu_port = (pMvaInfo->port == M4U_PORT_CCU0) ||
+		(pMvaInfo->port == M4U_PORT_CCU1) ||
+			(pMvaInfo->port == M4U_PORT_CAM_CCUI) ||
+			(pMvaInfo->port == M4U_PORT_CAM_CCUG)
+			|| (pMvaInfo->port == M4U_PORT_CAM_CCUO);
+#elif defined(CONFIG_MACH_MT6779)
+	is_ccu_port = (pMvaInfo->port == M4U_PORT_CCU0) ||
+		(pMvaInfo->port == M4U_PORT_CCU1) ||
+			(pMvaInfo->port == M4U_PORT_CAM_CCUI) ||
+			(pMvaInfo->port == M4U_PORT_CAM_CCUO);
+#elif defined(CONFIG_MACH_MT6785)
+	is_ccu_port =
+	(pMvaInfo->port == M4U_PORT_CCU0) ||
+	(pMvaInfo->port == M4U_PORT_CCU1) ||
+	(pMvaInfo->port == M4U_PORT_CCUI) ||
+	(pMvaInfo->port == M4U_PORT_CCUO) ||
+	(pMvaInfo->port == M4U_PORT_CCUG);
+#else
+	return 0;
 #endif
-#if defined(CONFIG_MACH_MT6779)
-#undef ccu_port_check_value
-#define ccu_port_check_value \
-	((pMvaInfo->port == M4U_PORT_CCU0) ||\
-	(pMvaInfo->port == M4U_PORT_CCU1) ||\
-	(pMvaInfo->port == M4U_PORT_CAM_CCUI) ||\
-	(pMvaInfo->port == M4U_PORT_CAM_CCUO))
+	/*check if input mva region is in ccu region.
+	 *if it's in ccu region, we will check if it's non-ccu port
+	 */
+#if 0
+	M4UINFO("%s: [0x%x - 0x%x]\n",
+		__func__, startIdx, GET_END_INDEX(startIdx, nr));
 #endif
-#if defined(CONFIG_MACH_MT6785)
-#undef ccu_port_check_value
-#define ccu_port_check_value \
-	((pMvaInfo->port == M4U_PORT_CCU0) ||\
-	(pMvaInfo->port == M4U_PORT_CCU1) ||\
-	(pMvaInfo->port == M4U_PORT_CCUI) ||\
-	(pMvaInfo->port == M4U_PORT_CCUO) ||\
-	(pMvaInfo->port == M4U_PORT_CCUG))
-
-#endif
-	is_ccu_port = ccu_port_check_value;
-
-//undef local macro
-#undef ccu_port_check_value
-
-
 	is_in = is_in_ccu_region(startIdx, nr);
-	is_interseted = is_intersected_with_ccu_region(startIdx, nr);
-
-	if (is_ccu_port) {
-		if (is_in) {
-			ret = 1;
-		} else {
-			M4UINFO("err: port-%d request [0x%x-0x%x] out!\n",
-					pMvaInfo->port,
-					startIdx, GET_END_INDEX(startIdx, nr));
-			ret = -1;
-		}
-	} else {
-		if (is_in || is_interseted) {
-			M4UINFO("err: port-%d request [0x%x-0x%x] out!\n",
-					pMvaInfo->port,
-					startIdx, GET_END_INDEX(startIdx, nr));
-			ret = -1;
-		} else {
-			ret = 0;
-		}
+	if (is_in && is_ccu_port)
+		return 1;
+	else if (is_in && !is_ccu_port) {
+		M4ULOG_MID(
+			"[0x%x - 0x%x] requested by port(%d) is in ccu reserved region!\n",
+			startIdx, GET_END_INDEX(startIdx, nr),
+			pMvaInfo->port);
+		return -1;
 	}
-	return ret;
+
+	/* if the port is not ccu, it will check
+	 * if input mva region is intersected with ccu region
+	 */
+	is_interseted = is_intersected_with_ccu_region(startIdx, nr);
+	/*return 0:means other port normal alloction.
+	 * return 1:it isn't in ccu region but insersected with ccu region.
+	 */
+	if (!is_in && !is_interseted)
+		return 0;
+	M4UINFO(
+		"[0x%x - 0x%x] requested by port(%d) intersects to ccu region!\n",
+		startIdx, GET_END_INDEX(startIdx, nr),
+		pMvaInfo->port);
+	return -1;
 }
 
 void *mva_get_priv(unsigned int mva, unsigned int domain_idx)
@@ -793,7 +828,12 @@ unsigned int m4u_do_mva_alloc(unsigned int domain_idx,
 
 	mvaRegionStart = (unsigned int)s;
 
-	return (mvaRegionStart << MVA_BLOCK_SIZE_ORDER) + mva_pageOffset(va);
+	if (unlikely(g_translation_fault_debug))
+		return MVA_MAX_BLOCK_NR;
+	else
+		return ((mvaRegionStart << MVA_BLOCK_SIZE_ORDER)
+		  + mva_pageOffset(va));
+
 }
 
 unsigned int __m4u_do_mva_alloc_fix(unsigned int domain_idx,
@@ -1040,7 +1080,11 @@ unsigned int m4u_do_mva_alloc_fix(unsigned int domain_idx,
 out:
 	spin_unlock_irqrestore(mva_graph_lock, irq_flags);
 
-	return mva;
+	if (unlikely(g_translation_fault_debug))
+		return MVA_MAX_BLOCK_NR;
+	else
+		return mva;
+
 }
 
 unsigned int __m4u_do_mva_alloc_start_from(
@@ -1531,7 +1575,12 @@ unsigned int m4u_do_mva_alloc_start_from(
 
 	mvaRegionStart = (unsigned int)s;
 
-	return (mvaRegionStart << MVA_BLOCK_SIZE_ORDER) + mva_pageOffset(va);
+	if (unlikely(g_translation_fault_debug))
+		return MVA_MAX_BLOCK_NR;
+	else
+		return ((mvaRegionStart << MVA_BLOCK_SIZE_ORDER)
+		  + mva_pageOffset(va));
+
 }
 
 #define RightWrong(x) ((x) ? "correct" : "error")
@@ -1613,7 +1662,7 @@ int __m4u_do_mva_free(unsigned int domain_idx,
 		M4UMSG(
 			"error to free mva , domain=%u========================>\n",
 			domain_idx);
-		M4UMSG("BufSize=%d(unit:0x%xBytes) (expect %d) [%s]\n",
+		M4UMSG("buf_size=%d(unit:0x%xBytes) (expect %d) [%s]\n",
 		       nrRequire, MVA_BLOCK_SIZE,
 		       nr, RightWrong(nrRequire == nr));
 		M4UMSG("mva=0x%x, (IsBusy?)=%d (expect %d) [%s]\n",
@@ -1774,7 +1823,7 @@ int m4u_do_mva_free(unsigned int domain_idx,
 		M4UMSG(
 			"error to free mva , domain=%u========================>\n",
 			domain_idx);
-		M4UMSG("BufSize=%d(unit:0x%xBytes) (expect %d) [%s]\n",
+		M4UMSG("buf_size=%d(unit:0x%xBytes) (expect %d) [%s]\n",
 		       nrRequire, MVA_BLOCK_SIZE,
 		       nr, RightWrong(nrRequire == nr));
 		M4UMSG("mva=0x%x, (IsBusy?)=%d (expect %d) [%s]\n",
