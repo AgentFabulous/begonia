@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2015 MediaTek Inc.
+# Copyright (C) 2018 MediaTek Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -10,7 +10,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
-
-subdir-ccflags-y += -Wformat
+obj-y += common/
 obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
 
+subdir-ccflags-y += -I$(src)/common/

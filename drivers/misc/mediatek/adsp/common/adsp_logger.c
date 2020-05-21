@@ -227,7 +227,7 @@ static ssize_t adsp_A_mobile_log_store(struct device *kobj,
 				       struct device_attribute *attr,
 				       const char *buf, size_t n)
 {
-	unsigned int enable;
+	unsigned int enable = 0;
 
 	if (kstrtouint(buf, 0, &enable) != 0)
 		return -EINVAL;
@@ -302,7 +302,7 @@ static ssize_t adsp_A_mobile_log_UT_store(struct device *kobj,
 					  struct device_attribute *attr,
 					  const char *buf, size_t n)
 {
-	unsigned int enable;
+	unsigned int enable = 0;
 
 	if (kstrtouint(buf, 0, &enable) != 0)
 		return -EINVAL;
@@ -520,26 +520,6 @@ error:
 	ADSP_A_buf_info = NULL;
 	return -1;
 
-}
-
-int dump_adsp_partial_log(void *buf, size_t size)
-{
-	unsigned int w_pos = 0, offset = 0, len = 0;
-	void *src = ((char *) ADSP_A_log_ctl) + ADSP_A_log_ctl->buff_ofs;
-
-	w_pos = ADSP_A_buf_info->w_pos;
-
-	if (w_pos >= size) {
-		offset = w_pos - size;
-		memcpy(buf, src + offset, size);
-	} else {
-		len = size - w_pos;
-		offset = dram_buf_len - len;
-		memcpy(buf, src + offset, len);
-		memcpy(buf + len, src, w_pos);
-	}
-
-	return size;
 }
 
 #if ADSP_TRAX

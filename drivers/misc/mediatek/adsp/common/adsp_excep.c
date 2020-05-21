@@ -19,7 +19,6 @@
 #include <linux/sysfs.h>
 #include <linux/device.h>       /* needed by device_* */
 #include <linux/workqueue.h>
-#include <linux/poll.h>         /* needed by poll */
 #include <linux/io.h>
 #include <linux/mutex.h>
 #include <mt-plat/aee.h>
@@ -32,7 +31,6 @@
 #include "adsp_excep.h"
 #include "adsp_feature_define.h"
 #include "adsp_reserved_mem.h"
-#include "adsp_logger.h"
 
 static unsigned char *adsp_ke_buffer;
 static unsigned char *adsp_A_dump_buffer;
@@ -43,7 +41,7 @@ static struct mutex adsp_A_excep_dump_mutex;
 static int adsp_A_dram_dump(void);
 static ssize_t adsp_A_ramdump(char *buf, loff_t offset, size_t size);
 
-#define ADSP_KE_DUMP_LEN  (256 * 1024)
+#define ADSP_KE_DUMP_LEN  (ADSP_A_CFG_SIZE + ADSP_A_TCM_SIZE)
 #define DRV_SetReg32(addr, val)   writel(readl(addr) | (val), addr)
 
 /* An ELF note in memory */
@@ -579,21 +577,6 @@ static ssize_t adsp_A_dump_ke_show(struct file *filep, struct kobject *kobj,
 	return adsp_A_ramdump(buf, offset, size);
 }
 
-static ssize_t adsp_A_dump_log_show(struct file *filep, struct kobject *kobj,
-				struct bin_attribute *attr,
-				char *buf, loff_t offset, size_t size)
-{
-	ssize_t n = 0;
-	ssize_t length = adsp_get_reserve_mem_size(ADSP_A_LOGGER_MEM_ID);
-
-	if (offset < length) {
-		n = copy_from_adsp_shared_memory(buf, offset, size,
-					ADSP_A_LOGGER_MEM_ID);
-	}
-
-	return n;
-}
-
 static struct bin_attribute bin_attr_adsp_dump = {
 	.attr = {
 		.name = "adsp_dump",
@@ -612,19 +595,9 @@ static struct bin_attribute bin_attr_adsp_dump_ke = {
 	.read = adsp_A_dump_ke_show,
 };
 
-static struct bin_attribute bin_attr_adsp_dump_log = {
-	.attr = {
-		.name = "adsp_last_log",
-		.mode = 0444,
-	},
-	.size = 0,
-	.read = adsp_A_dump_log_show,
-};
-
 static struct bin_attribute *adsp_excep_bin_attrs[] = {
 	&bin_attr_adsp_dump,
 	&bin_attr_adsp_dump_ke,
-	&bin_attr_adsp_dump_log,
 #if ADSP_TRAX
 	&bin_attr_adsp_trax,
 #endif
@@ -671,30 +644,15 @@ void adsp_excep_cleanup(void)
 void get_adsp_aee_buffer(unsigned long *vaddr, unsigned long *size)
 {
 	u32 n = 0;
-	u32 len = ADSP_KE_DUMP_LEN;
-	void *buf = adsp_ke_buffer;
 
-	if (buf) {
+	if (adsp_ke_buffer) {
 		adsp_enable_dsp_clk(true);
-		DRV_SetReg32(ADSP_CLK_CTRL_BASE, ADSP_CLK_UART_EN);
-		DRV_SetReg32(ADSP_UART_CTRL,
-			ADSP_UART_RST_N | ADSP_UART_BCLK_CG);
-
-		/* cfg reg : 24k */
-		n += copy_from_buffer(buf, len, ADSP_A_CFG,
-				ADSP_A_CFG_SIZE, 0, 0x6000);
-
-		/* dtcm : 32k */
-		n += copy_from_buffer(buf + n, len - n,
-				ADSP_A_DTCM, ADSP_A_DTCM_SIZE, 0, -1);
-
+		n += dump_adsp_cfg_reg(adsp_ke_buffer, ADSP_KE_DUMP_LEN);
+		n += dump_adsp_tcm(adsp_ke_buffer + n, ADSP_KE_DUMP_LEN - n);
 		adsp_enable_dsp_clk(false);
 
-		/* last adsp_log : 200k */
-		n += dump_adsp_partial_log(buf + n, len - n);
-
-		*vaddr = (unsigned long)buf;
-		*size = len;
+		*vaddr = (unsigned long)adsp_ke_buffer;
+		*size = ADSP_KE_DUMP_LEN;
 	}
 }
 EXPORT_SYMBOL(get_adsp_aee_buffer);
