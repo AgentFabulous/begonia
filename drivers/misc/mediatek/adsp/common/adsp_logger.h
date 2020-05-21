@@ -34,7 +34,6 @@ struct buffer_info_s {
 };
 
 int adsp_logger_init(void);
-int dump_adsp_partial_log(void *buf, size_t size);
 
 /* device fops */
 ssize_t adsp_A_log_if_read(struct file *file, char __user *data,
