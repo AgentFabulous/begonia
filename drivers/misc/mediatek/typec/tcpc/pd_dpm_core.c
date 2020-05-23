@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * PD Device Policy Manager Core Driver
  *
@@ -467,6 +468,7 @@ int pd_dpm_update_tcp_request(struct pd_port *pd_port,
 	struct pd_port_power_caps *src_cap = &pd_port->pe_data.remote_src_cap;
 	uint32_t snk_pdo = PDO_FIXED(pd_req->mv, pd_req->ma, 0);
 
+	pr_err("%s: snk mv = %d, ma = %d\n", __func__, pd_req->mv, pd_req->ma);
 	memset(&req_info, 0, sizeof(struct dpm_rdo_info_t));
 
 	DPM_DBG("charging_policy=0x%X\r\n", charging_policy);
@@ -1158,6 +1160,10 @@ void pd_dpm_dfp_inform_id(struct pd_port *pd_port, bool ack)
 				payload[0], payload[1], payload[2], payload[3]);
 
 		dpm_dfp_update_partner_id(pd_port, payload);
+		if (tcpm_check_wireless_vidpid(payload)) {
+			pd_port->tcpc_dev->is_wireless_charger = true;
+			tcpci_notify_wireless_charger(pd_port->tcpc_dev);
+		}
 	}
 
 	if (!pd_port->pe_data.vdm_discard_retry_flag) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -117,6 +117,7 @@ int tcpci_notify_cable_type(struct tcpc_device *tcpc);
 int tcpci_notify_ra_detect(struct tcpc_device *tcpc);
 
 #ifdef CONFIG_USB_POWER_DELIVERY
+int tcpci_notify_wireless_charger(struct tcpc_device *tcpc);
 
 int tcpci_set_msg_header(struct tcpc_device *tcpc,
 	uint8_t power_role, uint8_t data_role);

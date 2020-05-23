@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -396,6 +396,15 @@ int tcpci_notify_typec_otp(struct tcpc_device *tcpc)
 #endif /* CONFIG_TYPEC_OTP */
 
 #ifdef CONFIG_USB_POWER_DELIVERY
+
+int tcpci_notify_wireless_charger(struct tcpc_device *tcpc)
+{
+	struct tcp_notify tcp_noti;
+
+	tcp_noti.wireless_charger.is_wireless_charger = tcpc->is_wireless_charger;
+	return tcpc_check_notify_time(tcpc, &tcp_noti, TCP_NOTIFY_IDX_MISC,
+				      TCP_NOTIFY_WIRELESS_CHARGER);
+}
 
 int tcpci_set_msg_header(struct tcpc_device *tcpc,
 	uint8_t power_role, uint8_t data_role)

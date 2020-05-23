@@ -42,11 +42,6 @@
 #include <linux/sched/rt.h>
 #endif /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)) */
 
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-/* MTK only */
-#include <mt-plat/mtk_boot.h>
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
-
 /* #define DEBUG_GPIO	66 */
 
 #define RT5081_DRV_VERSION	"2.0.1_MTK"
@@ -1348,7 +1343,6 @@ static int rt5081_tcpcdev_init(struct rt5081_chip *chip, struct device *dev)
 	struct device_node *np;
 	u32 val, len;
 	const char *name = "default";
-	bool kpoc_boot = false;
 
 	np = of_find_node_by_name(NULL, "type_c_port0");
 	if (!np) {
@@ -1359,17 +1353,7 @@ static int rt5081_tcpcdev_init(struct rt5081_chip *chip, struct device *dev)
 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
 	if (!desc)
 		return -ENOMEM;
-
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-	if (get_boot_mode() == KERNEL_POWER_OFF_CHARGING_BOOT
-		|| get_boot_mode() == LOW_POWER_OFF_CHARGING_BOOT)
-		kpoc_boot = true;
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
-
-	if (kpoc_boot) {
-		dev_info(dev, "%s KPOC use default Role SNK\n", __func__);
-		desc->role_def = 0; /* SNK */
-	} else if (of_property_read_u32(np, "rt-tcpc,role_def", &val) >= 0) {
+	if (of_property_read_u32(np, "rt-tcpc,role_def", &val) >= 0) {
 		if (val >= TYPEC_ROLE_NR)
 			desc->role_def = TYPEC_ROLE_DRP;
 		else
@@ -1448,10 +1432,6 @@ static int rt5081_tcpcdev_init(struct rt5081_chip *chip, struct device *dev)
 	else
 		dev_info(dev, "PD_REV20\n");
 #endif	/* CONFIG_USB_PD_REV30 */
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-	if (kpoc_boot)
-		chip->tcpc->tcpc_flags |= TCPC_FLAGS_KPOC_BOOT;
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
 	return 0;
 }
 

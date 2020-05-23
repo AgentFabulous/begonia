@@ -44,11 +44,6 @@
 #include <linux/sched/rt.h>
 #endif /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)) */
 
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-/* MTK only */
-#include <mt-plat/mtk_boot.h>
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
-
 /* #define DEBUG_GPIO	66 */
 
 #define MT6370_DRV_VERSION	"2.0.1_MTK"
@@ -742,6 +737,10 @@ static int mt6370_tcpc_init(struct tcpc_device *tcpc, bool sw_reset)
 			return ret;
 	}
 
+	/* CK_300K from 320K, SHIPPING off, AUTOIDLE enable, TIMEOUT = 32ms */
+	mt6370_i2c_write8(tcpc, MT6370_REG_IDLE_CTRL,
+		MT6370_REG_IDLE_SET(0, 1, 1, 2));
+
 	/* For No-GoodCRC Case (0x70) */
 	mt6370_i2c_write8(tcpc, MT6370_REG_PHY_CTRL3, 0x70);
 	/* For BIST, Change Transition Toggle Counter (Noise) from 3 to 7 */
@@ -793,10 +792,6 @@ static int mt6370_tcpc_init(struct tcpc_device *tcpc, bool sw_reset)
 	mt6370_init_alert_mask(tcpc);
 	mt6370_init_fault_mask(tcpc);
 	mt6370_init_mt_mask(tcpc);
-
-	/* CK_300K from 320K, SHIPPING off, AUTOIDLE enable, TIMEOUT = 32ms */
-	mt6370_i2c_write8(tcpc, MT6370_REG_IDLE_CTRL,
-		MT6370_REG_IDLE_SET(0, 1, 1, 2));
 
 	return 0;
 }
@@ -1096,7 +1091,7 @@ static int mt6370_set_low_power_mode(
 			data |= MT6370_REG_BMCIO_LPRPRD;
 
 #ifdef CONFIG_TYPEC_CAP_NORP_SRC
-		data |= MT6370_REG_VBUS_DET_EN;
+		data |= (MT6370_REG_VBUS_DET_EN | MT6370_REG_BMCIO_BG_EN);
 #endif	/* CONFIG_TYPEC_CAP_NORP_SRC */
 	} else {
 		data = MT6370_REG_BMCIO_BG_EN |
@@ -1411,7 +1406,6 @@ static int mt6370_tcpcdev_init(struct mt6370_chip *chip, struct device *dev)
 	struct device_node *np;
 	u32 val, len;
 	const char *name = "default";
-	bool kpoc_boot = false;
 
 	np = of_find_node_by_name(NULL, "type_c_port0");
 	if (!np) {
@@ -1422,17 +1416,7 @@ static int mt6370_tcpcdev_init(struct mt6370_chip *chip, struct device *dev)
 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
 	if (!desc)
 		return -ENOMEM;
-
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-	if (get_boot_mode() == KERNEL_POWER_OFF_CHARGING_BOOT
-		|| get_boot_mode() == LOW_POWER_OFF_CHARGING_BOOT)
-		kpoc_boot = true;
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
-
-	if (kpoc_boot) {
-		dev_info(dev, "%s KPOC use default Role SNK\n", __func__);
-		desc->role_def = 0; /* SNK */
-	} else if (of_property_read_u32(np, "mt-tcpc,role_def", &val) >= 0) {
+	if (of_property_read_u32(np, "mt-tcpc,role_def", &val) >= 0) {
 		if (val >= TYPEC_ROLE_NR)
 			desc->role_def = TYPEC_ROLE_DRP;
 		else
@@ -1511,10 +1495,6 @@ static int mt6370_tcpcdev_init(struct mt6370_chip *chip, struct device *dev)
 	else
 		dev_info(dev, "PD_REV20\n");
 #endif	/* CONFIG_USB_PD_REV30 */
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-	if (kpoc_boot)
-		chip->tcpc->tcpc_flags |= TCPC_FLAGS_KPOC_BOOT;
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
 	return 0;
 }
 
@@ -1641,6 +1621,8 @@ err_irq_init:
 	tcpc_device_unregister(chip->dev, chip->tcpc);
 err_tcpc_reg:
 	mt6370_regmap_deinit(chip);
+	wakeup_source_trash(&chip->i2c_wake_lock);
+	wakeup_source_trash(&chip->irq_wake_lock);
 	return ret;
 }
 

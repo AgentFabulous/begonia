@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Power Delivery Managert Driver
  *
@@ -289,6 +290,22 @@ int tcpm_typec_disable_function(
 }
 
 #ifdef CONFIG_USB_POWER_DELIVERY
+
+bool tcpm_check_wireless_vidpid(uint32_t *payload)
+{
+	uint32_t vid, pid, idmask = 0xffff;
+
+		pr_err("%s, 0x%02x, 0x%02x, 0x%02x, 0x%02x\r\n",
+				__func__, payload[0], payload[1], payload[2], payload[3]);
+
+		/* payload[0] b[15:0] is USB vid */
+		vid = payload[0] & idmask;
+
+		/* payload[2] b[31:16] is USB pid */
+		pid = (payload[2] >> 16) & idmask;
+
+		return (vid == 0x2b01 && pid == 0x6010) ? true : false;
+}
 
 bool tcpm_inquire_pd_connected(
 	struct tcpc_device *tcpc_dev)

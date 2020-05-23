@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -448,6 +448,7 @@ struct tcpc_device {
 	uint8_t pd_transmit_state;
 	uint8_t pd_wait_vbus_once;
 
+	bool is_wireless_charger;
 #ifdef CONFIG_USB_PD_DIRECT_CHARGE
 	bool pd_during_direct_charge;
 #endif	/* CONFIG_USB_PD_DIRECT_CHARGE */
