@@ -1,15 +1,15 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 #include <linux/init.h>
@@ -53,10 +53,6 @@
 #endif /* CONFIG_MTK_GAUGE_VERSION == 30 */
 #endif /* WATER_DETECTION || CABLE_TYPE_DETECTION || TYPEC_OTP */
 
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-/* MTK only */
-#include <mt-plat/mtk_boot.h>
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
 
 /* #define DEBUG_GPIO	66 */
 
@@ -2148,7 +2144,7 @@ static int mt6360_get_message(struct tcpc_device *tcpc, u32 *payload,
 {
 	int ret;
 	u8 type, cnt = 0;
-	u8 buf[4];
+	u8 buf[4] = {0};
 
 	ret = mt6360_i2c_block_read(tcpc, TCPC_V10_REG_RX_BYTE_CNT, 4, buf);
 	cnt = buf[0];
@@ -2422,7 +2418,6 @@ static int mt6360_tcpcdev_init(struct mt6360_chip *chip, struct device *dev)
 	struct device_node *np;
 	u32 val, len;
 	const char *name = "default";
-	bool kpoc_boot = false;
 
 	np = of_find_node_by_name(NULL, "type_c_port0");
 	if (!np) {
@@ -2433,17 +2428,7 @@ static int mt6360_tcpcdev_init(struct mt6360_chip *chip, struct device *dev)
 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
 	if (!desc)
 		return -ENOMEM;
-
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-	if (get_boot_mode() == KERNEL_POWER_OFF_CHARGING_BOOT
-		|| get_boot_mode() == LOW_POWER_OFF_CHARGING_BOOT)
-		kpoc_boot = true;
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
-
-	if (kpoc_boot) {
-		dev_info(dev, "%s KPOC use default Role SNK\n", __func__);
-		desc->role_def = 0; /* SNK */
-	} else if (of_property_read_u32(np, "mt-tcpc,role_def", &val) >= 0) {
+	if (of_property_read_u32(np, "mt-tcpc,role_def", &val) >= 0) {
 		if (val >= TYPEC_ROLE_NR)
 			desc->role_def = TYPEC_ROLE_DRP;
 		else
@@ -2527,10 +2512,6 @@ static int mt6360_tcpcdev_init(struct mt6360_chip *chip, struct device *dev)
 #endif /* CONFIG_MTK_TYPEC_WATER_DETECT_BY_PCB */
 	chip->tcpc->tcpc_flags |= TCPC_FLAGS_CABLE_TYPE_DETECTION;
 	chip->tcpc->tcpc_flags |= TCPC_FLAGS_TYPEC_OTP;
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-	if (kpoc_boot)
-		chip->tcpc->tcpc_flags |= TCPC_FLAGS_KPOC_BOOT;
-#endif /* CONFIG_MTK_KERNEL_POWER_OFF_CHARGING */
 	return 0;
 }
 

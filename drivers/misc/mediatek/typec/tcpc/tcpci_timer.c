@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * TCPC Interface for timer handler
  *

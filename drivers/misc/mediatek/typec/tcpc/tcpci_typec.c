@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * TCPC Type-C Driver for Richtek
  *
@@ -396,7 +397,8 @@ static inline int typec_norp_src_attached_entry(struct tcpc_device *tcpc_dev)
 #ifdef CONFIG_WATER_DETECTION
 #ifdef CONFIG_WD_POLLING_ONLY
 	if (!tcpc_dev->typec_power_ctrl) {
-		if (tcpc_dev->tcpc_flags & TCPC_FLAGS_KPOC_BOOT)
+		if (get_boot_mode() == KERNEL_POWER_OFF_CHARGING_BOOT ||
+		    get_boot_mode() == LOW_POWER_OFF_CHARGING_BOOT)
 			typec_check_water_status(tcpc_dev);
 
 		tcpci_set_usbid_polling(tcpc_dev, false);
@@ -545,6 +547,7 @@ static inline void typec_unattached_cc_entry(struct tcpc_device *tcpc_dev)
 
 	switch (tcpc_dev->typec_role) {
 	case TYPEC_ROLE_SNK:
+		tcpc_dev->is_wireless_charger = false;
 		TYPEC_NEW_STATE(typec_unattached_snk);
 		tcpci_set_cc(tcpc_dev, TYPEC_CC_RD);
 		typec_enable_low_power_mode(tcpc_dev, TYPEC_CC_RD);
@@ -570,6 +573,7 @@ static inline void typec_unattached_cc_entry(struct tcpc_device *tcpc_dev)
 			tcpc_enable_timer(tcpc_dev, TYPEC_TIMER_DRP_SRC_TOGGLE);
 			break;
 		default:
+			tcpc_dev->is_wireless_charger = false;
 			TYPEC_NEW_STATE(typec_unattached_snk);
 			tcpci_set_cc(tcpc_dev, TYPEC_CC_DRP);
 			typec_enable_low_power_mode(tcpc_dev, TYPEC_CC_DRP);
@@ -2023,7 +2027,8 @@ int tcpc_typec_handle_cc_change(struct tcpc_device *tcpc_dev)
 		if (typec_state_old == typec_unattached_snk ||
 		    typec_state_old == typec_unattached_src) {
 #ifdef CONFIG_WD_POLLING_ONLY
-			if (tcpc_dev->tcpc_flags & TCPC_FLAGS_KPOC_BOOT)
+			if (get_boot_mode() == KERNEL_POWER_OFF_CHARGING_BOOT
+			    || get_boot_mode() == LOW_POWER_OFF_CHARGING_BOOT)
 				typec_check_water_status(tcpc_dev);
 #else
 			typec_check_water_status(tcpc_dev);
@@ -2761,7 +2766,9 @@ int tcpc_typec_handle_wd(struct tcpc_device *tcpc_dev, bool wd)
 	}
 
 #ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-	if (tcpc_dev->tcpc_flags & TCPC_FLAGS_KPOC_BOOT) {
+	ret = get_boot_mode();
+	if (ret == KERNEL_POWER_OFF_CHARGING_BOOT ||
+	    ret == LOW_POWER_OFF_CHARGING_BOOT) {
 		TYPEC_INFO("KPOC does not enter water protection\r\n");
 		goto out;
 	}

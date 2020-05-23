@@ -62,11 +62,10 @@ static inline void pd_parse_pdata_bat_info(
 	ret = of_property_read_string(sub, "bat,mfrs", &mstring);
 	if (ret < 0) {
 		pr_err("%s get bat,mfrs fail\n", __func__);
-		snprintf(mfrs_info->mfrs_string,
-			PAGE_SIZE, "%s", "no_bat_mfrs_string");
-	} else
-		snprintf(mfrs_info->mfrs_string,
-			strlen(mstring)+1, "%s", mstring);
+		mstring = "no_bat_mfrs_string";
+	}
+	snprintf(mfrs_info->mfrs_string,
+		strlen(mstring)+1, "%s", mstring);
 #endif	/* CONFIG_USB_PD_REV30_MFRS_INFO_LOCAL */
 
 	ret = of_property_read_u32(sub, "bat,design_cap", &design_cap);
@@ -333,12 +332,11 @@ static inline void pd_parse_pdata_mfrs(
 
 	ret = of_property_read_string(np, "pd,mfrs", &mstring);
 	if (ret < 0) {
+		mstring = "no_mfrs_string";
 		pr_err("%s get pd mfrs fail\n", __func__);
-		snprintf(mfrs_info->mfrs_string,
-			PAGE_SIZE, "%s", "no_mfrs_string");
-	} else
-		snprintf(mfrs_info->mfrs_string,
-			strlen(mstring)+1, "%s", mstring);
+	}
+	snprintf(mfrs_info->mfrs_string,
+		strlen(mstring)+1, "%s", mstring);
 
 	pr_info("%s PD mfrs_string = %s\n",
 		__func__, mfrs_info->mfrs_string);
@@ -517,9 +515,6 @@ static void pd_core_power_flags_init(struct pd_port *pd_port)
 		pd_port->dpm_caps |= DPM_CAP_DR_CHECK_PROP(val);
 	else
 		pr_err("%s get dr_check data fail\n", __func__);
-
-	if (pd_port->tcpc_dev->tcpc_flags & TCPC_FLAGS_KPOC_BOOT)
-		pd_port->dpm_caps |= DPM_CAP_DR_SWAP_REJECT_AS_DFP;
 
 	pr_info("dpm_caps = 0x%08x\n", pd_port->dpm_caps);
 
