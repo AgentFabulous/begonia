@@ -43,7 +43,6 @@
 #define WAIT_INTR_TIMEOUT_MS    500
 #define SUSPEND_TIMEOUT_CNT     5000
 
-
 /**
  * enum mtk_instance_type - The type of an MTK Vcodec instance.
  */
@@ -86,6 +85,8 @@ enum mtk_encode_param {
 	MTK_ENCODE_PARAM_PREPEND_SPSPPS_TO_IDR = (1 << 9),
 	MTK_ENCODE_PARAM_OPERATION_RATE = (1 << 10),
 	MTK_ENCODE_PARAM_BITRATE_MODE = (1 << 11),
+	MTK_ENCODE_PARAM_ROI_ON = (1 << 12),
+	MTK_ENCODE_PARAM_GRID_SIZE = (1 << 13),
 };
 
 /*
@@ -107,6 +108,8 @@ enum venc_yuv_fmt {
 	VENC_YUV_FORMAT_32bitBGRA8888 = 14,
 	VENC_YUV_FORMAT_32bitARGB8888 = 15,
 	VENC_YUV_FORMAT_32bitABGR8888 = 16,
+	VENC_YUV_FORMAT_MT10 = 17,
+	VENC_YUV_FORMAT_P010 = 18,
 };
 
 /**
@@ -158,6 +161,9 @@ struct mtk_dec_params {
 	unsigned int	nal_size_length;
 	unsigned int	svp_mode;
 	unsigned int	operating_rate;
+	u64	timestamp;
+	unsigned int	total_frame_bufq_count;
+	unsigned int	queued_frame_buf_count;
 };
 
 /**
@@ -200,6 +206,10 @@ struct mtk_enc_params {
 	unsigned int    prependheader;
 	unsigned int    operationrate;
 	unsigned int    bitratemode;
+	unsigned int    roion;
+	unsigned int    heif_grid_size;
+	unsigned int    max_w;
+	unsigned int    max_h;
 };
 
 /*
@@ -237,7 +247,11 @@ struct venc_enc_param {
 	unsigned int prependheader;
 	unsigned int operationrate;
 	unsigned int bitratemode;
+	unsigned int roion;
+	unsigned int heif_grid_size;
 	unsigned int sizeimage[MTK_VCODEC_MAX_PLANES];
+	unsigned int max_w;
+	unsigned int max_h;
 };
 
 /*
@@ -248,7 +262,8 @@ struct venc_enc_param {
 struct venc_frm_buf {
 	struct mtk_vcodec_mem fb_addr[MTK_VCODEC_MAX_PLANES];
 	unsigned int num_planes;
-	unsigned long timestamp;
+	u64 timestamp;
+	unsigned int roimap;
 };
 
 /**
@@ -317,12 +332,14 @@ struct mtk_vcodec_ctx {
 	struct vdec_pic_info picinfo;
 	int dpb_size;
 	int last_dpb_size;
+	int is_hdr;
+	int last_is_hdr;
 	unsigned int errormap_info[VB2_MAX_FRAME];
 	u64 input_max_ts;
 
 	int int_cond;
 	int int_type;
-	wait_queue_head_t queue;
+	wait_queue_head_t queue[MTK_VDEC_HW_NUM];
 	unsigned int irq_status;
 
 	struct v4l2_ctrl_handler ctrl_hdl;
@@ -332,7 +349,10 @@ struct mtk_vcodec_ctx {
 	struct mtk_video_dec_buf *dec_flush_buf;
 	struct mtk_video_enc_buf *enc_flush_buf;
 	struct vb2_buffer *pend_src_buf;
-	int slowmotion;
+	wait_queue_head_t fm_wq;
+	int input_driven;
+	int user_lock_hw;
+	int use_gce;
 	int oal_vcodec;
 
 	enum v4l2_colorspace colorspace;
@@ -374,8 +394,8 @@ struct mtk_vcodec_ctx {
  * @enc_irq: h264 encoder irq resource
  * @enc_lt_irq: vp8 encoder irq resource
  *
- * @dec_mutex: decoder hardware lock
- * @enc_mutex: encoder hardware lock.
+ * @dec_sem: decoder hw lock. Use sem for gce different thread lock unlock
+ * @enc_sem: encoder hw lock. Use sem for gce different thread lock unlock
  *
  * @pm: power management control
  * @dec_capability: used to identify decode capability, ex: 4k
@@ -405,16 +425,15 @@ struct mtk_vcodec_dev {
 	struct mutex dev_mutex;
 	wait_queue_head_t queue;
 
-	int dec_irq;
+	int dec_irq[MTK_VDEC_HW_NUM];
 	int enc_irq;
 	int enc_lt_irq;
 
-	struct mutex dec_mutex;
-	struct semaphore enc_sem;
+	struct semaphore dec_sem[MTK_VDEC_HW_NUM];
+	struct semaphore enc_sem[MTK_VENC_HW_NUM];
 
 	struct mutex dec_dvfs_mutex;
 	struct mutex enc_dvfs_mutex;
-	atomic_t enc_smvr;
 
 	struct mtk_vcodec_pm pm;
 	unsigned int dec_capability;

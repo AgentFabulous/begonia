@@ -81,6 +81,10 @@ typedef int (*ipi_handler_t)(void *data,
  *                      handle RV40 video decoder job, and vice versa.
  *                      Decode output format is always MT21 no matter what
  *                      the input format is.
+ * @IPI_VDEC_AV1:       The interrupt from vcu is to notify kernel to
+ *                      handle AV1 video decoder job, and vice versa.
+ *                      Decode output format is always MT21 no matter what
+ *                      the input format is.
  * @IPI_VENC_COMMON:    The interrupt from vcu is to notify kernel to
  *                      handle video codecs job, and vice versa.
  * @IPI_VENC_H264:      The interrupt from vcu is to notify kernel to
@@ -119,9 +123,11 @@ enum ipi_id {
 	IPI_VDEC_WMV,
 	IPI_VDEC_RV30,
 	IPI_VDEC_RV40,
+	IPI_VDEC_AV1,
 	IPI_VENC_COMMON,
 	IPI_VENC_H264,
 	IPI_VENC_H265,
+	IPI_VENC_HEIF,
 	IPI_VENC_VP8,
 	IPI_VENC_MPEG4,
 	IPI_VENC_HYBRID_H264,
@@ -247,7 +253,7 @@ void *vcu_mapping_dm_addr(struct platform_device *pdev,
  * vcu_get_task - Get VCUD task information
  *
  * @task:       VCUD task
- * @f:          VCUD task file
+ * @f:          VCUD task filie
  * @reset:      flag to reset task and file
  *
  * Get VCUD task information from mtk_vcu driver.
@@ -260,7 +266,11 @@ void vcu_put_file_lock(void);
 extern void smp_inner_dcache_flush_all(void);
 int vcu_set_codec_ctx(struct platform_device *pdev,
 		 void *codec_ctx, unsigned long type);
-extern void venc_encode_prepare(void *ctx_prepare, unsigned long *flags);
-extern void venc_encode_unprepare(void *ctx_prepare, unsigned long *flags);
+int vcu_clear_codec_ctx(struct platform_device *pdev,
+		 void *codec_ctx, unsigned long type);
+extern void venc_encode_prepare(void *ctx_prepare,
+		int core_id, unsigned long *flags);
+extern void venc_encode_unprepare(void *ctx_prepare,
+		int core_id, unsigned long *flags);
 
 #endif /* _MTK_VCU_H */

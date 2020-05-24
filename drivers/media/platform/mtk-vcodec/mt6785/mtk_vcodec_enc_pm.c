@@ -22,12 +22,11 @@
 #include "mtk_vcodec_util.h"
 #include "mtk_vcu.h"
 #include "smi_public.h"
-#include "smi_port.h"
+#include "mt6785/smi_port.h"
 
 #ifdef ENC_DVFS
 #include <linux/pm_qos.h>
 #include <mmdvfs_pmqos.h>
-//#include <mmdvfs_config_util.h>
 #include "vcodec_dvfs.h"
 #define STD_VENC_FREQ 364
 #define STD_LUMA_BW 100
@@ -58,6 +57,11 @@ static struct mm_qos_request venc_ref_luma;
 static struct mm_qos_request venc_ref_chroma;
 struct pm_qos_request venc_qos_req_bw;
 #endif
+
+void mtk_venc_init_ctx_pm(struct mtk_vcodec_ctx *ctx)
+{
+	ctx->use_gce = 0;
+}
 
 int mtk_vcodec_init_enc_pm(struct mtk_vcodec_dev *mtkdev)
 {
@@ -125,7 +129,7 @@ void mtk_vcodec_release_enc_pm(struct mtk_vcodec_dev *mtkdev)
 	//free_all_bw(&venc_bw);
 }
 
-void mtk_vcodec_enc_clock_on(struct mtk_vcodec_pm *pm)
+void mtk_vcodec_enc_clock_on(struct mtk_vcodec_pm *pm, int core_id)
 {
 #ifndef FPGA_PWRCLK_API_DISABLE
 	int ret;
@@ -137,7 +141,7 @@ void mtk_vcodec_enc_clock_on(struct mtk_vcodec_pm *pm)
 #endif
 }
 
-void mtk_vcodec_enc_clock_off(struct mtk_vcodec_pm *pm)
+void mtk_vcodec_enc_clock_off(struct mtk_vcodec_pm *pm, int core_id)
 {
 #ifndef FPGA_PWRCLK_API_DISABLE
 	clk_disable_unprepare(pm->clk_MT_CG_VENC);
@@ -221,7 +225,7 @@ void mtk_venc_dvfs_begin(struct mtk_vcodec_ctx *ctx)
 		target_freq_64 = match_freq(target_freq, &venc_freq_steps[0],
 					venc_freq_step_size);
 
-		if (ctx->slowmotion == 1)
+		if (ctx->use_gce == 1 && target_freq_64 > 450)
 			target_freq_64 = 450;
 
 		if (target_freq > 0) {
@@ -259,7 +263,7 @@ void mtk_venc_dvfs_end(struct mtk_vcodec_ctx *ctx)
 	venc_cur_job = venc_jobs;
 	if (venc_cur_job != 0 && (venc_cur_job->handle == &ctx->id)) {
 		venc_cur_job->end = get_time_us();
-		if (ctx->slowmotion == 0) {
+		if (ctx->use_gce == 0) {
 			if ((ctx->enc_params.operationrate == 60 ||
 				((ctx->enc_params.framerate_num /
 				ctx->enc_params.framerate_denom) >= 59 &&
@@ -326,7 +330,7 @@ void mtk_venc_emi_bw_begin(struct mtk_vcodec_ctx *ctx)
 
 	cur_bw = add_bw_by_id(&venc_bw, ctx->id);
 
-	if (ctx->slowmotion == 1 ||
+	if (ctx->use_gce == 1 ||
 		ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_H265 ||
 		(ctx->q_data[MTK_Q_DATA_SRC].visible_width == 3840 &&
 		ctx->q_data[MTK_Q_DATA_SRC].visible_height == 2160)) {
@@ -379,7 +383,7 @@ void mtk_venc_emi_bw_begin(struct mtk_vcodec_ctx *ctx)
 	}
 
 	if (ctx->enc_params.operationrate == 60 ||
-		ctx->slowmotion == 1 ||
+		ctx->use_gce == 1 ||
 		(ctx->q_data[MTK_Q_DATA_SRC].visible_width == 3840 &&
 		ctx->q_data[MTK_Q_DATA_SRC].visible_height == 2160)) {
 		/* 60fps / 4K30 / SMVR  recording use theoretical max BW */
@@ -474,7 +478,7 @@ void mtk_venc_emi_bw_end(struct mtk_vcodec_ctx *ctx)
 #endif
 }
 
-void mtk_venc_pmqos_prelock(struct mtk_vcodec_ctx *ctx)
+void mtk_venc_pmqos_prelock(struct mtk_vcodec_ctx *ctx, int core_id)
 {
 #ifdef ENC_DVFS
 	mutex_lock(&ctx->dev->enc_dvfs_mutex);

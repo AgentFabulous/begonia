@@ -1297,8 +1297,6 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
 			descr = "DIVX6"; break;
 		case V4L2_PIX_FMT_H265:
 			descr = "H.265"; break;
-		case V4L2_PIX_FMT_HEIF:
-			descr = "HEIF"; break;
 		case V4L2_PIX_FMT_S263:
 			descr = "S.263"; break;
 		case V4L2_PIX_FMT_WMV1:
@@ -1315,6 +1313,8 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
 			descr = "RealVideo 8"; break;
 		case V4L2_PIX_FMT_RV40:
 			descr = "RealVideo 9/10"; break;
+		case V4L2_PIX_FMT_AV1:
+			descr = "AV1"; break;
 		case V4L2_PIX_FMT_MT21C:
 		case V4L2_PIX_FMT_MT21:
 		case V4L2_PIX_FMT_MT2110T:

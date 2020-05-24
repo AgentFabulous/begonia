@@ -114,24 +114,24 @@ static int vcu_enc_ipi_handler(void *data, unsigned int len, void *priv)
 		/* Prevent slowmotion with GCE mode on,
 		 * user thread enter freezing while holding mutex (enc lock)
 		 */
-		if (ctx->slowmotion)
+		if (ctx->use_gce)
 			current->flags |= PF_NOFREEZE;
 		break;
 	case VCU_IPIMSG_ENC_DEINIT_DONE:
 		break;
 	case VCU_IPIMSG_ENC_POWER_ON:
-		venc_encode_prepare(ctx, &flags);
+		venc_encode_prepare(ctx, 0, &flags);
 		ret = 1;
 		break;
 	case VCU_IPIMSG_ENC_POWER_OFF:
-		venc_encode_unprepare(ctx, &flags);
+		venc_encode_unprepare(ctx, 0, &flags);
 		ret = 1;
 		break;
 	case VCU_IPIMSG_ENC_QUERY_CAP_ACK:
 		handle_query_cap_ack_msg(data);
 		break;
 	case VCU_IPIMSG_ENC_WAIT_ISR:
-		if (-1 == mtk_vcodec_wait_for_done_ctx(ctx,
+		if (-1 == mtk_vcodec_wait_for_done_ctx(ctx, 0,
 			MTK_INST_IRQ_RECEIVED,
 			WAIT_INTR_TIMEOUT_MS)) {
 			handle_enc_waitisr_msg(vcu, data, 1);
@@ -336,6 +336,14 @@ int vcu_enc_set_param(struct venc_vcu_inst *vcu,
 		out.data_item = 1;
 		out.data[0] = enc_param->bitratemode;
 		break;
+	case VENC_SET_PARAM_ROI_ON:
+		out.data_item = 1;
+		out.data[0] = enc_param->roion;
+		break;
+	case VENC_SET_PARAM_HEIF_GRID_SIZE:
+		out.data_item = 1;
+		out.data[0] = enc_param->heif_grid_size;
+		break;
 	default:
 		mtk_vcodec_err(vcu, "id %d not supported", id);
 		return -EINVAL;
@@ -442,7 +450,7 @@ int vcu_enc_deinit(struct venc_vcu_inst *vcu)
 		return -EINVAL;
 	}
 
-	if (vcu->ctx->slowmotion)
+	if (vcu->ctx->use_gce)
 		current->flags &= ~PF_NOFREEZE;
 
 	mtk_vcodec_debug_leave(vcu);
@@ -455,6 +463,16 @@ int vcu_enc_set_ctx_for_gce(struct venc_vcu_inst *vcu)
 	int err = 0;
 
 	vcu_set_codec_ctx(vcu->dev,
+		(void *)vcu->ctx, VCU_VENC);
+
+	return err;
+}
+
+int vcu_enc_clear_ctx_for_gce(struct venc_vcu_inst *vcu)
+{
+	int err = 0;
+
+	vcu_clear_codec_ctx(vcu->dev,
 		(void *)vcu->ctx, VCU_VENC);
 
 	return err;

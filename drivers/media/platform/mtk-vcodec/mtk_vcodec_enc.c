@@ -383,6 +383,32 @@ static int vidioc_venc_s_ctrl(struct v4l2_ctrl *ctrl)
 		p->bitratemode = ctrl->val;
 		ctx->param_change |= MTK_ENCODE_PARAM_BITRATE_MODE;
 		break;
+	case V4L2_CID_MPEG_MTK_ENCODE_ROI_ON:
+		mtk_v4l2_debug(2,
+			"V4L2_CID_MPEG_MTK_ENCODE_ROI_ON: %d",
+			ctrl->val);
+		p->roion = ctrl->val;
+		ctx->param_change |= MTK_ENCODE_PARAM_ROI_ON;
+		break;
+	case V4L2_CID_MPEG_MTK_ENCODE_GRID_SIZE:
+		mtk_v4l2_debug(2,
+			"V4L2_CID_MPEG_MTK_ENCODE_GRID_SIZE: %d",
+			ctrl->val);
+		p->heif_grid_size = ctrl->val;
+		ctx->param_change |= MTK_ENCODE_PARAM_GRID_SIZE;
+		break;
+	case V4L2_CID_MPEG_MTK_MAX_WIDTH:
+		mtk_v4l2_debug(2,
+			"V4L2_CID_MPEG_MTK_MAX_WIDTH: %d",
+			ctrl->val);
+		p->max_w = ctrl->val;
+		break;
+	case V4L2_CID_MPEG_MTK_MAX_HEIGHT:
+		mtk_v4l2_debug(2,
+			"V4L2_CID_MPEG_MTK_MAX_HEIGHT: %d",
+			ctrl->val);
+		p->max_h = ctrl->val;
+		break;
 	default:
 		mtk_v4l2_err("ctrl-id=%d not support!", ctrl->id);
 		ret = -EINVAL;
@@ -392,8 +418,60 @@ static int vidioc_venc_s_ctrl(struct v4l2_ctrl *ctrl)
 	return ret;
 }
 
+static int vidioc_venc_g_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct mtk_vcodec_ctx *ctx = ctrl_to_ctx(ctrl);
+	int ret = 0;
+	int value = 0;
+	struct venc_resolution_change *reschange;
+
+	switch (ctrl->id) {
+	case V4L2_CID_MPEG_MTK_ENCODE_ROI_RC_QP:
+		venc_if_get_param(ctx,
+			GET_PARAM_ROI_RC_QP,
+			&value);
+		ctrl->val = value;
+		break;
+	case V4L2_CID_MPEG_MTK_RESOLUTION_CHANGE:
+		reschange = (struct venc_resolution_change *)ctrl->p_new.p_u32;
+		venc_if_get_param(ctx,
+			GET_PARAM_RESOLUTION_CHANGE,
+			reschange);
+		break;
+	default:
+		mtk_v4l2_err("ctrl-id=%d not support!", ctrl->id);
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+#if 0
+static int vidioc_venc_g_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct mtk_vcodec_ctx *ctx = ctrl_to_ctx(ctrl);
+	int ret = 0;
+	int value = 0;
+
+	switch (ctrl->id) {
+	case V4L2_CID_MPEG_MTK_ENCODE_ROI_RC_QP:
+		venc_if_get_param(ctx,
+			GET_PARAM_ROI_RC_QP,
+			&value);
+		ctrl->val = value;
+		break;
+	default:
+		mtk_v4l2_err("ctrl-id=%d not support!", ctrl->id);
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+#endif
 static const struct v4l2_ctrl_ops mtk_vcodec_enc_ctrl_ops = {
 	.s_ctrl = vidioc_venc_s_ctrl,
+	.g_volatile_ctrl = vidioc_venc_g_ctrl,
 };
 
 static int vidioc_enum_fmt(struct v4l2_fmtdesc *f, bool output_queue)
@@ -524,8 +602,12 @@ static int vidioc_try_fmt(struct v4l2_format *f, struct mtk_video_fmt *fmt,
 {
 	struct v4l2_pix_format_mplane *pix_fmt_mp = &f->fmt.pix_mp;
 	int org_w, org_h, i;
+	int bytesPP = 100;  /* bytes per pixel */
 	__u32 bs_fourcc;
-	__u32 saligned, width_align, height_align;
+	unsigned int step_width_in_pixel;
+	unsigned int step_height_in_pixel;
+	unsigned int saligned;
+	unsigned int imagePixels;
 
 	struct mtk_codec_framesizes *spec_size_info = NULL;
 
@@ -569,30 +651,50 @@ static int vidioc_try_fmt(struct v4l2_format *f, struct mtk_video_fmt *fmt,
 			mtk_v4l2_err("Unsupport stepwise.step_height not 2^ %d\n",
 				     spec_size_info->stepwise.step_height);
 
+		if (pix_fmt_mp->pixelformat == V4L2_PIX_FMT_MT10 ||
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_MT10S) {
+			step_width_in_pixel =
+				spec_size_info->stepwise.step_width * 4;
+			step_height_in_pixel =
+				spec_size_info->stepwise.step_height;
+			bytesPP = 125;
+			saligned = 6;
+		} else if (pix_fmt_mp->pixelformat == V4L2_PIX_FMT_P010M ||
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_P010S) {
+			step_width_in_pixel =
+				spec_size_info->stepwise.step_width / 2;
+			step_height_in_pixel =
+				spec_size_info->stepwise.step_height;
+			bytesPP = 200;
+			saligned = 6;
+		} else if (pix_fmt_mp->pixelformat == V4L2_PIX_FMT_ABGR32 ||
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_ARGB32 ||
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_RGB32 ||
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_BGR32) {
+			step_width_in_pixel = 1;
+			step_height_in_pixel = 1;
+			bytesPP = 400;
+			saligned = 4;
+		} else if (pix_fmt_mp->pixelformat == V4L2_PIX_FMT_RGB24 ||
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_BGR24) {
+			step_width_in_pixel = 1;
+			step_height_in_pixel = 1;
+			bytesPP = 300;
+			saligned = 4;
+		} else {
+			step_width_in_pixel =
+				spec_size_info->stepwise.step_width;
+			step_height_in_pixel =
+				spec_size_info->stepwise.step_height;
+			bytesPP = 100;
+			saligned = 6;
+		}
 
-		/* find next closer width align 16, height align 16, size align
-		 * 64 rectangle without MBAFF encoder
+		/* find next closer width stride align 16, height align 16,
+		 * size align 64 rectangle without MBAFF encoder
 		 * (with MBAFF height align should be 32)
 		 * width height swappable
 		 */
-		if (pix_fmt_mp->pixelformat == V4L2_PIX_FMT_ABGR32 ||
-			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_ARGB32 ||
-			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_RGB32 ||
-			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_BGR32 ||
-			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_BGR24 ||
-			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_RGB24) {
-			saligned = 4;
-			width_align =
-				spec_size_info->stepwise.step_width;
-			height_align = 1;
-		} else {
-			saligned = 6;
-			width_align =
-				spec_size_info->stepwise.step_width;
-			height_align =
-				spec_size_info->stepwise.step_height;
-		}
-
 
 		if (pix_fmt_mp->height > pix_fmt_mp->width) {
 			pix_fmt_mp->height = clamp(pix_fmt_mp->height,
@@ -603,29 +705,28 @@ static int vidioc_try_fmt(struct v4l2_format *f, struct mtk_video_fmt *fmt,
 				(spec_size_info->stepwise.max_height));
 			org_w = pix_fmt_mp->width;
 			org_h = pix_fmt_mp->height;
-
 			v4l_bound_align_image(&pix_fmt_mp->width,
 				spec_size_info->stepwise.min_width,
 				spec_size_info->stepwise.max_height,
-				log2_enc(width_align),
+				log2_enc(step_width_in_pixel),
 				&pix_fmt_mp->height,
 				spec_size_info->stepwise.min_height,
 				spec_size_info->stepwise.max_width,
-				log2_enc(height_align),
+				log2_enc(step_height_in_pixel),
 				saligned);
 
 			if (pix_fmt_mp->width < org_w &&
 			    (pix_fmt_mp->width +
-			     spec_size_info->stepwise.step_width) <=
+			     step_width_in_pixel) <=
 			    spec_size_info->stepwise.max_height)
 				pix_fmt_mp->width +=
-					spec_size_info->stepwise.step_width;
+					step_width_in_pixel;
 			if (pix_fmt_mp->height < org_h &&
 			    (pix_fmt_mp->height +
-			     spec_size_info->stepwise.step_height) <=
+			     step_height_in_pixel) <=
 			    spec_size_info->stepwise.max_width)
 				pix_fmt_mp->height +=
-					spec_size_info->stepwise.step_height;
+					step_height_in_pixel;
 		} else {
 			pix_fmt_mp->height = clamp(pix_fmt_mp->height,
 				(spec_size_info->stepwise.min_height),
@@ -635,79 +736,72 @@ static int vidioc_try_fmt(struct v4l2_format *f, struct mtk_video_fmt *fmt,
 				(spec_size_info->stepwise.max_width));
 			org_w = pix_fmt_mp->width;
 			org_h = pix_fmt_mp->height;
-
 			v4l_bound_align_image(&pix_fmt_mp->width,
 				spec_size_info->stepwise.min_width,
 				spec_size_info->stepwise.max_width,
-				log2_enc(width_align),
+				log2_enc(step_width_in_pixel),
 				&pix_fmt_mp->height,
 				spec_size_info->stepwise.min_height,
 				spec_size_info->stepwise.max_height,
-				log2_enc(height_align),
+				log2_enc(step_height_in_pixel),
 				saligned);
 
 			if (pix_fmt_mp->width < org_w &&
 			    (pix_fmt_mp->width +
-			     spec_size_info->stepwise.step_width) <=
+			     step_width_in_pixel) <=
 			    spec_size_info->stepwise.max_width)
 				pix_fmt_mp->width +=
-					spec_size_info->stepwise.step_width;
+					step_width_in_pixel;
 			if (pix_fmt_mp->height < org_h &&
 			    (pix_fmt_mp->height +
-			     spec_size_info->stepwise.step_height) <=
+			     step_height_in_pixel) <=
 			    spec_size_info->stepwise.max_height)
 				pix_fmt_mp->height +=
-					spec_size_info->stepwise.step_height;
+					step_height_in_pixel;
 		}
 
 		pix_fmt_mp->num_planes = fmt->num_planes;
+		imagePixels = pix_fmt_mp->width * pix_fmt_mp->height;
 
-		if (pix_fmt_mp->num_planes == 1U) {
-			if (pix_fmt_mp->pixelformat == V4L2_PIX_FMT_ABGR32 ||
+		if (pix_fmt_mp->pixelformat == V4L2_PIX_FMT_ABGR32 ||
 			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_ARGB32 ||
 			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_RGB32 ||
-			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_BGR32) {
-				pix_fmt_mp->plane_fmt[0].sizeimage =
-				    pix_fmt_mp->width * 4 * pix_fmt_mp->height;
-				pix_fmt_mp->plane_fmt[0].bytesperline =
-				    pix_fmt_mp->width * 4;
-			} else if (pix_fmt_mp->pixelformat ==
-					V4L2_PIX_FMT_BGR24 ||
-				 pix_fmt_mp->pixelformat ==
-					V4L2_PIX_FMT_RGB24) {
-				pix_fmt_mp->plane_fmt[0].sizeimage =
-				    pix_fmt_mp->width * 3 * pix_fmt_mp->height;
-				pix_fmt_mp->plane_fmt[0].bytesperline =
-				    pix_fmt_mp->width * 3;
-			} else {
-				pix_fmt_mp->plane_fmt[0].sizeimage =
-				(pix_fmt_mp->width * pix_fmt_mp->height) +
-				(pix_fmt_mp->width * pix_fmt_mp->height) / 2;
-				pix_fmt_mp->plane_fmt[0].bytesperline =
-					pix_fmt_mp->width;
-			}
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_BGR32 ||
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_RGB24 ||
+			pix_fmt_mp->pixelformat == V4L2_PIX_FMT_BGR24) {
+			pix_fmt_mp->plane_fmt[0].sizeimage =
+				imagePixels * bytesPP / 100;
+			pix_fmt_mp->plane_fmt[0].bytesperline =
+				pix_fmt_mp->width * bytesPP / 100;
+			pix_fmt_mp->num_planes = 1U;
+		} else if (pix_fmt_mp->num_planes == 1U) {
+			pix_fmt_mp->plane_fmt[0].sizeimage =
+				(imagePixels * bytesPP / 100) +
+				(imagePixels * bytesPP / 100) / 2;
+			pix_fmt_mp->plane_fmt[0].bytesperline =
+				pix_fmt_mp->width * bytesPP / 100;
 		} else if (pix_fmt_mp->num_planes == 2U) {
 			pix_fmt_mp->plane_fmt[0].sizeimage =
-				pix_fmt_mp->width * pix_fmt_mp->height;
+				imagePixels * bytesPP / 100;
 			pix_fmt_mp->plane_fmt[0].bytesperline =
-				pix_fmt_mp->width;
+				pix_fmt_mp->width * bytesPP / 100;
 			pix_fmt_mp->plane_fmt[1].sizeimage =
-				(pix_fmt_mp->width * pix_fmt_mp->height) / 2;
+				(imagePixels * bytesPP / 100) / 2;
 			pix_fmt_mp->plane_fmt[1].bytesperline =
-				pix_fmt_mp->width;
+				pix_fmt_mp->width * bytesPP / 100;
 		} else if (pix_fmt_mp->num_planes == 3U) {
 			pix_fmt_mp->plane_fmt[0].sizeimage =
-				pix_fmt_mp->width * pix_fmt_mp->height;
+				imagePixels * bytesPP / 100;
 			pix_fmt_mp->plane_fmt[0].bytesperline =
-				pix_fmt_mp->width;
+				pix_fmt_mp->width * bytesPP / 100;
 			pix_fmt_mp->plane_fmt[1].sizeimage =
-				(pix_fmt_mp->width * pix_fmt_mp->height) / 4;
+				(imagePixels * bytesPP / 100) / 4;
 			pix_fmt_mp->plane_fmt[1].bytesperline =
-				pix_fmt_mp->width / 2;
+				(pix_fmt_mp->width * bytesPP / 100) / 2;
 			pix_fmt_mp->plane_fmt[2].sizeimage =
-				(pix_fmt_mp->width * pix_fmt_mp->height) / 4;
+				(imagePixels * bytesPP / 100) / 4;
 			pix_fmt_mp->plane_fmt[2].bytesperline =
-				pix_fmt_mp->width / 2;
+				(pix_fmt_mp->width * bytesPP / 100) / 2;
 		} else
 			mtk_v4l2_err("Unsupport num planes = %d\n",
 				     pix_fmt_mp->num_planes);
@@ -773,8 +867,19 @@ static void mtk_venc_set_param(struct mtk_vcodec_ctx *ctx,
 	case V4L2_PIX_FMT_RGB32:
 		param->input_yuv_fmt = VENC_YUV_FORMAT_32bitRGBA8888;
 		break;
+	case V4L2_PIX_FMT_MT10:
+	case V4L2_PIX_FMT_MT10S:
+		param->input_yuv_fmt = VENC_YUV_FORMAT_MT10;
+		break;
+	case V4L2_PIX_FMT_P010M:
+	case V4L2_PIX_FMT_P010S:
+		param->input_yuv_fmt = VENC_YUV_FORMAT_P010;
+		break;
+
 	default:
-		mtk_v4l2_err("Unsupport fourcc =%d", q_data_src->fmt->fourcc);
+		mtk_v4l2_err("Unsupport fourcc =%d default use I420",
+			q_data_src->fmt->fourcc);
+		param->input_yuv_fmt = VENC_YUV_FORMAT_I420;
 		break;
 	}
 	param->profile = enc_params->profile;
@@ -791,27 +896,28 @@ static void mtk_venc_set_param(struct mtk_vcodec_ctx *ctx,
 	param->intra_period = enc_params->intra_period;
 	param->gop_size = enc_params->gop_size;
 	param->bitrate = enc_params->bitrate;
-
-	ctx->slowmotion = atomic_read(&ctx->dev->enc_smvr) ? 0 :
-		(enc_params->operationrate >= MTK_SLOWMOTION_GCE_TH);
-	if (ctx->slowmotion)
-		atomic_set(&ctx->dev->enc_smvr, ctx->slowmotion);
-	else if (enc_params->operationrate >= MTK_SLOWMOTION_GCE_TH)
-		enc_params->operationrate = MTK_SLOWMOTION_GCE_TH / 4;
-
 	param->operationrate = enc_params->operationrate;
 	param->scenario = enc_params->scenario;
 	param->prependheader = enc_params->prependheader;
 	param->bitratemode = enc_params->bitratemode;
+	param->roion = enc_params->roion;
+	param->heif_grid_size = enc_params->heif_grid_size;
+	param->max_w = enc_params->max_w;
+	param->max_h = enc_params->max_h;
+
+	ctx->use_gce = (ctx->use_gce == 1) ?
+		ctx->use_gce :
+		(enc_params->operationrate >= MTK_SLOWMOTION_GCE_TH);
 
 	mtk_v4l2_debug(0,
-	"fmt 0x%x, P/L %d/%d, w/h %d/%d, buf %d/%d, fps/bps %d/%d(%d), gop %d, i_period %d opr %d smvr %d",
+	"fmt 0x%x, P/L %d/%d, w/h %d/%d, buf %d/%d, fps/bps %d/%d(%d), gop %d, i_period %d opr %d smvr %d grid size %d/%d",
 	param->input_yuv_fmt, param->profile,
 	param->level, param->width, param->height,
 	param->buf_width, param->buf_height,
 	param->frm_rate, param->bitrate, param->bitratemode,
 	param->gop_size, param->intra_period,
-	param->operationrate, ctx->slowmotion);
+	param->operationrate, ctx->use_gce,
+	(param->heif_grid_size>>16), param->heif_grid_size&0xffff);
 }
 
 static int vidioc_venc_subscribe_evt(struct v4l2_fh *fh,
@@ -903,6 +1009,8 @@ static int vidioc_venc_s_fmt_cap(struct file *file, void *priv,
 		if (ret) {
 			mtk_v4l2_err("venc_if_init failed=%d, codec type=%x",
 				     ret, q_data->fmt->fourcc);
+			ctx->state = MTK_STATE_ABORT;
+			mtk_venc_queue_error_event(ctx);
 			return -EBUSY;
 		}
 		ctx->state = MTK_STATE_INIT;
@@ -1157,6 +1265,13 @@ static int vidioc_venc_qbuf(struct file *file, void *priv,
 		mtk_v4l2_debug(4, "[%d] No need for Cache invalidate, buf->index:%d. mtkbuf:%p",
 		   ctx->id, buf->index, mtkbuf);
 		mtkbuf->flags |= NO_CAHCE_INVALIDATE;
+	}
+
+	if (buf->flags & V4L2_BUF_FLAG_ROI && buf->reserved2 != 0) {
+		mtk_v4l2_debug(1, "[%d] Have ROI info map 1, buf->index:%d. mtkbuf:%p, pa:0x%x",
+			ctx->id, buf->index, mtkbuf, buf->reserved2);
+		mtkbuf->roimap = buf->reserved2;
+		mtkbuf->frm_buf.roimap = buf->reserved2;
 	}
 
 	return v4l2_m2m_qbuf(file, ctx->m2m_ctx, buf);
@@ -1435,7 +1550,7 @@ static int vb2ops_venc_start_streaming(struct vb2_queue *q, unsigned int count)
 	/* Once state turn into MTK_STATE_ABORT, we need stop_streaming
 	  * to clear it
 	  */
-	if ((ctx->state == MTK_STATE_ABORT) || (ctx->state == MTK_STATE_FREE)) {
+	if (ctx->state == MTK_STATE_ABORT || ctx->state == MTK_STATE_FREE) {
 		ret = -EIO;
 		goto err_set_param;
 	}
@@ -1461,6 +1576,7 @@ static int vb2ops_venc_start_streaming(struct vb2_queue *q, unsigned int count)
 
 	if ((ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_H264 ||
 	     ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_H265 ||
+	     ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_HEIF ||
 	     ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_MPEG4) &&
 	    (ctx->enc_params.seq_hdr_mode !=
 	     V4L2_MPEG_VIDEO_HEADER_MODE_SEPARATE)) {
@@ -1474,6 +1590,8 @@ static int vb2ops_venc_start_streaming(struct vb2_queue *q, unsigned int count)
 			goto err_set_param;
 		}
 		ctx->state = MTK_STATE_HEADER;
+	} else {
+		ctx->state = MTK_STATE_INIT;
 	}
 
 	return 0;
@@ -1496,10 +1614,20 @@ static void vb2ops_venc_stop_streaming(struct vb2_queue *q)
 {
 	struct mtk_vcodec_ctx *ctx = vb2_get_drv_priv(q);
 	struct vb2_buffer *src_buf, *dst_buf;
+	struct venc_done_result enc_result;
 	int ret;
 
 	mtk_v4l2_debug(2, "[%d]-> type=%d", ctx->id, q->type);
 
+	if (ctx->state != MTK_STATE_ABORT) {
+		ret = venc_if_encode(ctx,
+			VENC_START_OPT_ENCODE_FRAME_FINAL,
+			NULL, NULL, &enc_result);
+		return_free_buffers(ctx);
+
+		if (ret)
+			mtk_v4l2_err("venc_if_deinit failed=%d", ret);
+	}
 	if (q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 		while ((dst_buf = v4l2_m2m_dst_buf_remove(ctx->m2m_ctx))) {
 			dst_buf->planes[0].bytesused = 0;
@@ -1523,12 +1651,6 @@ static void vb2ops_venc_stop_streaming(struct vb2_queue *q)
 		return;
 	}
 
-	/* Release the encoder if both streams are stopped. */
-	ret = venc_if_deinit(ctx);
-	if (ret)
-		mtk_v4l2_err("venc_if_deinit failed=%d", ret);
-
-	ctx->state = MTK_STATE_FREE;
 }
 
 static const struct vb2_ops mtk_venc_vb2_ops = {
@@ -1718,16 +1840,6 @@ static int mtk_venc_param_change(struct mtk_vcodec_ctx *ctx)
 
 	if (!ret &&
 	mtk_buf->param_change & MTK_ENCODE_PARAM_OPERATION_RATE) {
-		ctx->slowmotion = atomic_read(&ctx->dev->enc_smvr) ? 0 :
-			(mtk_buf->enc_params.operationrate >=
-				MTK_SLOWMOTION_GCE_TH);
-		if (ctx->slowmotion)
-			atomic_set(&ctx->dev->enc_smvr, ctx->slowmotion);
-		else if (mtk_buf->enc_params.operationrate >=
-				MTK_SLOWMOTION_GCE_TH)
-			mtk_buf->enc_params.operationrate =
-				MTK_SLOWMOTION_GCE_TH / 4;
-
 		enc_prm.operationrate = mtk_buf->enc_params.operationrate;
 		mtk_v4l2_debug(1, "[%d] idx=%d, operationrate=%d",
 				ctx->id,
@@ -1736,6 +1848,9 @@ static int mtk_venc_param_change(struct mtk_vcodec_ctx *ctx)
 		ret |= venc_if_set_param(ctx,
 					VENC_SET_PARAM_OPERATION_RATE,
 					&enc_prm);
+		ctx->use_gce = (ctx->use_gce == 1) ?
+			ctx->use_gce : (mtk_buf->enc_params.operationrate >=
+				MTK_SLOWMOTION_GCE_TH);
 	}
 
 	if (!ret &&
@@ -1747,6 +1862,30 @@ static int mtk_venc_param_change(struct mtk_vcodec_ctx *ctx)
 				mtk_buf->enc_params.bitratemode);
 		ret |= venc_if_set_param(ctx,
 					VENC_SET_PARAM_BITRATE_MODE,
+					&enc_prm);
+	}
+
+	if (!ret &&
+	mtk_buf->param_change & MTK_ENCODE_PARAM_ROI_ON) {
+		enc_prm.roion = mtk_buf->enc_params.roion;
+		mtk_v4l2_debug(1, "[%d] idx=%d, roion=%d",
+				ctx->id,
+				mtk_buf->vb.vb2_buf.index,
+				mtk_buf->enc_params.roion);
+		ret |= venc_if_set_param(ctx,
+					VENC_SET_PARAM_ROI_ON,
+					&enc_prm);
+	}
+
+	if (!ret &&
+	mtk_buf->param_change & MTK_ENCODE_PARAM_GRID_SIZE) {
+		enc_prm.heif_grid_size = mtk_buf->enc_params.heif_grid_size;
+		mtk_v4l2_err("[%d] idx=%d, heif_grid_size=%d",
+				ctx->id,
+				mtk_buf->vb.vb2_buf.index,
+				mtk_buf->enc_params.heif_grid_size);
+		ret |= venc_if_set_param(ctx,
+					VENC_SET_PARAM_HEIF_GRID_SIZE,
 					&enc_prm);
 	}
 
@@ -1861,21 +2000,25 @@ static void mtk_venc_worker(struct work_struct *work)
 		} else {
 			ret = venc_if_encode(ctx,
 					VENC_START_OPT_ENCODE_FRAME_FINAL,
-					NULL, pbs_buf, &enc_result);
+					NULL, NULL, &enc_result);
 			dst_vb2_v4l2->vb2_buf.timestamp =
 				src_vb2_v4l2->vb2_buf.timestamp;
 			dst_vb2_v4l2->timecode = src_vb2_v4l2->timecode;
+			dst_vb2_v4l2->flags |= V4L2_BUF_FLAG_LAST;
+			dst_buf->planes[0].bytesused = 0;
+
 			if (ret) {
 				mtk_v4l2_err("last venc_if_encode failed=%d",
 									ret);
-				v4l2_m2m_buf_done(dst_vb2_v4l2,
-							VB2_BUF_STATE_ERROR);
 				if (ret == -EIO) {
 					ctx->state = MTK_STATE_ABORT;
 					mtk_venc_queue_error_event(ctx);
 				}
 			} else
 				return_free_buffers(ctx);
+
+			v4l2_m2m_buf_done(dst_vb2_v4l2,
+				VB2_BUF_STATE_DONE);
 		}
 		mtk_vdec_queue_stop_enc_event(ctx);
 
@@ -1942,6 +2085,8 @@ static void mtk_venc_worker(struct work_struct *work)
 			pfrm_buf->fb_addr[2].size,
 			src_buf->planes[2].data_offset);
 
+	pfrm_buf->roimap = src_buf_info->roimap;
+
 	ret = venc_if_encode(ctx, VENC_START_OPT_ENCODE_FRAME,
 				 pfrm_buf, pbs_buf, &enc_result);
 	if (ret) {
@@ -1973,6 +2118,7 @@ static void m2mops_venc_device_run(void *priv)
 
 	if ((ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_H264 ||
 	     ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_H265 ||
+	     ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_HEIF ||
 	     ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_MPEG4 ||
 	     ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_H263) &&
 	    (ctx->state != MTK_STATE_HEADER)) {
@@ -2214,6 +2360,97 @@ int mtk_vcodec_enc_ctrls_setup(struct mtk_vcodec_ctx *ctx)
 	cfg.ops = ops;
 	ctrl = v4l2_ctrl_new_custom(handler, &cfg, NULL);
 
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.id = V4L2_CID_MPEG_MTK_ENCODE_ROI_ON;
+	cfg.type = V4L2_CTRL_TYPE_INTEGER;
+	cfg.flags = V4L2_CTRL_FLAG_WRITE_ONLY;
+	cfg.name = "Video encode roi switch";
+	cfg.min = 0;
+	cfg.max = 8;
+	cfg.step = 1;
+	cfg.def = 0;
+	cfg.ops = ops;
+	ctrl = v4l2_ctrl_new_custom(handler, &cfg, NULL);
+
+	/* g_volatile_ctrl */
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.id = V4L2_CID_MPEG_MTK_ENCODE_ROI_RC_QP;
+	cfg.type = V4L2_CTRL_TYPE_INTEGER;
+	cfg.flags = V4L2_CTRL_FLAG_VOLATILE;
+	cfg.name = "Video encode roi rc qp";
+	cfg.min = 0;
+	cfg.max = 2048;
+	cfg.step = 1;
+	cfg.def = 0;
+	cfg.ops = ops;
+	ctrl = v4l2_ctrl_new_custom(handler, &cfg, NULL);
+
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.id = V4L2_CID_MPEG_MTK_ENCODE_GRID_SIZE;
+	cfg.type = V4L2_CTRL_TYPE_INTEGER;
+	cfg.flags = V4L2_CTRL_FLAG_WRITE_ONLY;
+	cfg.name = "Video encode heif grid size";
+	cfg.min = 0;
+	cfg.max = (3840<<16)+2176;
+	cfg.step = 16;
+	cfg.def = 0;
+	cfg.ops = ops;
+	ctrl = v4l2_ctrl_new_custom(handler, &cfg, NULL);
+
+
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.id = V4L2_CID_MPEG_MTK_MAX_WIDTH;
+	cfg.type = V4L2_CTRL_TYPE_INTEGER;
+	cfg.flags = V4L2_CTRL_FLAG_WRITE_ONLY;
+	cfg.name = "Video encode max width";
+	cfg.min = 0;
+	cfg.max = 3840;
+	cfg.step = 16;
+	cfg.def = 0;
+	cfg.ops = ops;
+	ctrl = v4l2_ctrl_new_custom(handler, &cfg, NULL);
+
+
+
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.id = V4L2_CID_MPEG_MTK_MAX_HEIGHT;
+	cfg.type = V4L2_CTRL_TYPE_INTEGER;
+	cfg.flags = V4L2_CTRL_FLAG_WRITE_ONLY;
+	cfg.name = "Video encode max height";
+	cfg.min = 0;
+	cfg.max = 3840;
+	cfg.step = 16;
+	cfg.def = 0;
+	cfg.ops = ops;
+	ctrl = v4l2_ctrl_new_custom(handler, &cfg, NULL);
+
+	/* g_volatile_ctrl */
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.id = V4L2_CID_MPEG_MTK_ENCODE_ROI_RC_QP;
+	cfg.type = V4L2_CTRL_TYPE_INTEGER;
+	cfg.flags = V4L2_CTRL_FLAG_VOLATILE;
+	cfg.name = "Video encode roi rc qp";
+	cfg.min = 0;
+	cfg.max = 2048;
+	cfg.step = 1;
+	cfg.def = 0;
+	cfg.ops = ops;
+	ctrl = v4l2_ctrl_new_custom(handler, &cfg, NULL);
+
+	/* g_volatile_ctrl */
+	memset(&cfg, 0, sizeof(cfg));
+	cfg.id = V4L2_CID_MPEG_MTK_RESOLUTION_CHANGE;
+	cfg.type = V4L2_CTRL_TYPE_U32;
+	cfg.flags = V4L2_CTRL_FLAG_VOLATILE;
+	cfg.name = "Video encode resolution change";
+	cfg.min = 0x00000000;
+	cfg.max = 0x00ffffff;
+	cfg.step = 1;
+	cfg.def = 0;
+	cfg.ops = ops;
+	cfg.dims[0] = sizeof(struct venc_resolution_change)/sizeof(u32);
+	ctrl = v4l2_ctrl_new_custom(handler, &cfg, NULL);
+
 	if (handler->error) {
 		mtk_v4l2_err("Init control handler fail %d",
 			     handler->error);
@@ -2265,16 +2502,17 @@ int mtk_vcodec_enc_queue_init(void *priv, struct vb2_queue *src_vq,
 	return vb2_queue_init(dst_vq);
 }
 
-int mtk_venc_unlock(struct mtk_vcodec_ctx *ctx)
+void mtk_venc_unlock(struct mtk_vcodec_ctx *ctx, u32 hw_id)
 {
-	mtk_v4l2_debug(4, "ctx %p [%d]", ctx, ctx->id);
-	up(&ctx->dev->enc_sem);
-	return 0;
+	mtk_v4l2_debug(4, "ctx %p [%d] core %d", ctx, ctx->id, hw_id);
+	if (hw_id < MTK_VENC_HW_NUM)
+		up(&ctx->dev->enc_sem[hw_id]);
 }
 
-int mtk_venc_lock(struct mtk_vcodec_ctx *ctx)
+void mtk_venc_lock(struct mtk_vcodec_ctx *ctx, u32 hw_id)
 {
 	unsigned int suspend_block_cnt = 0;
+	int ret = -1;
 
 	while (ctx->dev->is_codec_suspending == 1) {
 		suspend_block_cnt++;
@@ -2286,7 +2524,8 @@ int mtk_venc_lock(struct mtk_vcodec_ctx *ctx)
 	}
 
 	mtk_v4l2_debug(4, "ctx %p [%d]", ctx, ctx->id);
-	return down_interruptible(&ctx->dev->enc_sem);
+	while (hw_id < MTK_VENC_HW_NUM && ret != 0)
+		ret = down_interruptible(&ctx->dev->enc_sem[hw_id]);
 }
 
 void mtk_vcodec_enc_empty_queues(struct file *file, struct mtk_vcodec_ctx *ctx)
@@ -2318,8 +2557,6 @@ void mtk_vcodec_enc_release(struct mtk_vcodec_ctx *ctx)
 {
 	int ret = venc_if_deinit(ctx);
 
-	if (ctx->slowmotion)
-		atomic_set(&ctx->dev->enc_smvr, 0);
 	if (ret)
 		mtk_v4l2_err("venc_if_deinit failed=%d", ret);
 }

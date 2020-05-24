@@ -308,6 +308,7 @@ int est_new_kcy(struct codec_history *hist)
 {
 	long long tot_time = 0;
 	int i = 0;
+
 	if (hist == 0)
 		return 0;
 

@@ -567,6 +567,8 @@ struct v4l2_pix_format {
 #define V4L2_PIX_FMT_YUV420  v4l2_fourcc('Y', 'U', '1', '2') /* 12  YUV 4:2:0     */
 #define V4L2_PIX_FMT_YVU420  v4l2_fourcc('Y', 'V', '1', '2') /* 12  YVU 4:2:0     */
 #define V4L2_PIX_FMT_YUV422P v4l2_fourcc('4', '2', '2', 'P') /* 16  YVU422 planar */
+/* 10-bit; each pixel needs 2 bytes, and LSB 6-bit is not used */
+#define V4L2_PIX_FMT_P010M   v4l2_fourcc('P', '0', '1', '0')
 
 /* three non contiguous planes - Y, Cb, Cr */
 #define V4L2_PIX_FMT_YUV420M v4l2_fourcc('Y', 'M', '1', '2') /* 12  YUV420 planar */
@@ -645,13 +647,15 @@ struct v4l2_pix_format {
 #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
 #define V4L2_PIX_FMT_VP8_FRAME v4l2_fourcc('V', 'P', '8', 'F') /* VP8 parsed frames */
 #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
-#define V4L2_PIX_FMT_WMV1      v4l2_fourcc('W', 'M', 'V', '1') /* WMV7 */
-#define V4L2_PIX_FMT_WMV2      v4l2_fourcc('W', 'M', 'V', '2') /* WMV8 */
-#define V4L2_PIX_FMT_WMV3      v4l2_fourcc('W', 'M', 'V', '3') /* WMV9 */
-#define V4L2_PIX_FMT_WMVA      v4l2_fourcc('W', 'M', 'V', 'A') /* WMVA */
-#define V4L2_PIX_FMT_WVC1      v4l2_fourcc('W', 'V', 'C', '1') /* VC1 */
-#define V4L2_PIX_FMT_RV30      v4l2_fourcc('R', 'V', '3', '0') /* RealVideo 8 */
-#define V4L2_PIX_FMT_RV40      v4l2_fourcc('R', 'V', '4', '0') /* RealVideo 9/10 */
+#define V4L2_PIX_FMT_WMV1     v4l2_fourcc('W', 'M', 'V', '1') /* WMV7 */
+#define V4L2_PIX_FMT_WMV2     v4l2_fourcc('W', 'M', 'V', '2') /* WMV8 */
+#define V4L2_PIX_FMT_WMV3     v4l2_fourcc('W', 'M', 'V', '3') /* WMV9 */
+#define V4L2_PIX_FMT_WMVA     v4l2_fourcc('W', 'M', 'V', 'A') /* WMVA */
+#define V4L2_PIX_FMT_WVC1     v4l2_fourcc('W', 'V', 'C', '1') /* VC1 */
+#define V4L2_PIX_FMT_RV30     v4l2_fourcc('R', 'V', '3', '0') /* RealVideo 8 */
+#define V4L2_PIX_FMT_RV40     v4l2_fourcc('R', 'V', '4', '0') /* RealVideo 9/10 */
+#define V4L2_PIX_FMT_AV1      v4l2_fourcc('A', 'V', '1', '0') /* AV1 */
+
 
 /*  Vendor-specific formats   */
 #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
@@ -684,39 +688,46 @@ struct v4l2_pix_format {
 #define V4L2_PIX_FMT_Y12I     v4l2_fourcc('Y', '1', '2', 'I') /* Greyscale 12-bit L/R interleaved */
 #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
 #define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
-#define V4L2_PIX_FMT_MT21    v4l2_fourcc('M', 'M', '2', '1')
+#define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /* Intel Planar Greyscale 10-bit and Depth 16-bit */
+	/* Mediatek compressed block mode  */
+#define V4L2_PIX_FMT_MT21         v4l2_fourcc('M', 'M', '2', '1')
 	/* MTK 8-bit block mode, two non-contiguous planes */
-#define V4L2_PIX_FMT_MT2110T    v4l2_fourcc('M', 'T', '2', 'T')
+#define V4L2_PIX_FMT_MT2110T      v4l2_fourcc('M', 'T', '2', 'T')
 	/* MTK 10-bit tile block mode, two non-contiguous planes */
-#define V4L2_PIX_FMT_MT2110R    v4l2_fourcc('M', 'T', '2', 'R')
+#define V4L2_PIX_FMT_MT2110R      v4l2_fourcc('M', 'T', '2', 'R')
 	/* MTK 10-bit raster block mode, two non-contiguous planes */
-#define V4L2_PIX_FMT_MT21C10T    v4l2_fourcc('M', 'T', 'C', 'T')
+#define V4L2_PIX_FMT_MT21C10T     v4l2_fourcc('M', 'T', 'C', 'T')
 	/* MTK 10-bit tile compressed block mode, two non-contiguous planes */
-#define V4L2_PIX_FMT_MT21C10R    v4l2_fourcc('M', 'T', 'C', 'R')
+#define V4L2_PIX_FMT_MT21C10R     v4l2_fourcc('M', 'T', 'C', 'R')
 	/* MTK 10-bit raster compressed block mode, two non-contiguous planes */
-#define V4L2_PIX_FMT_MT21CS    v4l2_fourcc('M', '2', 'C', 'S')
+#define V4L2_PIX_FMT_MT21CS       v4l2_fourcc('M', '2', 'C', 'S')
 	/* MTK 8-bit compressed block mode, two contiguous planes */
-#define V4L2_PIX_FMT_MT21S    v4l2_fourcc('M', '2', '1', 'S')
+#define V4L2_PIX_FMT_MT21S        v4l2_fourcc('M', '2', '1', 'S')
 	/* MTK 8-bit block mode, two contiguous planes */
-#define V4L2_PIX_FMT_MT21S10T    v4l2_fourcc('M', 'T', 'S', 'T')
+#define V4L2_PIX_FMT_MT21S10T     v4l2_fourcc('M', 'T', 'S', 'T')
 	/* MTK 10-bit tile block mode, two contiguous planes */
-#define V4L2_PIX_FMT_MT21S10R    v4l2_fourcc('M', 'T', 'S', 'R')
+#define V4L2_PIX_FMT_MT21S10R     v4l2_fourcc('M', 'T', 'S', 'R')
 	/* MTK 10-bit raster block mode, two contiguous planes */
 #define V4L2_PIX_FMT_MT21CS10T    v4l2_fourcc('M', 'C', 'S', 'T')
 	/* MTK 10-bit tile compressed block mode, two contiguous planes */
 #define V4L2_PIX_FMT_MT21CS10R    v4l2_fourcc('M', 'C', 'S', 'R')
 	/* MTK 10-bit raster compressed block mode, two contiguous planes */
-#define V4L2_PIX_FMT_MT21CSA    v4l2_fourcc('M', 'A', 'C', 'S')
+#define V4L2_PIX_FMT_MT21CSA      v4l2_fourcc('M', 'A', 'C', 'S')
 	/* MTK 8-bit compressed block au offset mode, two contiguous planes */
 #define V4L2_PIX_FMT_MT21S10TJ    v4l2_fourcc('M', 'J', 'S', 'T')
 	/* MTK 10-bit tile block jump mode, two contiguous planes */
 #define V4L2_PIX_FMT_MT21S10RJ    v4l2_fourcc('M', 'J', 'S', 'R')
 	/* MTK 10-bit raster block jump mode, two contiguous planes */
-#define V4L2_PIX_FMT_MT21CS10TJ    v4l2_fourcc('J', 'C', 'S', 'T')
+#define V4L2_PIX_FMT_MT21CS10TJ   v4l2_fourcc('J', 'C', 'S', 'T')
 	/* MTK 10-bit tile compressed block jump mode, two contiguous planes */
-#define V4L2_PIX_FMT_MT21CS10RJ    v4l2_fourcc('J', 'C', 'S', 'R')
+#define V4L2_PIX_FMT_MT21CS10RJ   v4l2_fourcc('J', 'C', 'S', 'R')
 	/* MTK 10-bit raster compressed block jump mode, two cont. planes */
-#define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /* Intel Planar Greyscale 10-bit and Depth 16-bit */
+#define V4L2_PIX_FMT_MT10S     v4l2_fourcc('M', '1', '0', 'S')
+	/* MTK 10-bit compressed mode, three contiguous planes */
+#define V4L2_PIX_FMT_MT10     v4l2_fourcc('M', 'T', '1', '0')
+	/* MTK 10-bit compressed mode, three non-contiguous planes */
+#define V4L2_PIX_FMT_P010S   v4l2_fourcc('P', '0', '1', 'S')
+	/* 10-bit each pixel needs 2 bytes, LSB 6-bit is not used contiguous*/
 
 /* SDR formats - used only for Software Defined Radio devices */
 #define V4L2_SDR_FMT_CU8          v4l2_fourcc('C', 'U', '0', '8') /* IQ u8 */
@@ -992,6 +1003,7 @@ struct v4l2_buffer {
 /* Image is a B-frame */
 #define V4L2_BUF_FLAG_BFRAME			0x00000020
 /* Buffer is ready, but the data contained within is corrupted. */
+/* Status related. This would be used in videobuf_status  */
 #define V4L2_BUF_FLAG_ERROR			0x00000040
 /* Buffer is ready, but the data contained within is corrupted. */
 /* This would not be status-related usage*/
@@ -999,7 +1011,7 @@ struct v4l2_buffer {
 /* timecode field is valid */
 #define V4L2_BUF_FLAG_TIMECODE			0x00000100
 /* Reference freed flags*/
-#define V4L2_BUF_FLAG_REF_FREED		0x00000200
+#define V4L2_BUF_FLAG_REF_FREED			0x00000200
 /* Buffer is prepared for queuing */
 #define V4L2_BUF_FLAG_PREPARED			0x00000400
 /* Cache handling flags */
@@ -1019,6 +1031,7 @@ struct v4l2_buffer {
 /* mem2mem encoder/decoder */
 #define V4L2_BUF_FLAG_LAST			0x00100000
 #define V4L2_BUF_FLAG_CSD			0x00200000
+#define V4L2_BUF_FLAG_ROI                      0x00400000
 
 /**
  * struct v4l2_exportbuffer - export of video buffer as DMABUF file descriptor

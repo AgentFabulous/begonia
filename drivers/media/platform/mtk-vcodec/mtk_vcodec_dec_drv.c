@@ -45,6 +45,7 @@ static int fops_vcodec_open(struct file *file)
 	struct mtk_vcodec_ctx *ctx = NULL;
 	struct mtk_video_dec_buf *mtk_buf = NULL;
 	int ret = 0;
+	int i = 0;
 	struct vb2_queue *src_vq;
 
 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
@@ -64,7 +65,8 @@ static int fops_vcodec_open(struct file *file)
 	v4l2_fh_add(&ctx->fh);
 	INIT_LIST_HEAD(&ctx->list);
 	ctx->dev = dev;
-	init_waitqueue_head(&ctx->queue);
+	for (i = 0; i < MTK_VDEC_HW_NUM; i++)
+		init_waitqueue_head(&ctx->queue[i]);
 	mutex_init(&ctx->buf_lock);
 	mutex_init(&ctx->worker_lock);
 
@@ -90,7 +92,6 @@ static int fops_vcodec_open(struct file *file)
 	mtk_vcodec_dec_set_default_params(ctx);
 
 	if (v4l2_fh_is_singular(&ctx->fh)) {
-		mtk_vcodec_dec_pw_on(&dev->pm);
 		/*
 		 * vcu_load_firmware checks if it was loaded already and
 		 * does nothing in that case
@@ -161,8 +162,6 @@ static int fops_vcodec_release(struct file *file)
 	mutex_unlock(&ctx->worker_lock);
 	mtk_vcodec_dec_release(ctx);
 
-	if (v4l2_fh_is_singular(&ctx->fh))
-		mtk_vcodec_dec_pw_off(&dev->pm);
 	v4l2_fh_del(&ctx->fh);
 	v4l2_fh_exit(&ctx->fh);
 	v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
@@ -192,10 +191,17 @@ static const struct v4l2_file_operations mtk_vcodec_fops = {
  **/
 static int mtk_vcodec_dec_suspend(struct device *pDev)
 {
-	if (mutex_is_locked(&vdec_dev->dec_mutex)) {
-		mtk_v4l2_debug(0, "fail due to videocodec activity");
-		return -EBUSY;
+	int val, i;
+
+	for (i = 0; i < MTK_VDEC_HW_NUM; i++) {
+		val = down_trylock(&vdec_dev->dec_sem[i]);
+		if (val == 1) {
+			mtk_v4l2_debug(0, "fail due to videocodec activity");
+			return -EBUSY;
+		}
+		up(&vdec_dev->dec_sem[i]);
 	}
+
 	mtk_v4l2_debug(1, "done");
 	return 0;
 }
@@ -210,23 +216,27 @@ static int mtk_vcodec_dec_suspend_notifier(struct notifier_block *nb,
 					unsigned long action, void *data)
 {
 	int wait_cnt = 0;
+	int val = 0;
+	int i;
 
 	mtk_v4l2_debug(1, "action = %ld", action);
 	switch (action) {
 	case PM_SUSPEND_PREPARE:
-		vdec_dev->is_codec_suspending = 1;
-		do {
-			usleep_range(10000, 20000);
-			wait_cnt++;
-			if (wait_cnt > 5) {
-				mtk_v4l2_err("waiting fail");
+		for (i = 0; i < MTK_VDEC_HW_NUM; i++) {
+			vdec_dev->is_codec_suspending = 1;
+			do {
+				usleep_range(10000, 20000);
+				wait_cnt++;
 				/* Current task is still not finished, don't
 				 * care, will check again in real suspend
 				 */
-				return NOTIFY_DONE;
-			}
-		} while (mutex_is_locked(&vdec_dev->dec_mutex));
-
+				if (wait_cnt > 5) {
+					mtk_v4l2_err("waiting fail");
+					return NOTIFY_DONE;
+				} val = down_trylock(&vdec_dev->dec_sem[i]);
+			} while (val == 1);
+			up(&vdec_dev->dec_sem[i]);
+		}
 		return NOTIFY_OK;
 	case PM_POST_SUSPEND:
 		vdec_dev->is_codec_suspending = 0;
@@ -234,6 +244,7 @@ static int mtk_vcodec_dec_suspend_notifier(struct notifier_block *nb,
 	default:
 		return NOTIFY_DONE;
 	}
+
 	return NOTIFY_DONE;
 }
 
@@ -289,7 +300,8 @@ static int mtk_vcodec_dec_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_res;
 
-	mutex_init(&dev->dec_mutex);
+	for (i = 0; i < MTK_VDEC_HW_NUM; i++)
+		sema_init(&dev->dec_sem[i], 1);
 	mutex_init(&dev->dev_mutex);
 	mutex_init(&dev->dec_dvfs_mutex);
 	spin_lock_init(&dev->irqlock);

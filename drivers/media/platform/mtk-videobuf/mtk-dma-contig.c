@@ -161,9 +161,9 @@ static int vb2_dc_map_dmabuf(void *mem_priv)
 
 	if (mtk_secure_mode == 1) {
 		dprintk(INFO, "bypass %s for secure buffer\n", __func__);
-		buf->dma_addr = 0;
-		buf->dma_sgt  = NULL;
-		buf->vaddr    = NULL;
+	buf->dma_addr = 0;
+	buf->dma_sgt = NULL;
+	buf->vaddr = NULL;
 	} else {
 		/* get the associated scatterlist for this buffer */
 		sgt = dma_buf_map_attachment(buf->db_attach, buf->dma_dir);
@@ -223,8 +223,8 @@ static void vb2_dc_unmap_dmabuf(void *mem_priv)
 		}
 		dma_buf_unmap_attachment(buf->db_attach, sgt, buf->dma_dir);
 
-		buf->dma_addr = 0;
-		buf->dma_sgt = NULL;
+	buf->dma_addr = 0;
+	buf->dma_sgt = NULL;
 	}
 
 }
