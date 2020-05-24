@@ -17,6 +17,19 @@
 #define _VCODEC_IPI_MSG_H_
 
 #include <linux/videodev2.h>
+#include <linux/v4l2-controls.h>
+
+enum mtk_venc_hw_id {
+	MTK_VENC_CORE_0 = 0,
+	MTK_VENC_CORE_1 = 1,
+	MTK_VENC_HW_NUM = 2,
+};
+
+enum mtk_vdec_hw_id {
+	MTK_VDEC_CORE = 0,
+	MTK_VDEC_LAT = 1,
+	MTK_VDEC_HW_NUM = 2,
+};
 
 enum mtk_fmt_type {
 	MTK_FMT_DEC = 0,
@@ -46,7 +59,6 @@ struct mtk_codec_framesizes {
 
 
 struct mtk_color_desc {
-	__u32	full_range;
 	__u32	color_primaries;
 	__u32	transform_character;
 	__u32	matrix_coeffs;
@@ -59,6 +71,7 @@ struct mtk_color_desc {
 	__u32	max_content_light_level;
 	__u32	max_pic_light_level;
 	__u32	is_hdr;
+	__u32	full_range;
 };
 
 /**
@@ -111,6 +124,8 @@ struct vdec_dec_info {
 	__u32 index;
 	__u32 wait_key_frame;
 	__u32 error_map;
+	__u32 timestamp;
+	__u32 queued_frame_buf_count;
 };
 
 #endif

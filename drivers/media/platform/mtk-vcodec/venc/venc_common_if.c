@@ -198,6 +198,9 @@ static int venc_encode_frame(struct venc_inst *inst,
 	else {
 		inst->vsi->venc.venc_fb_va = (u64)(uintptr_t)frm_buf;
 		inst->vsi->venc.timestamp = frm_buf->timestamp;
+		inst->vsi->venc.roimap = frm_buf->roimap;
+
+		mtk_vcodec_debug(inst, "ROI: 0x%X", inst->vsi->venc.roimap);
 	}
 	ret = vcu_enc_encode(&inst->vcu_inst, VENC_BS_MODE_FRAME, frm_buf,
 						 bs_buf, bs_size);
@@ -287,6 +290,10 @@ static int venc_init(struct mtk_vcodec_ctx *ctx, unsigned long *handle)
 		inst->vcu_inst.id = IPI_VENC_H265;
 		break;
 	}
+	case V4L2_PIX_FMT_HEIF: {
+		inst->vcu_inst.id = IPI_VENC_HEIF;
+		break;
+	}
 
 	default: {
 		mtk_vcodec_err(inst, "%s fourcc not supported", __func__);
@@ -320,16 +327,15 @@ static int venc_encode(unsigned long handle,
 {
 	int ret = 0;
 	struct venc_inst *inst = (struct venc_inst *)handle;
-	struct mtk_vcodec_ctx *ctx = inst->ctx;
 
 	mtk_vcodec_debug(inst, "opt %d ->", opt);
 
-	if (ctx->oal_vcodec == 0)
-		enable_irq(ctx->dev->enc_irq);
+	if (inst->ctx->use_gce)
+		vcu_enc_set_ctx_for_gce(&inst->vcu_inst);
 
 	switch (opt) {
 	case VENC_START_OPT_ENCODE_SEQUENCE_HEADER: {
-		unsigned int bs_size_hdr;
+		unsigned int bs_size_hdr = 0;
 
 		ret = venc_encode_header(inst, bs_buf, &bs_size_hdr);
 		if (ret)
@@ -366,9 +372,6 @@ static int venc_encode(unsigned long handle,
 	}
 
 encode_err:
-
-	if (ctx->oal_vcodec == 0)
-		disable_irq(ctx->dev->enc_irq);
 	mtk_vcodec_debug(inst, "opt %d <-", opt);
 
 	return ret;
@@ -403,6 +406,26 @@ static void venc_get_free_buffers(struct venc_inst *inst,
 	list->count--;
 }
 
+static void venc_get_resolution_change(struct venc_inst *inst,
+			     struct venc_vcu_config *Config,
+			     struct venc_resolution_change *pResChange)
+{
+	pResChange->width = Config->pic_w;
+	pResChange->height = Config->pic_h;
+	pResChange->framerate = Config->framerate;
+	pResChange->resolutionchange = Config->resolutionChange;
+
+	if (Config->resolutionChange)
+		Config->resolutionChange = 0;
+
+	mtk_vcodec_debug(inst, "get reschange %d %d %d %d\n",
+		 pResChange->width,
+		 pResChange->height,
+		 pResChange->framerate,
+		 pResChange->resolutionchange);
+}
+
+
 static int venc_get_param(unsigned long handle,
 						  enum venc_get_param_type type,
 						  void *out)
@@ -425,6 +448,17 @@ static int venc_get_param(unsigned long handle,
 		if (inst->vsi == NULL)
 			return -EINVAL;
 		venc_get_free_buffers(inst, &inst->vsi->list_free, out);
+		break;
+	case GET_PARAM_ROI_RC_QP: {
+		if (inst->vsi == NULL || out == NULL)
+			return -EINVAL;
+		*(int *)out = inst->vsi->config.roi_rc_qp;
+		break;
+	}
+	case GET_PARAM_RESOLUTION_CHANGE:
+		if (inst->vsi == NULL)
+			return -EINVAL;
+		venc_get_resolution_change(inst, &inst->vsi->config, out);
 		break;
 	default:
 		mtk_vcodec_err(inst, "invalid get parameter type=%d", type);
@@ -461,14 +495,19 @@ static int venc_set_param(unsigned long handle,
 		inst->vsi->config.intra_period = enc_prm->intra_period;
 		inst->vsi->config.operationrate = enc_prm->operationrate;
 		inst->vsi->config.bitratemode = enc_prm->bitratemode;
+		inst->vsi->config.roion = enc_prm->roion;
 		inst->vsi->config.scenario = enc_prm->scenario;
 		inst->vsi->config.prependheader = enc_prm->prependheader;
+		inst->vsi->config.heif_grid_size = enc_prm->heif_grid_size;
+		inst->vsi->config.max_w = enc_prm->max_w;
+		inst->vsi->config.max_h = enc_prm->max_h;
 
 		if (inst->vcu_inst.id == IPI_VENC_H264 ||
 			inst->vcu_inst.id == IPI_VENC_HYBRID_H264) {
 			inst->vsi->config.profile = enc_prm->profile;
 			inst->vsi->config.level = enc_prm->level;
-		} else if (inst->vcu_inst.id == IPI_VENC_H265) {
+		} else if (inst->vcu_inst.id == IPI_VENC_H265 ||
+				inst->vcu_inst.id == IPI_VENC_HEIF) {
 			inst->vsi->config.profile =
 				venc_h265_get_profile(inst, enc_prm->profile);
 			inst->vsi->config.level =
@@ -490,8 +529,6 @@ static int venc_set_param(unsigned long handle,
 			mtk_vcodec_debug(inst, "sizeimage[%d] size=0x%x", i,
 							 enc_prm->sizeimage[i]);
 		}
-		if (inst->ctx->slowmotion)
-			vcu_enc_set_ctx_for_gce(&inst->vcu_inst);
 
 		break;
 	case VENC_SET_PARAM_PREPEND_HEADER:
@@ -516,6 +553,9 @@ static int venc_deinit(unsigned long handle)
 	mtk_vcodec_debug_enter(inst);
 
 	ret = vcu_enc_deinit(&inst->vcu_inst);
+
+	if (inst->ctx->use_gce)
+		vcu_enc_clear_ctx_for_gce(&inst->vcu_inst);
 
 	mtk_vcodec_debug_leave(inst);
 	kfree(inst);

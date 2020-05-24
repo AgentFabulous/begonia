@@ -67,7 +67,7 @@ static int fops_vcodec_open(struct file *file)
 	v4l2_fh_add(&ctx->fh);
 	INIT_LIST_HEAD(&ctx->list);
 	ctx->dev = dev;
-	init_waitqueue_head(&ctx->queue);
+	init_waitqueue_head(&ctx->queue[0]);
 	mutex_init(&ctx->worker_lock);
 
 	ctx->type = MTK_INST_ENCODER;
@@ -145,7 +145,6 @@ static int fops_vcodec_release(struct file *file)
 	mtk_v4l2_debug(0, "[%d] encoder", ctx->id);
 	mutex_lock(&dev->dev_mutex);
 
-	mtk_release_pmqos(ctx);
 	mtk_vcodec_enc_empty_queues(file, ctx);
 	mutex_lock(&ctx->worker_lock);
 	v4l2_m2m_ctx_release(ctx->m2m_ctx);
@@ -179,14 +178,16 @@ static const struct v4l2_file_operations mtk_vcodec_fops = {
  **/
 static int mtk_vcodec_enc_suspend(struct device *pDev)
 {
-	int val = 0;
+	int val, i;
 
-	val = down_trylock(&venc_dev->enc_sem);
+	for (i = 0; i < MTK_VENC_HW_NUM; i++) {
+		val = down_trylock(&venc_dev->enc_sem[i]);
 	if (val == 1) {
 		mtk_v4l2_debug(0, "fail due to videocodec activity");
 		return -EBUSY;
 	}
-	up(&venc_dev->enc_sem);
+		up(&venc_dev->enc_sem[i]);
+	}
 
 	mtk_v4l2_debug(1, "done");
 	return 0;
@@ -203,25 +204,27 @@ static int mtk_vcodec_enc_suspend_notifier(struct notifier_block *nb,
 {
 	int wait_cnt = 0;
 	int val = 0;
+	int i;
 
 	mtk_v4l2_debug(1, "action = %ld", action);
 	switch (action) {
 	case PM_SUSPEND_PREPARE:
 		venc_dev->is_codec_suspending = 1;
-		do {
-			usleep_range(10000, 20000);
-			wait_cnt++;
-			if (wait_cnt > 5) {
-				mtk_v4l2_err("waiting fail");
+		for (i = 0; i < MTK_VENC_HW_NUM; i++) {
+			do {
+				usleep_range(10000, 20000);
+				wait_cnt++;
 				/* Current task is still not finished, don't
 				 * care, will check again in real suspend
 				 */
-				return NOTIFY_DONE;
-			}
-			val = down_trylock(&venc_dev->enc_sem);
-		} while (val == 1);
-		up(&venc_dev->enc_sem);
-
+				if (wait_cnt > 5) {
+					mtk_v4l2_err("waiting fail");
+					return NOTIFY_DONE;
+				}
+				val = down_trylock(&venc_dev->enc_sem[i]);
+			} while (val == 1);
+			up(&venc_dev->enc_sem[i]);
+		}
 		return NOTIFY_OK;
 	case PM_POST_SUSPEND:
 		venc_dev->is_codec_suspending = 0;
@@ -310,7 +313,9 @@ static int mtk_vcodec_enc_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_res;
 
-	sema_init(&dev->enc_sem, 1);
+	for (i = 0; i < MTK_VENC_HW_NUM; i++)
+		sema_init(&dev->enc_sem[i], 1);
+
 	mutex_init(&dev->dev_mutex);
 	mutex_init(&dev->enc_dvfs_mutex);
 	spin_lock_init(&dev->irqlock);
@@ -374,7 +379,6 @@ static int mtk_vcodec_enc_probe(struct platform_device *pdev)
 	mtk_v4l2_debug(0, "encoder registered as /dev/video%d",
 				   vfd_enc->num);
 
-	atomic_set(&dev->enc_smvr, 0);
 	mtk_prepare_venc_dvfs();
 	mtk_prepare_venc_emi_bw();
 	pm_notifier(mtk_vcodec_enc_suspend_notifier, 0);

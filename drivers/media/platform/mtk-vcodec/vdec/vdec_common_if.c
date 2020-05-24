@@ -22,6 +22,7 @@
 #include "mtk_vcodec_drv.h"
 #include "vdec_drv_if.h"
 
+
 static void put_fb_to_free(struct vdec_inst *inst, struct vdec_fb *fb)
 {
 	struct ring_fb_list *list;
@@ -159,6 +160,9 @@ static int vdec_init(struct mtk_vcodec_ctx *ctx, unsigned long *h_vdec)
 	case V4L2_PIX_FMT_RV40:
 		inst->vcu.id = IPI_VDEC_RV40;
 		break;
+	case V4L2_PIX_FMT_AV1:
+		inst->vcu.id = IPI_VDEC_AV1;
+		break;
 	default:
 		mtk_vcodec_err(inst, "%s no fourcc", __func__);
 		break;
@@ -175,6 +179,7 @@ static int vdec_init(struct mtk_vcodec_ctx *ctx, unsigned long *h_vdec)
 	}
 
 	inst->vsi = (struct vdec_vsi *)inst->vcu.vsi;
+	ctx->input_driven = inst->vsi->input_driven;
 
 	mtk_vcodec_debug(inst, "Decoder Instance >> %p", inst);
 
@@ -251,6 +256,11 @@ static int vdec_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
 	} else {
 		inst->vsi->dec.index = 0xFF;
 	}
+
+	inst->vsi->dec.queued_frame_buf_count =
+		inst->ctx->dec_params.queued_frame_buf_count;
+	inst->vsi->dec.timestamp =
+		inst->ctx->dec_params.timestamp;
 
 	mtk_vcodec_debug(inst, "+ FB y_fd=%llx c_fd=%llx BS fd=%llx format=%c%c%c%c",
 		inst->vsi->dec.fb_fd[0], inst->vsi->dec.fb_fd[1],
@@ -551,6 +561,7 @@ static int vdec_set_param(unsigned long h_vdec,
 	case SET_PARAM_NAL_SIZE_LENGTH:
 	case SET_PARAM_WAIT_KEY_FRAME:
 	case SET_PARAM_OPERATING_RATE:
+	case SET_PARAM_TOTAL_FRAME_BUFQ_COUNT:
 		vcu_dec_set_param(&inst->vcu, (unsigned int)type, in, 1U);
 		break;
 	case SET_PARAM_UFO_MODE:

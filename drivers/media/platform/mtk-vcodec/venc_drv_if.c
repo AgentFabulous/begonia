@@ -41,12 +41,13 @@ int venc_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
 	int ret = 0;
 
 	ctx->oal_vcodec = 0;
-	ctx->slowmotion = 0;
+	mtk_venc_init_ctx_pm(ctx);
 
 #ifdef CONFIG_VIDEO_MEDIATEK_VCU
 	switch (fourcc) {
 	case V4L2_PIX_FMT_H264:
 	case V4L2_PIX_FMT_H265:
+	case V4L2_PIX_FMT_HEIF:
 	case V4L2_PIX_FMT_MPEG4:
 	case V4L2_PIX_FMT_H263:
 		ctx->enc_if = get_enc_common_if();
@@ -104,35 +105,40 @@ int venc_if_set_param(struct mtk_vcodec_ctx *ctx,
 {
 	int ret = 0;
 
+	if (ctx->drv_handle == 0)
+		return -EIO;
+
 	ret = ctx->enc_if->set_param(ctx->drv_handle, type, in);
 
 	return ret;
 }
 
-void venc_encode_prepare(void *ctx_prepare, unsigned long *flags)
+void venc_encode_prepare(void *ctx_prepare, int core_id, unsigned long *flags)
 {
 	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)ctx_prepare;
 
-	mtk_venc_pmqos_prelock(ctx);
-	mtk_venc_lock(ctx);
+	mtk_venc_pmqos_prelock(ctx, core_id);
+	mtk_venc_lock(ctx, core_id);
+	mtk_venc_pmqos_begin_frame(ctx);
 	spin_lock_irqsave(&ctx->dev->irqlock, *flags);
 	ctx->dev->curr_ctx = ctx;
 	spin_unlock_irqrestore(&ctx->dev->irqlock, *flags);
-	mtk_vcodec_enc_clock_on(&ctx->dev->pm);
-	mtk_venc_pmqos_begin_frame(ctx);
+	mtk_vcodec_enc_clock_on(&ctx->dev->pm, core_id);
+	enable_irq(ctx->dev->enc_irq);
 }
 EXPORT_SYMBOL_GPL(venc_encode_prepare);
 
-void venc_encode_unprepare(void *ctx_unprepare, unsigned long *flags)
+void venc_encode_unprepare(void *ctx_unprepare,
+	int core_id, unsigned long *flags)
 {
 	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)ctx_unprepare;
-
+	disable_irq(ctx->dev->enc_irq);
 	mtk_venc_pmqos_end_frame(ctx);
-	mtk_vcodec_enc_clock_off(&ctx->dev->pm);
+	mtk_vcodec_enc_clock_off(&ctx->dev->pm, core_id);
 	spin_lock_irqsave(&ctx->dev->irqlock, *flags);
 	ctx->dev->curr_ctx = NULL;
 	spin_unlock_irqrestore(&ctx->dev->irqlock, *flags);
-	mtk_venc_unlock(ctx);
+	mtk_venc_unlock(ctx, core_id);
 }
 EXPORT_SYMBOL_GPL(venc_encode_unprepare);
 
@@ -142,6 +148,9 @@ int venc_if_encode(struct mtk_vcodec_ctx *ctx,
 	struct venc_done_result *result)
 {
 	int ret = 0;
+
+	if (ctx->drv_handle == 0)
+		return -EIO;
 
 	ret = ctx->enc_if->encode(ctx->drv_handle, opt, frm_buf,
 							  bs_buf, result);
@@ -154,7 +163,7 @@ int venc_if_deinit(struct mtk_vcodec_ctx *ctx)
 	int ret = 0;
 
 	if (ctx->drv_handle == 0)
-		return 0;
+		return -EIO;
 
 	ret = ctx->enc_if->deinit(ctx->drv_handle);
 

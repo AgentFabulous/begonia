@@ -19,6 +19,7 @@
 #define _VENC_IPI_MSG_H_
 
 #include <linux/videodev2.h>
+#include "vcodec_ipi_msg.h"
 
 #define MTK_MAX_ENC_CODECS_SUPPORT       (32)
 #define AP_IPIMSG_VENC_BASE 0xC000
@@ -60,7 +61,9 @@ enum venc_ipi_msg_id {
 enum venc_get_param_type {
 	GET_PARAM_CAPABILITY_SUPPORTED_FORMATS,
 	GET_PARAM_CAPABILITY_FRAME_SIZES,
-	GET_PARAM_FREE_BUFFERS
+	GET_PARAM_FREE_BUFFERS,
+	GET_PARAM_ROI_RC_QP,
+	GET_PARAM_RESOLUTION_CHANGE,
 };
 
 /*
@@ -96,6 +99,8 @@ enum venc_set_param_type {
 	VENC_SET_PARAM_PREPEND_SPSPPS_TO_IDR,
 	VENC_SET_PARAM_OPERATION_RATE,
 	VENC_SET_PARAM_BITRATE_MODE,
+	VENC_SET_PARAM_ROI_ON,
+	VENC_SET_PARAM_HEIF_GRID_SIZE,
 };
 
 /**
@@ -378,6 +383,12 @@ struct venc_vcu_config {
 	__u32 scenario;
 	__u32 prependheader;
 	__u32 bitratemode;
+	__u32 roi_rc_qp;
+	__u32 roion;
+	__u32 heif_grid_size;
+	__u32 resolutionChange;
+	__u32 max_w;
+	__u32 max_h;
 };
 
 /**
@@ -413,6 +424,7 @@ struct venc_info {
 	__u32 fb_num_planes;
 	__u32 index;
 	__u64 timestamp;
+	__u32 roimap;
 };
 
 /**
