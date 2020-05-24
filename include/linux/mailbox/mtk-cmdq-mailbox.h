@@ -22,7 +22,8 @@
 #define CMDQ_NO_TIMEOUT			0xffffffff
 #define CMDQ_TIMEOUT_DEFAULT		1000
 
-#if IS_ENABLED(CONFIG_MACH_MT6771) || IS_ENABLED(CONFIG_MACH_MT6785)
+#if IS_ENABLED(CONFIG_MACH_MT6771) || IS_ENABLED(CONFIG_MACH_MT6785) || \
+	IS_ENABLED(CONFIG_MACH_MT6789)
 #define CMDQ_THR_MAX_COUNT		24
 #else
 #define CMDQ_THR_MAX_COUNT		16
@@ -123,6 +124,11 @@ struct cmdq_pkt {
 	void			*priv;
 	struct device		*dev;
 	bool			loop;
+	void			*buf_pool;
+#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) || \
+	defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
+	void			*sec_data;
+#endif
 };
 
 struct cmdq_thread {
@@ -180,5 +186,9 @@ s32 cmdq_task_get_pkt_from_thread(struct mbox_chan *chan,
 void cmdq_set_event(void *chan, u16 event_id);
 void cmdq_clear_event(void *chan, u16 event_id);
 u32 cmdq_get_event(void *chan, u16 event_id);
-
+void cmdq_event_verify(void *chan, u16 event_id);
+#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) || \
+	defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
+s32 cmdq_sec_insert_backup_cookie(struct cmdq_pkt *pkt);
+#endif
 #endif /* __MTK_CMDQ_MAILBOX_H__ */

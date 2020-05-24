@@ -21,11 +21,9 @@
 
 #include "cmdq_def.h"
 
-#ifdef CMDQ_AEE_READY
+#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 #include <mt-plat/aee.h>
 #endif
-
-/* #define CMDQ_TIMER_ENABLE */
 
 #define CMDQ_EVENT_ENUM cmdq_event
 
@@ -112,7 +110,7 @@ if (status < 0)		\
 	break;			\
 }
 
-#ifdef CMDQ_AEE_READY
+#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 #define CMDQ_AEE_EX(DB_OPTs, tag, string, args...) \
 {		\
 do {			\
@@ -328,6 +326,11 @@ enum CMDQ_CLT_ENUM {
 	CMDQ_CLT_MAX	/* ALWAYS keep at the end */
 };
 
+/* sync with request in atf */
+enum cmdq_smc_request {
+	CMDQ_ENABLE_DEBUG,
+};
+
 /* handle to gce life cycle callback */
 typedef void (*cmdq_core_handle_cb)(struct cmdqRecStruct *handle);
 
@@ -348,6 +351,7 @@ enum CMDQ_PROFILE_LEVEL {
 	CMDQ_PROFILE_OFF = 0,
 	CMDQ_PROFILE_MET = 1,
 	CMDQ_PROFILE_FTRACE = 2,
+	CMDQ_PROFILE_EXEC = 3,
 
 	CMDQ_PROFILE_MAX	/* ALWAYS keep at the end */
 };
@@ -748,11 +752,10 @@ struct cmdqRecStruct {
 	cmdq_core_handle_cb unprepare;
 	cmdq_core_handle_cb stop;
 
-	struct cmdq_timeout_info *timeout_info;
-
 	/* debug information */
 	u32 error_irq_pc;
 	bool dumpAllocTime;	/* flag to print static info to kernel log. */
+	bool profile_exec;
 	s32 reorder;
 	CMDQ_TIME submit;
 	CMDQ_TIME trigger;
@@ -772,7 +775,6 @@ struct cmdqRecStruct {
 	/* secure world */
 	struct iwcCmdqSecStatus_t *secStatus;
 	u32 irq;
-
 	void *sec_client_meta;
 	enum cmdq_sec_rec_meta_type sec_meta_type;
 	u32 sec_meta_size;
@@ -856,6 +858,7 @@ bool cmdq_core_aee_enable(void);
 void cmdq_core_set_aee(bool enable);
 
 bool cmdq_core_ftrace_enabled(void);
+bool cmdq_core_profile_exec_enabled(void);
 void cmdq_long_string_init(bool force, char *buf, u32 *offset, s32 *max_size);
 void cmdq_long_string(char *buf, u32 *offset, s32 *max_size,
 	const char *string, ...);
