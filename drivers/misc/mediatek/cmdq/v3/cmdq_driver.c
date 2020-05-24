@@ -484,6 +484,19 @@ static long cmdq_driver_process_command_request(
 	u32 *userRegValue = NULL;
 	u32 userRegCount = 0;
 
+	if (pCommand->regRequest.count > CMDQ_MAX_DUMP_REG_COUNT) {
+		CMDQ_ERR("reg request count too much:%u\n",
+			pCommand->regRequest.count);
+		return -EFAULT;
+	}
+
+
+	if (pCommand->regValue.count > CMDQ_MAX_DUMP_REG_COUNT) {
+		CMDQ_ERR("reg value count too much:%u\n",
+			pCommand->regValue.count);
+		return -EFAULT;
+	}
+
 	if (pCommand->regRequest.count != pCommand->regValue.count) {
 		CMDQ_ERR("mismatch regRequest and regValue\n");
 		return -EFAULT;
@@ -845,6 +858,7 @@ static s32 cmdq_driver_ioctl_async_job_wait_and_close(unsigned long param)
 		CMDQ_ERR("wait task result failed:%d handle:0x%p\n",
 			status, handle);
 		cmdq_task_destroy(handle);
+		kfree(CMDQ_U32_PTR(jobResult.regValue.regValues));
 		return status;
 	}
 
@@ -868,6 +882,7 @@ static s32 cmdq_driver_ioctl_async_job_wait_and_close(unsigned long param)
 	if (copy_to_user((void *)userRegValue, (void *)(unsigned long)
 		handle->reg_values, handle->user_reg_count * sizeof(u32))) {
 		CMDQ_ERR("Copy REGVALUE to user space failed\n");
+		kfree(CMDQ_U32_PTR(jobResult.regValue.regValues));
 		return -EFAULT;
 	}
 
@@ -1311,10 +1326,6 @@ static int __init cmdq_init(void)
 	cmdq_core_register_task_cycle_cb(CMDQ_GROUP_MDP,
 			cmdq_mdp_get_func()->beginTask,
 			cmdq_mdp_get_func()->endTask);
-
-	cmdq_core_register_task_cycle_cb(CMDQ_GROUP_ISP,
-			cmdq_mdp_get_func()->beginISPTask,
-			cmdq_mdp_get_func()->endISPTask);
 
 	status = platform_driver_register(&gCmdqDriver);
 	if (status != 0) {

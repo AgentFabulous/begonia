@@ -50,6 +50,8 @@ void cmdq_mmp_init(void)
 			CMDQ_MMP_events.CMDQ, "wait_task");
 		CMDQ_MMP_events.wait_task_done = mmprofile_register_event(
 			CMDQ_MMP_events.CMDQ, "wait_task_done");
+		CMDQ_MMP_events.task_exec = mmprofile_register_event(
+			CMDQ_MMP_events.CMDQ, "task_exec");
 		CMDQ_MMP_events.wait_thread = mmprofile_register_event(
 			CMDQ_MMP_events.CMDQ, "wait_thread");
 		CMDQ_MMP_events.MDP_reset = mmprofile_register_event(

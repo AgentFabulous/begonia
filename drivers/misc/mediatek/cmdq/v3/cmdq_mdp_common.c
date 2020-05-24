@@ -43,6 +43,7 @@
 #include <linux/iopoll.h>
 #include <linux/notifier.h>
 #include <linux/sched/clock.h>
+#include <linux/dmapool.h>
 
 #ifdef MDP_MMPATH
 #include "mmpath.h"
@@ -145,6 +146,7 @@ struct mdp_context {
 	atomic_t mdp_smi_usage;
 };
 static struct mdp_context mdp_ctx;
+static struct cmdq_buf_pool mdp_pool;
 
 static DEFINE_MUTEX(mdp_clock_mutex);
 static DEFINE_MUTEX(mdp_task_mutex);
@@ -1024,6 +1026,30 @@ static void cmdq_mdp_store_debug(struct cmdqCommandStruct *desc,
 	CMDQ_MSG("user debug string:%s\n", handle->user_debug_str);
 }
 
+static void cmdq_mdp_setup_sec_ext(struct cmdqCommandStruct *desc,
+	struct cmdqRecStruct *handle)
+{
+	/* assign extension feature flag and read back buffer */
+	handle->secData.extension = desc->secData.extension;
+	if (!handle->secData.extension)
+		return;
+
+	handle->reg_count = desc->regValue.count;
+	handle->reg_values = cmdq_core_alloc_hw_buffer(cmdq_dev_get(),
+		desc->regValue.count * sizeof(handle->reg_values[0]),
+		&handle->reg_values_pa,
+		GFP_KERNEL);
+	if (!handle->reg_values) {
+		CMDQ_ERR(
+			"fail to allocate read back buffer count:%u\n",
+			desc->regValue.count);
+		handle->secData.extension = 0;
+	}
+
+	CMDQ_LOG("secure read back cnt:%u extension:%#llx\n",
+		handle->reg_count, handle->secData.extension);
+}
+
 static s32 cmdq_mdp_setup_sec(struct cmdqCommandStruct *desc,
 	struct cmdqRecStruct *handle)
 {
@@ -1037,6 +1063,8 @@ static s32 cmdq_mdp_setup_sec(struct cmdqCommandStruct *desc,
 	handle->secData.enginesNeedPortSecurity =
 		desc->secData.enginesNeedPortSecurity;
 	handle->secData.addrMetadataCount = desc->secData.addrMetadataCount;
+
+	cmdq_mdp_setup_sec_ext(desc, handle);
 
 	/* copy isp meta */
 	handle->secData.ispMeta = desc->secData.ispMeta;
@@ -1084,6 +1112,7 @@ s32 cmdq_mdp_flush_async(struct cmdqCommandStruct *desc, bool user_space,
 	CMDQ_TRACE_FORCE_BEGIN("%s\n", __func__);
 
 	cmdq_task_create(desc->scenario, &handle);
+	handle->pkt->buf_pool = &mdp_pool;
 
 	/* set secure data */
 	handle->secStatus = NULL;
@@ -1123,8 +1152,8 @@ s32 cmdq_mdp_flush_async(struct cmdqCommandStruct *desc, bool user_space,
 		}
 	}
 
-	if (!cmdq_core_check_user_valid((void *)(unsigned long)desc->pVABase,
-		copy_size))
+	if (user_space && !cmdq_core_check_user_valid(
+		(void *)(unsigned long)desc->pVABase, copy_size))
 		return -EFAULT;
 
 	if (desc->regRequest.count &&
@@ -1147,6 +1176,9 @@ s32 cmdq_mdp_flush_async(struct cmdqCommandStruct *desc, bool user_space,
 		cmdq_sec_insert_backup_cookie_instr(handle, handle->thread);
 	}
 #endif
+
+	if (handle->profile_exec)
+		cmdq_pkt_perf_end(handle->pkt);
 
 	err = cmdq_mdp_copy_cmd_to_task(handle,
 		(void *)(unsigned long)desc->pVABase + copy_size,
@@ -1308,7 +1340,7 @@ s32 cmdq_mdp_wait(struct cmdqRecStruct *handle,
 
 s32 cmdq_mdp_flush(struct cmdqCommandStruct *desc, bool user_space)
 {
-	struct cmdqRecStruct *handle;
+	struct cmdqRecStruct *handle = NULL;
 	s32 status;
 
 	status = cmdq_mdp_flush_async(desc, user_space, &handle);
@@ -1326,6 +1358,32 @@ s32 cmdq_mdp_flush(struct cmdqCommandStruct *desc, bool user_space)
 	return status;
 }
 
+static void cmdq_mdp_pool_create(void)
+{
+	if (unlikely(mdp_pool.pool)) {
+		cmdq_msg("mdp buffer pool already created");
+		return;
+	}
+
+	mdp_pool.pool = dma_pool_create("mdp", cmdq_dev_get(),
+		CMDQ_BUF_ALLOC_SIZE, 0, 0);
+	atomic_set(&mdp_pool.cnt, 0);
+	mdp_pool.limit = CMDQ_DMA_POOL_COUNT;
+}
+
+static void cmdq_mdp_pool_clear(void)
+{
+	/* check pool still in use */
+	if (unlikely((atomic_read(&mdp_pool.cnt)))) {
+		cmdq_msg("mdp buffers still in use:%d",
+			atomic_read(&mdp_pool.cnt));
+		return;
+	}
+
+	dma_pool_destroy(mdp_pool.pool);
+	mdp_pool.pool = NULL;
+}
+
 void cmdq_mdp_suspend(void)
 {
 	if (atomic_read(&mdp_ctx.mdp_smi_usage)) {
@@ -1334,10 +1392,14 @@ void cmdq_mdp_suspend(void)
 		cmdq_mdp_dump_thread_usage();
 		cmdq_mdp_dump_engine_usage();
 	}
+
+	cmdq_mdp_pool_clear();
 }
 
 void cmdq_mdp_resume(void)
 {
+	cmdq_mdp_pool_create();
+
 	/* during suspending, there may be queued tasks.
 	 * we should process them if any.
 	 */
@@ -1499,7 +1561,7 @@ int cmdq_mdp_status_dump(struct notifier_block *nb,
 static void cmdq_mdp_init_pmqos(void)
 {
 #ifdef CONFIG_MTK_SMI_EXT
-	s32 i;
+	s32 i = 0;
 	s32 result = 0;
 	/* INIT_LIST_HEAD(&gCmdqMdpContext.mdp_tasks);*/
 
@@ -1589,6 +1651,8 @@ void cmdq_mdp_init(void)
 	/* MDP initialization setting */
 	cmdq_mdp_get_func()->mdpInitialSet();
 	cmdq_mdp_init_pmqos();
+
+	cmdq_mdp_pool_create();
 }
 
 void cmdq_mdp_deinit(void)
@@ -1608,6 +1672,8 @@ void cmdq_mdp_deinit(void)
 		pm_qos_remove_request(&isp_clk_qos_request[i]);
 		pm_qos_remove_request(&mdp_clk_qos_request[i]);
 	}
+
+	cmdq_mdp_pool_clear();
 }
 
 /* Platform dependent function */
@@ -2252,8 +2318,10 @@ static void cmdq_mdp_begin_task_virtual(struct cmdqRecStruct *handle,
 	} while (0);
 #endif	/* MDP_MMPATH */
 
+#if 0
 #if IS_ENABLED(CONFIG_MTK_SMI_EXT) && IS_ENABLED(CONFIG_MACH_MT6771)
 	smi_larb_mon_act_cnt();
+#endif
 #endif
 #endif	/* CONFIG_MTK_SMI_EXT */
 }
@@ -2298,8 +2366,10 @@ static void cmdq_mdp_end_task_virtual(struct cmdqRecStruct *handle,
 	bool update_isp_throughput = false;
 	bool update_isp_bandwidth = false;
 
+#if 0
 #if IS_ENABLED(CONFIG_MTK_SMI_EXT) && IS_ENABLED(CONFIG_MACH_MT6771)
 	smi_larb_mon_act_cnt();
+#endif
 #endif
 	do_gettimeofday(&curr_time);
 	CMDQ_LOG_PMQOS("enter %s with handle:0x%p engine:0x%llx\n", __func__,
@@ -2808,7 +2878,7 @@ const char *cmdq_mdp_get_rdma_state(u32 state)
 
 void cmdq_mdp_dump_rdma(const unsigned long base, const char *label)
 {
-	u32 value[17] = { 0 };
+	u32 value[39] = { 0 };
 	u32 state = 0;
 	u32 grep = 0;
 
@@ -2825,11 +2895,33 @@ void cmdq_mdp_dump_rdma(const unsigned long base, const char *label)
 	value[9] = CMDQ_REG_GET32(base + 0x400);
 	value[10] = CMDQ_REG_GET32(base + 0x408);
 	value[11] = CMDQ_REG_GET32(base + 0x410);
-	value[12] = CMDQ_REG_GET32(base + 0x420);
-	value[13] = CMDQ_REG_GET32(base + 0x430);
-	value[14] = CMDQ_REG_GET32(base + 0x440);
-	value[15] = CMDQ_REG_GET32(base + 0x4D0);
-	value[16] = CMDQ_REG_GET32(base + 0x0);
+	value[12] = CMDQ_REG_GET32(base + 0x418);
+	value[13] = CMDQ_REG_GET32(base + 0x420);
+	value[14] = CMDQ_REG_GET32(base + 0x428);
+	value[15] = CMDQ_REG_GET32(base + 0x430);
+	value[16] = CMDQ_REG_GET32(base + 0x438);
+	value[17] = CMDQ_REG_GET32(base + 0x440);
+	value[18] = CMDQ_REG_GET32(base + 0x448);
+	value[19] = CMDQ_REG_GET32(base + 0x450);
+	value[20] = CMDQ_REG_GET32(base + 0x458);
+	value[21] = CMDQ_REG_GET32(base + 0x460);
+	value[22] = CMDQ_REG_GET32(base + 0x468);
+	value[23] = CMDQ_REG_GET32(base + 0x470);
+	value[24] = CMDQ_REG_GET32(base + 0x478);
+	value[25] = CMDQ_REG_GET32(base + 0x480);
+	value[26] = CMDQ_REG_GET32(base + 0x488);
+	value[27] = CMDQ_REG_GET32(base + 0x490);
+	value[28] = CMDQ_REG_GET32(base + 0x498);
+	value[29] = CMDQ_REG_GET32(base + 0x4A0);
+	value[30] = CMDQ_REG_GET32(base + 0x4A8);
+	value[31] = CMDQ_REG_GET32(base + 0x4B0);
+	value[32] = CMDQ_REG_GET32(base + 0x4B8);
+	value[33] = CMDQ_REG_GET32(base + 0x4C0);
+	value[34] = CMDQ_REG_GET32(base + 0x4C8);
+	value[35] = CMDQ_REG_GET32(base + 0x4D0);
+	value[36] = CMDQ_REG_GET32(base + 0x4D8);
+	value[37] = CMDQ_REG_GET32(base + 0x4E0);
+	value[38] = CMDQ_REG_GET32(base + 0x0);
 
 	CMDQ_ERR(
 		"=============== [CMDQ] %s Status ====================================\n",
@@ -2847,10 +2939,33 @@ void cmdq_mdp_dump_rdma(const unsigned long base, const char *label)
 		"RDMA_MON_STA_0: 0x%08x, RDMA_MON_STA_1: 0x%08x, RDMA_MON_STA_2: 0x%08x\n",
 		value[9], value[10], value[11]);
 	CMDQ_ERR(
-		"RDMA_MON_STA_4: 0x%08x, RDMA_MON_STA_6: 0x%08x, RDMA_MON_STA_8: 0x%08x\n",
+		"RDMA_MON_STA_3: 0x%08x, RDMA_MON_STA_4: 0x%08x, RDMA_MON_STA_5: 0x%08x\n",
 		value[12], value[13], value[14]);
-	CMDQ_ERR("RDMA_MON_STA_26: 0x%08x\n", value[15]);
-	CMDQ_ERR("RDMA_EN: 0x%08x\n", value[16]);
+	CMDQ_ERR(
+		"RDMA_MON_STA_6: 0x%08x, RDMA_MON_STA_7: 0x%08x, RDMA_MON_STA_8: 0x%08x\n",
+		value[15], value[16], value[17]);
+	CMDQ_ERR(
+		"RDMA_MON_STA_9: 0x%08x, RDMA_MON_STA_10: 0x%08x, RDMA_MON_STA_11: 0x%08x\n",
+		value[18], value[19], value[20]);
+	CMDQ_ERR(
+		"RDMA_MON_STA_12: 0x%08x, RDMA_MON_STA_13: 0x%08x, RDMA_MON_STA_14: 0x%08x\n",
+		value[21], value[22], value[23]);
+	CMDQ_ERR(
+		"RDMA_MON_STA_15: 0x%08x, RDMA_MON_STA_16: 0x%08x, RDMA_MON_STA_17: 0x%08x\n",
+		value[24], value[25], value[26]);
+	CMDQ_ERR(
+		"RDMA_MON_STA_18: 0x%08x, RDMA_MON_STA_19: 0x%08x, RDMA_MON_STA_20: 0x%08x\n",
+		value[27], value[28], value[29]);
+	CMDQ_ERR(
+		"RDMA_MON_STA_21: 0x%08x, RDMA_MON_STA_22: 0x%08x, RDMA_MON_STA_23: 0x%08x\n",
+		value[30], value[31], value[32]);
+	CMDQ_ERR(
+		"RDMA_MON_STA_24: 0x%08x, RDMA_MON_STA_25: 0x%08x, RDMA_MON_STA_26: 0x%08x\n",
+		value[33], value[34], value[35]);
+	CMDQ_ERR(
+		"RDMA_MON_STA_27: 0x%08x, RDMA_MON_STA_28: 0x%08x\n",
+		value[36], value[37]);
+	CMDQ_ERR("RDMA_EN: 0x%08x\n", value[38]);
 
 	/* parse state */
 	CMDQ_ERR("RDMA ack:%d req:%d\n", (value[9] & (1 << 11)) >> 11,
@@ -2860,7 +2975,7 @@ void cmdq_mdp_dump_rdma(const unsigned long base, const char *label)
 	CMDQ_ERR("RDMA state: 0x%x (%s)\n",
 		state, cmdq_mdp_get_rdma_state(state));
 	CMDQ_ERR("RDMA horz_cnt: %d vert_cnt:%d\n",
-		value[15] & 0xFFF, (value[15] >> 16) & 0xFFF);
+		value[35] & 0xFFF, (value[35] >> 16) & 0xFFF);
 
 	CMDQ_ERR("RDMA grep:%d => suggest to ask SMI help:%d\n", grep, grep);
 }
@@ -3319,7 +3434,6 @@ void cmdq_mdp_check_TF_address(unsigned int mva, char *module)
 		strncat(module, mdp_tasks[tfTaskIndex].callerName,
 			callerNameLen);
 	}
-
 	CMDQ_ERR("[MDP] TF Other Task\n");
 	for (taskIndex = 0; taskIndex < MDP_MAX_TASK_NUM;
 		taskIndex++) {
@@ -3341,3 +3455,4 @@ void cmdq_mdp_platform_function_setting(void)
 {
 }
 #endif
+

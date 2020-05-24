@@ -15,11 +15,7 @@
 
 MTK_PLATFORM := $(CONFIG_MTK_PLATFORM)
 
-ifeq ($(CONFIG_MACH_MT6779),y)
-ccflags-y += -DPMQOS_VERSION2
-ccflags-y += -DMDP_MMPATH
-ccflags-y += -DCMDQ_MDP_ENABLE_SPR
-endif
+ccflags-$(CONFIG_MACH_MT6768) += -DCMDQ_MDP_ENABLE_SPR
 
 ifeq ($(CONFIG_MACH_MT6785),y)
 ccflags-y += -DPMQOS_VERSION2
@@ -36,6 +32,10 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi/ \
              -I$(srctree)/drivers/misc/mediatek/mmp/ \
              -I$(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/include
 
+ifneq ($(filter mt8168,$(shell echo $(MTK_PLATFORM)|tr A-Z a-z)),)
+ccflags-y += -DCMDQ_TABLET_ENABLE
+endif
+
 # mdp platform code
 MDP_PLATFORM_DIR=$(srctree)/drivers/misc/mediatek/cmdq/v3/$(MTK_PLATFORM)
 
@@ -45,9 +45,6 @@ ccflags-y += -I$(MDP_PLATFORM_DIR)/
 else
 ccflags-y += -DCMDQ_COMMON_ENG_SUPPORT
 endif
-
-# Enable AEE
-ccflags-y += -DCMDQ_AEE_READY
 
 ifeq ($(CONFIG_MTK_ENG_BUILD),y)
 ccflags-y += -DCMDQ_TEST_PROC

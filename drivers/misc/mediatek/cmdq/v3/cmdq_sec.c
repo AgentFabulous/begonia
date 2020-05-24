@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -303,6 +302,7 @@ static u64 cmdq_sec_get_secure_engine(u64 engine_flags)
 	CMDQ_ENGINE_TRANS(engine_flags, engine_flags_sec, DISP_OVL2);
 	CMDQ_ENGINE_TRANS(engine_flags, engine_flags_sec, DISP_2L_OVL0);
 	CMDQ_ENGINE_TRANS(engine_flags, engine_flags_sec, DISP_2L_OVL1);
+	CMDQ_ENGINE_TRANS(engine_flags, engine_flags_sec, DISP_2L_OVL2);
 
 	return engine_flags_sec;
 }
@@ -386,7 +386,6 @@ static void cmdq_sec_fill_isp_cq_meta(struct cmdqRecStruct *task,
 	}
 }
 
-
 s32 cmdq_sec_fill_iwc_command_msg_unlocked(
 	s32 iwc_cmd, void *task_ptr, s32 thread, void *iwc_ptr,
 	void *iwcex_ptr)
@@ -458,6 +457,10 @@ s32 cmdq_sec_fill_iwc_command_msg_unlocked(
 	iwc->command.priority = task->pkt->priority;
 	iwc->command.engineFlag = cmdq_sec_get_secure_engine(task->engineFlag);
 	iwc->command.hNormalTask = 0LL | ((unsigned long)task);
+
+	/* assign extension and read back parameter */
+	iwc->command.extension = task->secData.extension;
+	iwc->command.readback_pa = task->reg_values_pa;
 
 	last_buf = list_last_entry(&task->pkt->buf, typeof(*last_buf),
 		list_entry);
@@ -1007,10 +1010,10 @@ static void cmdq_sec_irq_notify_start(void)
 	}
 
 	cmdq_pkt_cl_create(&cmdq_sec_irq_pkt, clt);
-	cmdq_pkt_wfe(cmdq_sec_irq_pkt, CMDQ_SYNC_TOKEN_SEC_DONE);
+	cmdq_pkt_wfe(cmdq_sec_irq_pkt, CMDQ_SYNC_SECURE_THR_EOF);
 	cmdq_pkt_finalize_loop(cmdq_sec_irq_pkt);
 
-	cmdqCoreClearEvent(CMDQ_SYNC_TOKEN_SEC_DONE);
+	cmdqCoreClearEvent(CMDQ_SYNC_SECURE_THR_EOF);
 
 	err = cmdq_pkt_flush_async(clt, cmdq_sec_irq_pkt,
 		cmdq_sec_irq_notify_callback, (void *)g_cmdq);
@@ -1085,7 +1088,8 @@ int32_t cmdq_sec_submit_to_secure_world_async_unlocked(uint32_t iwcCommand,
 		}
 
 		/* always check and lunch irq notify loop thread */
-		cmdq_sec_irq_notify_start();
+		if (pTask)
+			cmdq_sec_irq_notify_start();
 
 		if (cmdq_sec_setup_context_session(handle) < 0) {
 			status = -(CMDQ_ERR_SEC_CTX_SETUP);
@@ -1185,6 +1189,12 @@ int32_t cmdq_sec_init_allocate_resource_thread(void *data)
 	return status;
 }
 
+/* empty function to compatible with mailbox */
+s32 cmdq_sec_insert_backup_cookie(struct cmdq_pkt *pkt)
+{
+	return 0;
+}
+
 /*
  * Insert instruction to back secure threads' cookie count to normal world
  * Return:
@@ -1216,8 +1226,11 @@ s32 cmdq_sec_insert_backup_cookie_instr(struct cmdqRecStruct *task, s32 thread)
 
 	err = cmdq_pkt_read(task->pkt, cmdq_helper_mbox_base(), regAddr,
 		CMDQ_THR_SPR_IDX1);
-	if (err != 0)
+	if (err != 0) {
+		CMDQ_ERR("fail to read pkt:%#p reg:%#x err:%d\n",
+			task->pkt, regAddr, err);
 		return err;
+	}
 
 	left.reg = true;
 	left.idx = CMDQ_THR_SPR_IDX1;
@@ -1230,13 +1243,16 @@ s32 cmdq_sec_insert_backup_cookie_instr(struct cmdqRecStruct *task, s32 thread)
 	WSMCookieAddr = context->hSecSharedMem->MVABase + addrCookieOffset;
 	err = cmdq_pkt_write_indriect(task->pkt, cmdq_helper_mbox_base(),
 		WSMCookieAddr, CMDQ_THR_SPR_IDX1, ~0);
-	if (err < 0)
+	if (err < 0) {
+		CMDQ_ERR("fail to write pkt:%#p wsm:%#llx err:%d\n",
+			task->pkt, WSMCookieAddr, err);
 		return err;
+	}
 
 	/* trigger notify thread so that normal world start handling
 	 * with new backup cookie
 	 */
-	cmdq_pkt_set_event(task->pkt, CMDQ_SYNC_TOKEN_SEC_DONE);
+	cmdq_pkt_set_event(task->pkt, CMDQ_SYNC_SECURE_THR_EOF);
 
 	return 0;
 }
@@ -1905,14 +1921,27 @@ static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)
 
 static bool cmdq_sec_thread_timeout_excceed(struct cmdq_sec_thread *thread)
 {
-	struct cmdq_task *task;
+	struct cmdq_task *task = NULL;
 	struct cmdqRecStruct *handle;
 	u64 duration, now, timeout;
+	s32 i, last_idx;
+	CMDQ_TIME last_trigger = 0;
 
-	task = thread->task_list[1];
+	for (i = CMDQ_MAX_TASK_IN_SECURE_THREAD - 1; i >= 0; i--) {
+		/* task put in array from index 1 */
+		if (!thread->task_list[i])
+			continue;
+		if (thread->task_list[i]->handle->trigger > last_trigger &&
+			last_trigger)
+			break;
+
+		last_idx = i;
+		task = thread->task_list[i];
+		last_trigger = thread->task_list[i]->handle->trigger;
+	}
+
 	if (!task) {
-		CMDQ_ERR(
-			"we expected this is occurred in first task, but first task is empty...\n");
+		CMDQ_MSG("timeout excceed no timeout task in list\n");
 		return true;
 	}
 
@@ -1923,6 +1952,9 @@ static bool cmdq_sec_thread_timeout_excceed(struct cmdq_sec_thread *thread)
 	if (duration < timeout) {
 		mod_timer(&thread->timeout, jiffies +
 			msecs_to_jiffies(timeout - duration));
+		CMDQ_MSG(
+			"timeout excceed ignore handle:0x%p pkt:0x%p trigger:%llu\n",
+			handle, handle->pkt, handle->trigger);
 		return false;
 	}
 
@@ -2029,7 +2061,7 @@ static void cmdq_sec_thread_irq_handle_by_cookie(
 		 */
 		thread->wait_cookie = 0;
 		thread->task_cnt = 0;
-		CMDQ_REG_SET32(va, 0);
+		*va = 0;
 
 		spin_unlock_irqrestore(&cmdq_sec_task_list_lock, flags);
 		return;

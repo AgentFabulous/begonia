@@ -28,18 +28,21 @@
 #define CMDQ_GPR_CNT_ID			(32)
 #define CMDQ_CPR_STRAT_ID		(0x8000)
 #define CMDQ_EVENT_MAX			0x3FF
+#define SUBSYS_NO_SUPPORT		99
 
 /* GCE provide 26M timer, thus each tick 1/26M second,
  * which is, 1 microsecond = 26 ticks
  */
 #define CMDQ_US_TO_TICK(_t)		(_t * 26)
-
+#define CMDQ_TICK_TO_US(_t)		(do_div(_t, 26))
 
 #if IS_ENABLED(CONFIG_MACH_MT6771) || IS_ENABLED(CONFIG_MACH_MT8168) || \
-	IS_ENABLED(CONFIG_MACH_MT6768)
+	IS_ENABLED(CONFIG_MACH_MT6768) || IS_ENABLED(CONFIG_MACH_MT6739) || \
+	IS_ENABLED(CONFIG_MACH_MT8167) || IS_ENABLED(CONFIG_MACH_MT6765)
 #define CMDQ_REG_SHIFT_ADDR(addr)	(addr)
 #define CMDQ_REG_REVERT_ADDR(addr)	(addr)
-#else
+#elif IS_ENABLED(CONFIG_MACH_MT6779) || IS_ENABLED(CONFIG_MACH_MT6785) || \
+	IS_ENABLED(CONFIG_MACH_MT6789) || IS_ENABLED(CONFIG_MACH_MT6885)
 #define CMDQ_REG_SHIFT_ADDR(addr)	((addr) >> 3)
 #define CMDQ_REG_REVERT_ADDR(addr)	((addr) << 3)
 #endif
@@ -106,6 +109,12 @@ struct cmdq_client {
 	struct mbox_client client;
 	struct mbox_chan *chan;
 	void *cl_priv;
+};
+
+struct cmdq_buf_pool {
+	struct dma_pool *pool;
+	atomic_t cnt;
+	u32 limit;
 };
 
 struct cmdq_operand {
@@ -304,17 +313,19 @@ s32 cmdq_pkt_poll(struct cmdq_pkt *pkt, struct cmdq_base *clt_base,
 
 /* cmdq_pkt_sleep() - append commands to wait a short time in microsecond
  * @pkt:	the CMDQ packet
- * @clt_base:	the CMDQ base
  * @tick:	sleep time in tick, use CMDQ_MS_TO_TICK to translate into ms
  * @reg_gpr:	GPR use to counting
  *
  * Return 0 for success; else the error code is returned
  */
-s32 cmdq_pkt_sleep(struct cmdq_pkt *pkt, struct cmdq_base *clt_base,
-	u16 tick, u16 reg_gpr);
+s32 cmdq_pkt_sleep(struct cmdq_pkt *pkt, u16 tick, u16 reg_gpr);
 
-s32 cmdq_pkt_poll_timeout(struct cmdq_pkt *pkt, struct cmdq_base *clt_base,
-	u32 value, u32 addr, u32 mask, u16 count, u16 reg_gpr);
+s32 cmdq_pkt_poll_timeout(struct cmdq_pkt *pkt, u32 value, u8 subsys,
+	phys_addr_t addr, u32 mask, u16 count, u16 reg_gpr);
+
+void cmdq_pkt_perf_end(struct cmdq_pkt *pkt);
+void cmdq_pkt_perf_begin(struct cmdq_pkt *pkt);
+u32 *cmdq_pkt_get_perf_ret(struct cmdq_pkt *pkt);
 
 /**
  * cmdq_pkt_wfe() - append wait for event command to the CMDQ packet
