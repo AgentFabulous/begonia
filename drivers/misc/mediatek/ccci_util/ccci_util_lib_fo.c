@@ -442,7 +442,7 @@ static void ccci_dump_opt_tbl(void)
 static void parse_option_setting_from_lk(void)
 {
 	int i = 0;
-	int val;
+	int val = 0;
 	char *name;
 	int using_default = 1;
 	int using_lk_setting;
@@ -610,6 +610,11 @@ static int md1_smem_dfd_size = -1;
 static int smem_amms_pos_size = -1;
 static int smem_align_padding_size = -1;
 static unsigned int md1_bank4_cache_offset;
+struct _udc_info {
+	unsigned int noncache_size;
+	unsigned int cache_size;
+};
+static struct _udc_info udc_size;
 
 /* cacheable share memory */
 struct _csmem_item {
@@ -696,6 +701,16 @@ static void share_memory_info_parsing(void)
 	CCCI_UTIL_INF_MSG("ccci_util get ccb: data:%llx data_size:%d\n",
 			ccb_info.ccb_data_buffer_addr,
 			ccb_info.ccb_data_buffer_size);
+
+	/* Get udc cache&noncache size */
+	memset(&udc_size, 0, sizeof(struct _udc_info));
+	if (find_ccci_tag_inf("udc_layout", (char *)&udc_size,
+		sizeof(struct _udc_info)) != sizeof(struct _udc_info))
+		CCCI_UTIL_ERR_MSG("Invalid udc layout info dt para\n");
+
+	CCCI_UTIL_INF_MSG(
+		"ccci_util get udc: cache_size:0x%x noncache_size:0x%x\n",
+		udc_size.cache_size, udc_size.noncache_size);
 
 	/* Get md1_phy_cap_size  */
 	if (find_ccci_tag_inf("md1_phy_cap",
@@ -815,7 +830,7 @@ static void md_mem_info_parsing(void)
 {
 	struct _modem_info md_inf[4];
 	struct _modem_info *curr;
-	int md_num;
+	int md_num = 0;
 	int md_id;
 
 	if (find_ccci_tag_inf("hdr_count",
@@ -1374,6 +1389,15 @@ int get_md_resv_ccb_info(int md_id, phys_addr_t *ccb_data_base,
 {
 	*ccb_data_base = ccb_info.ccb_data_buffer_addr;
 	*ccb_data_size = ccb_info.ccb_data_buffer_size;
+
+	return 0;
+}
+
+int get_md_resv_udc_info(int md_id, unsigned int *udc_noncache_size,
+	unsigned int *udc_cache_size)
+{
+	*udc_noncache_size = udc_size.noncache_size;
+	*udc_cache_size = udc_size.cache_size;
 
 	return 0;
 }
