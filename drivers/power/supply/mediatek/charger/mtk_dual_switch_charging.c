@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,6 +22,12 @@
 #include "mtk_charger_intf.h"
 #include "mtk_dual_switch_charging.h"
 #include "mtk_charger_init.h"
+
+#define is_between(left, right, value) \
+		(((left) >= (right) && (left) >= (value) \
+			&& (value) >= (right)) \
+		|| ((left) <= (right) && (left) <= (value) \
+			&& (value) <= (right)))
 
 static int _uA_to_mA(int uA)
 {
@@ -111,6 +117,45 @@ static bool check_start_dual_charging_status(struct charger_manager *info)
 	} else {
 		return false;
 	}
+}
+
+static int get_cycle_count_cv(struct range_data *range, int threshold,
+		int *index, int *val)
+{
+	int i;
+
+	*index = -EINVAL;
+
+	/*
+	 * If the threshold is lesser than the minimum allowed range,
+	 * return -ENODATA.
+	 */
+	if (threshold < range[0].low_threshold)
+		return -ENODATA;
+
+	/* try to find the matching index */
+	for (i = 0; i < MAX_STEP_CHG_ENTRIES; i++) {
+		if (!range[i].high_threshold && !range[i].low_threshold) {
+			/* First invalid table entry; exit loop */
+			break;
+		}
+
+		if (is_between(range[i].low_threshold,
+			range[i].high_threshold, threshold)) {
+			*index = i;
+			*val = range[i].value;
+			break;
+		}
+	}
+
+	if (*index == -EINVAL) {
+		if (i == MAX_STEP_CHG_ENTRIES) {
+			*index = (i - 1);
+			*val = range[*index].value;
+		}
+	}
+
+	return 0;
 }
 
 #define WIRELESS_HVDCP_CHG_CURRENT	1200000;
@@ -316,6 +361,9 @@ dual_swchg_select_charging_current_limit(struct charger_manager *info)
 					&pdata->charging_current_limit,
 					&pdata->input_current_limit);
 
+		pdata2->input_current_limit =
+					info->data.chg2_ta_ac_charger_input_current * 2;
+
 		/* Only enable slave charger when PE+/PE+2.0/QC/QC3 is connected */
 		if (((mtk_pe20_get_is_enable(info) && mtk_pe20_get_is_connect(info))
 			|| (mtk_pe_get_is_enable(info) && mtk_pe_get_is_connect(info))
@@ -328,14 +376,10 @@ dual_swchg_select_charging_current_limit(struct charger_manager *info)
 			pdata2->input_current_limit =
 					info->data.chg2_ta_ac_charger_input_current * 2;
 
-			if ((swchgalg->vbus_mv >= HVDCP2P0_VOLATGE) &&
+			if ((swchgalg->vbus_mv > HVDCP2P0_VOLATGE) &&
 					(info->hvdcp_type == HVDCP)) {
 				pdata->input_current_limit = HVDCP_INPUT_CURRENT_LIMIT;
 				pdata2->input_current_limit = HVDCP_INPUT_CURRENT_LIMIT;
-			} else if ((swchgalg->vbus_mv < HVDCP2P0_VOLATGE) &&
-					(info->hvdcp_type == HVDCP)) {
-				pdata->input_current_limit = NON_STANDARD_HVDCP_ICL;
-				pdata2->input_current_limit = NON_STANDARD_HVDCP_ICL;
 			} else if ((mtk_pe20_get_is_enable(info) && mtk_pe20_get_is_connect(info))
 				|| (mtk_pe_get_is_enable(info) && mtk_pe_get_is_connect(info))) {
 				pdata->input_current_limit = CHG1_INPUT_CURRENT_LIMIT_PE;
@@ -351,7 +395,7 @@ dual_swchg_select_charging_current_limit(struct charger_manager *info)
 				if (info->wireless_status == WIRELESS_CHG_HVDCP ||
 					((swchgalg->vbus_mv > HVDCP2P0_VOLATGE) &&
 					(info->hvdcp_type == HVDCP))) {
-
+					//wireless hvdcp support 9V/1.5A,set total current 2.4A
 					pdata->charging_current_limit
 						= WIRELESS_HVDCP_CHG_CURRENT;
 					pdata2->charging_current_limit
@@ -557,7 +601,18 @@ static int swchg_select_cv(struct charger_manager *info)
 	u32 constant_voltage;
 	bool chg2_chip_enabled = false;
 	bool chg2_enabled = false;
+	u32 cycle_count_index = 0;
 	u32 sw_jeita_cv = 0;
+	u32 cycle_count_cv = 0;
+	union power_supply_propval val;
+
+	power_supply_get_property(info->battery_psy,
+			POWER_SUPPLY_PROP_CYCLE_COUNT, &val);
+
+	get_cycle_count_cv(info->cycle_count_cv_cfg,
+		val.intval, &cycle_count_index, &cycle_count_cv);
+	pr_notice("%s cycle count:%d index:%d  cv:%d \n",
+		__func__, val.intval, cycle_count_index, cycle_count_cv);
 
 	charger_dev_is_chip_enabled(info->chg2_dev, &chg2_chip_enabled);
 	charger_dev_is_enabled(info->chg2_dev, &chg2_enabled);
@@ -578,8 +633,14 @@ static int swchg_select_cv(struct charger_manager *info)
 		}
 
 		if (info->sw_jeita.cv != 0) {
-			charger_dev_set_constant_voltage(info->chg1_dev,
+			if (cycle_count_cv >= BATTERY_CV_MIN &&
+					cycle_count_cv <= info->sw_jeita.cv)
+				charger_dev_set_constant_voltage(info->chg1_dev,
+							cycle_count_cv);
+			else
+				charger_dev_set_constant_voltage(info->chg1_dev,
 							info->sw_jeita.cv);
+
 			return 0;
 		}
 	}
@@ -588,11 +649,17 @@ static int swchg_select_cv(struct charger_manager *info)
 	constant_voltage = info->data.battery_cv;
 	mtk_get_dynamic_cv(info, &constant_voltage);
 
-	charger_dev_set_constant_voltage(info->chg1_dev, constant_voltage);
+	if (cycle_count_cv >= BATTERY_CV_MIN &&
+			cycle_count_cv <= constant_voltage)
+		charger_dev_set_constant_voltage(info->chg1_dev, cycle_count_cv);
+	else
+		charger_dev_set_constant_voltage(info->chg1_dev, constant_voltage);
+
 	/* Set slave charger's CV to 60mV higher than master's */
 	if (chg2_chip_enabled)
 		charger_dev_set_constant_voltage(info->chg2_dev,
 			constant_voltage + 60000);
+
 	return 0;
 }
 
@@ -723,12 +790,7 @@ static void dual_swchg_turn_on_charging(struct charger_manager *info)
 
 			if (info->hvdcp_type != HVDCP_NULL) {
 				if (info->chg1_data.thermal_charging_current_limit == -1) {
-					if ((swchgalg->vbus_mv < HVDCP2P0_VOLATGE) &&
-						(info->hvdcp_type == HVDCP))
-						charger_dev_set_charging_current(info->chg1_dev,
-							info->data.ac_charger_current);
-					else
-						charger_dev_set_charging_current(info->chg1_dev,
+					charger_dev_set_charging_current(info->chg1_dev,
 							SINGLE_THERMAL_CHG_CURRENT);
 				}
 			}
@@ -974,7 +1036,7 @@ static int mtk_dual_switch_charging_run(struct charger_manager *info)
 {
 	struct dual_switch_charging_alg_data *swchgalg = info->algorithm_data;
 	int ret = 10, rc = 0;
-	bool chg2_en;
+	bool chg2_en = false;
 	bool dpdm_status = false, chg1_enabled;
 	union power_supply_propval val;
 	struct timespec time, time_now;
@@ -1070,8 +1132,7 @@ static int mtk_dual_switch_charging_run(struct charger_manager *info)
 	charger_dev_dump_registers(info->chg1_dev);
 	charger_dev_is_enabled(info->chg2_dev, &chg2_en);
 	pr_debug_ratelimited("chg2_en: %d\n", chg2_en);
-	if (chg2_en)
-		charger_dev_dump_registers(info->chg2_dev);
+	charger_dev_dump_registers(info->chg2_dev);
 
 	if (swchgalg->first_run == false)
 			swchgalg->first_run = true;
@@ -1089,6 +1150,8 @@ int dual_charger_dev_event(struct notifier_block *nb, unsigned long event,
 	u32 ichg2, ichg2_min;
 	bool chg_en = false;
 	bool chg2_chip_enabled = false;
+	bool charger_online = false;
+	union power_supply_propval val;
 
 	charger_dev_is_chip_enabled(info->chg2_dev, &chg2_chip_enabled);
 
@@ -1142,10 +1205,19 @@ int dual_charger_dev_event(struct notifier_block *nb, unsigned long event,
 		return NOTIFY_DONE;
 	}
 
+	power_supply_get_property(swchgalg->charger_psy,
+			POWER_SUPPLY_PROP_ONLINE, &val);
+	charger_online = val.intval;
+	pr_info("%s: chg_online=%d.\n", charger_online);
+
 	switch (event) {
 	case CHARGER_DEV_NOTIFY_RECHG:
-		charger_manager_notifier(info, CHARGER_NOTIFY_START_CHARGING);
-		pr_info("%s: recharge\n", __func__);
+		if(charger_online) {
+			charger_manager_notifier(info, CHARGER_NOTIFY_START_CHARGING);
+			pr_info("%s: recharge\n", __func__);
+		} else {
+			pr_info("%s: stop recharge\n", __func__);
+		}
 		break;
 	case CHARGER_DEV_NOTIFY_SAFETY_TIMEOUT:
 		info->safety_timeout = true;
@@ -1191,7 +1263,14 @@ int mtk_dual_switch_charging_init(struct charger_manager *info)
 	/* Get usb power supply */
 	swch_alg->usb_psy = power_supply_get_by_name("usb");
 	if (!swch_alg->usb_psy) {
-		chr_err("%s: get power supply failed\n", __func__);
+		chr_err("%s: get usb power supply failed\n", __func__);
+		return -EINVAL;
+	}
+
+	/* Get charger power supply */
+	swch_alg->charger_psy = power_supply_get_by_name("charger");
+	if (!swch_alg->charger_psy) {
+		chr_err("%s: get charger power supply failed\n", __func__);
 		return -EINVAL;
 	}
 

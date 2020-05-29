@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -316,7 +316,7 @@ int gauge_enable_iavg_interrupt(bool ht_en, int ht_th,
 
 int gauge_get_nag_vbat(void)
 {
-	int nafg_vbat;
+	int nafg_vbat = 0;
 
 	gauge_dev_get_nag_vbat(gm.gdev, &nafg_vbat);
 	return nafg_vbat;
@@ -324,7 +324,7 @@ int gauge_get_nag_vbat(void)
 
 int gauge_get_nag_cnt(void)
 {
-	int nafg_cnt;
+	int nafg_cnt = 0;
 
 	gauge_dev_get_nag_cnt(gm.gdev, &nafg_cnt);
 	return nafg_cnt;
@@ -332,7 +332,7 @@ int gauge_get_nag_cnt(void)
 
 int gauge_get_nag_c_dltv(void)
 {
-	int nafg_c_dltv;
+	int nafg_c_dltv = 0;
 
 	gauge_dev_get_nag_c_dltv(gm.gdev, &nafg_c_dltv);
 	return nafg_c_dltv;
@@ -340,7 +340,7 @@ int gauge_get_nag_c_dltv(void)
 
 int gauge_get_nag_dltv(void)
 {
-	int nafg_dltv;
+	int nafg_dltv = 0;
 
 	gauge_dev_get_nag_dltv(gm.gdev, &nafg_dltv);
 	return nafg_dltv;
@@ -370,7 +370,6 @@ void fgauge_get_profile_id(void)
 	int auxadc_voltage;
 	struct device_node *batterty_node;
 	struct platform_device *battery_dev;
-
 
 	batterty_node = of_find_node_by_name(NULL, "battery");
 	if (!batterty_node)
@@ -513,6 +512,12 @@ void fg_custom_init_from_header(void)
 	fg_cust_data.aging_one_en = AGING_ONE_EN;
 	fg_cust_data.aging1_update_soc = UNIT_TRANS_100 * AGING1_UPDATE_SOC;
 	fg_cust_data.aging1_load_soc = UNIT_TRANS_100 * AGING1_LOAD_SOC;
+	fg_cust_data.aging4_update_soc = UNIT_TRANS_100 * AGING4_UPDATE_SOC;
+	fg_cust_data.aging4_load_soc = UNIT_TRANS_100 * AGING4_LOAD_SOC;
+	fg_cust_data.aging5_update_soc = UNIT_TRANS_100 * AGING5_UPDATE_SOC;
+	fg_cust_data.aging5_load_soc = UNIT_TRANS_100 * AGING5_LOAD_SOC;
+	fg_cust_data.aging6_update_soc = UNIT_TRANS_100 * AGING6_UPDATE_SOC;
+	fg_cust_data.aging6_load_soc = UNIT_TRANS_100 * AGING6_LOAD_SOC;
 	fg_cust_data.aging_temp_diff = AGING_TEMP_DIFF;
 	fg_cust_data.aging_temp_low_limit = AGING_TEMP_LOW_LIMIT;
 	fg_cust_data.aging_temp_high_limit = AGING_TEMP_HIGH_LIMIT;
@@ -524,6 +529,10 @@ void fg_custom_init_from_header(void)
 	fg_cust_data.aging_two_en = AGING_TWO_EN;
 	/* Aging Compensation 3*/
 	fg_cust_data.aging_third_en = AGING_THIRD_EN;
+	fg_cust_data.aging_4_en = AGING_4_EN;
+	fg_cust_data.aging_5_en = AGING_5_EN;
+	fg_cust_data.aging_6_en = AGING_6_EN;
+
 
 	/* ui_soc related */
 	fg_cust_data.diff_soc_setting = DIFF_SOC_SETTING;
@@ -993,6 +1002,22 @@ void fg_custom_init_from_dts(struct platform_device *dev)
 		&(fg_cust_data.aging1_update_soc), UNIT_TRANS_100);
 	fg_read_dts_val(np, "AGING1_LOAD_SOC",
 		&(fg_cust_data.aging1_load_soc), UNIT_TRANS_100);
+
+	fg_read_dts_val(np, "AGING4_UPDATE_SOC",
+		&(fg_cust_data.aging4_update_soc), UNIT_TRANS_100);
+	fg_read_dts_val(np, "AGING4_LOAD_SOC",
+		&(fg_cust_data.aging4_load_soc), UNIT_TRANS_100);
+	fg_read_dts_val(np, "AGING5_UPDATE_SOC",
+		&(fg_cust_data.aging5_update_soc), UNIT_TRANS_100);
+	fg_read_dts_val(np, "AGING5_LOAD_SOC",
+		&(fg_cust_data.aging5_load_soc), UNIT_TRANS_100);
+	fg_read_dts_val(np, "AGING6_UPDATE_SOC",
+		&(fg_cust_data.aging6_update_soc), UNIT_TRANS_100);
+	fg_read_dts_val(np, "AGING6_LOAD_SOC",
+		&(fg_cust_data.aging6_load_soc), UNIT_TRANS_100);
+
+
+
 	fg_read_dts_val(np, "AGING_TEMP_DIFF",
 		&(fg_cust_data.aging_temp_diff), 1);
 	fg_read_dts_val(np, "AGING_TEMP_LOW_LIMIT",
@@ -1271,7 +1296,7 @@ void fg_custom_init_from_dts(struct platform_device *dev)
 		sprintf(node_name, "TEMPERATURE_T%d", i);
 		fg_read_dts_val(np, node_name,
 			&(fg_table_cust_data.fg_profile[i].temperature), 1);
-	}
+		}
 
 
 	fg_read_dts_val(np, "TEMPERATURE_TB0",
@@ -1314,7 +1339,7 @@ void fg_custom_init_from_dts(struct platform_device *dev)
 		for (j = 0; j < 100; j++) {
 			if (p[j].resistance2 == 0)
 				p[j].resistance2 = p[j].resistance;
-		}
+	}
 	}
 
 	if (bat_id >= 0 && bat_id < TOTAL_BATTERY_NUMBER) {
@@ -1402,13 +1427,13 @@ void fg_custom_init_from_dts(struct platform_device *dev)
 				__func__, node_name, column);
 			/* correction */
 			column = 3;
-		}
+	}
 
 		sprintf(node_name, "battery%d_profile_t%d", bat_id, i);
 		fg_custom_parse_table(np, node_name,
 			fg_table_cust_data.fg_profile[i].fg_profile, column);
 	}
-}
+		}
 
 #endif	/* end of CONFIG_OF */
 
@@ -1622,7 +1647,7 @@ void sw_check_bat_plugout(void)
 
 void fg_nafg_monitor(void)
 {
-	int nafg_cnt;
+	int nafg_cnt = 0;
 	struct timespec now_time, dtime;
 
 	if (gm.disableGM30 || gm.cmd_disable_nafg || gm.ntc_disable_nafg)
@@ -1831,7 +1856,7 @@ void fg_zcv_int_handler(void)
 	int fg_coulomb = 0;
 	int zcv_intr_en = 0;
 	int zcv_intr_curr = 0;
-	int zcv;
+	int zcv = 0;
 
 	if (fg_interrupt_check() == false)
 		return;
@@ -1969,6 +1994,12 @@ void fg_charger_in_handler(void)
 		if (chr_type == CHARGER_UNKNOWN)
 			wakeup_fg_algo_atomic(FG_INTR_CHARGER_IN);
 	}
+
+	if (current_chr_type == CHARGER_UNKNOWN) {
+		if (chr_type != CHARGER_UNKNOWN)
+			wakeup_fg_algo_atomic(FG_INTR_CHARGER_OUT);
+	}
+
 	chr_type = current_chr_type;
 }
 
@@ -2419,6 +2450,8 @@ int battery_update_routine(void *x)
 			gm.onepercent_cb_flag = 0;
 			wakeup_fg_algo_cmd(FG_INTR_FG_TIME, 0, 1);
 		}
+		if (gm.fix_coverity == 1)
+			return 0;
 	}
 }
 
@@ -2570,6 +2603,8 @@ void fg_cmd_check(struct fgd_nl_msg_t *msg)
 			FGD_NL_MSG_T_HDR_LEN,
 			msg->fgd_subcmd_para1);
 		msleep(5000);
+		if (gm.fix_coverity == 1)
+			return;
 	}
 }
 
@@ -2970,11 +3005,13 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 				memcpy(&gm.g_fgd_pid, &msg->fgd_data[0],
 					sizeof(gm.g_fgd_pid));
 				bm_err(
-					"[fr]FG_DAEMON_CMD_SET_DAEMON_PID=%d,kill daemon case, %d\n",
+					"[fr]FG_DAEMON_CMD_SET_DAEMON_PID=%d,kill daemon case, %d init_flag:%d\n",
 					gm.g_fgd_pid,
-					get_ec()->debug_kill_daemontest);
+					get_ec()->debug_kill_daemontest,
+					gm.init_flag);
 				/* kill daemon dod_init 14*/
-				if (get_ec()->debug_kill_daemontest != 1)
+				if (get_ec()->debug_kill_daemontest != 1 &&
+					gm.init_flag == 1)
 					fg_cust_data.dod_init_sel = 14;
 			}
 
@@ -3243,7 +3280,7 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 
 	case FG_DAEMON_CMD_GET_BAT_PLUG_OUT_TIME:
 	{
-		int p1, p2;
+		int p1 = 0, p2 = 0;
 		unsigned int time = 0;
 
 		gauge_dev_get_boot_battery_plug_out_status(gm.gdev, &p1, &p2);
@@ -3298,7 +3335,7 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 
 	case FG_DAEMON_CMD_GET_IS_FG_INITIALIZED:
 	{
-		int fg_reset;
+		int fg_reset = 0;
 
 		gauge_dev_is_gauge_initialized(gm.gdev, &fg_reset);
 		ret_msg->fgd_data_len += sizeof(fg_reset);
@@ -3967,7 +4004,7 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 
 	case FG_DAEMON_CMD_GET_RTC_UI_SOC:
 	{
-		int rtc_ui_soc;
+		int rtc_ui_soc = 0;
 
 		gauge_dev_get_rtc_ui_soc(gm.gdev, &rtc_ui_soc);
 
@@ -4064,7 +4101,7 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 
 	case FG_DAEMON_CMD_GET_RTC_INVALID:
 	{
-		int rtc_invalid;
+		int rtc_invalid = 0;
 
 		gauge_dev_is_rtc_invalid(gm.gdev, &rtc_invalid);
 
@@ -4095,6 +4132,7 @@ void bmd_ctrl_cmd_from_user(void *nl_data, struct fgd_nl_msg_t *ret_msg)
 void mtk_battery_init(struct platform_device *dev)
 {
 	gm.ui_soc = -1;
+	gm.soc = -1;
 	gm.log_level = BM_DAEMON_DEFAULT_LOG_LEVEL;
 	gm.d_log_level = BM_DAEMON_DEFAULT_LOG_LEVEL;
 
@@ -4218,7 +4256,7 @@ void mtk_battery_init(struct platform_device *dev)
 
 		/* VBAT2 L/H */
 		pmic_register_interrupt_callback(FG_RG_INT_EN_BAT2_H,
-			fg_vbat2_h_int_handler);
+		fg_vbat2_h_int_handler);
 		pmic_register_interrupt_callback(FG_RG_INT_EN_BAT2_L,
 			fg_vbat2_l_int_handler);
 
@@ -4426,12 +4464,12 @@ void gm3_log_dump(bool force)
 
 	if (gm.gdev->fg_hw_info.hw_zcv != 0)
 		bm_err("GM3log5 %d %d %d %d %d\n",
-			gm.gdev->fg_hw_info.pmic_zcv,
-			gm.gdev->fg_hw_info.pmic_zcv_rdy,
-			gm.gdev->fg_hw_info.charger_zcv,
+		gm.gdev->fg_hw_info.pmic_zcv,
+		gm.gdev->fg_hw_info.pmic_zcv_rdy,
+		gm.gdev->fg_hw_info.charger_zcv,
 			gm.gdev->fg_hw_info.hw_zcv,
 			gm.hw_status.flag_hw_ocv_unreliable
-			);
+		);
 
 	bm_err("GM3log int %llu %d %d %d %d %d\n",
 		logtime,

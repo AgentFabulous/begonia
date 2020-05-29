@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -647,7 +647,8 @@ int mtk_pe20_start_algorithm(struct charger_manager *pinfo)
 				pe20_set_mivr(pinfo, pe20->vbus - 500000);
 			else
 				pe20_leave(pinfo);
-		}
+		} else
+			pe20_set_mivr(pinfo, pe20->vbus - 500000);
 		break;
 	}
 	pes = 2;

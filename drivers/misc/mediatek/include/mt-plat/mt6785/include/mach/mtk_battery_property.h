@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -117,6 +117,18 @@
 
 /* Aging Compensation 3*/
 #define AGING_THIRD_EN 1
+#define AGING_4_EN 1
+#define AGING_5_EN 1
+#define AGING_6_EN 1
+
+#define AGING4_UPDATE_SOC 40
+#define AGING4_LOAD_SOC 70
+
+#define AGING5_UPDATE_SOC 30
+#define AGING5_LOAD_SOC 70
+
+#define AGING6_UPDATE_SOC 30
+#define AGING6_LOAD_SOC 70
 
 /* threshold */
 #define HWOCV_SWOCV_DIFF	300
@@ -200,7 +212,7 @@
 
 #define MULTI_TEMP_GAUGE0 1	/* different temp using different gauge 0% */
 
-#define OVER_DISCHARGE_LEVEL -1500
+#define OVER_DISCHARGE_LEVEL -2000
 
 #define UISOC_UPDATE_TYPE 0
 /*

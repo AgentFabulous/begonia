@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -56,7 +56,7 @@ int mtk_pe40_set_mivr(struct charger_manager *pinfo, int uV)
 int mtk_pe40_pd_1st_request(struct charger_manager *pinfo,
 	int adapter_mv, int adapter_ma, int ma)
 {
-	unsigned int oldmA;
+	unsigned int oldmA = 3000000;
 	int ret;
 	int mivr;
 	bool chg2_enable = false;
@@ -117,8 +117,8 @@ int mtk_pe40_pd_1st_request(struct charger_manager *pinfo,
 int mtk_pe40_pd_request(struct charger_manager *pinfo,
 	int *adapter_vbus, int *adapter_ibus, int ma)
 {
-	unsigned int oldmA;
-	unsigned int oldmivr;
+	unsigned int oldmA = 3000000;
+	unsigned int oldmivr = 4600;
 	int ret;
 	int mivr;
 	int adapter_mv, adapter_ma;
@@ -760,8 +760,7 @@ int mtk_pe40_init_state(struct charger_manager *pinfo)
 			vbat1 = battery_get_bat_voltage();
 			mtk_pe40_get_ibus(pinfo, &ibus1);
 			ibus1 = ibus1 / 1000;
-			ret = pe40_get_output(pinfo,
-								&cap1);
+			ret = pe40_get_output(pinfo, &cap1);
 			if (ret != 0) {
 				chr_err("[pe40_i0] err:4 %d\n", ret);
 				goto err;
@@ -795,8 +794,7 @@ int mtk_pe40_init_state(struct charger_manager *pinfo)
 			vbat2 = battery_get_bat_voltage();
 			mtk_pe40_get_ibus(pinfo, &ibus2);
 			ibus2 = ibus2 / 1000;
-			ret = pe40_get_output(pinfo,
-								&cap2);
+			ret = pe40_get_output(pinfo, &cap2);
 			if (ret != 0)
 				goto err;
 
@@ -886,6 +884,11 @@ int mtk_pe40_safety_check(struct charger_manager *pinfo)
 
 	pe40 = &pinfo->pe4;
 
+	TAstatus.ocp = 0;
+	TAstatus.otp = 0;
+	TAstatus.ovp = 0;
+	TAstatus.temperature = 0;
+
 	/* vbus ov */
 	vbus = battery_get_vbus();
 	if (vbus - pe40->avbus >= 2000) {
@@ -947,9 +950,7 @@ int mtk_pe40_safety_check(struct charger_manager *pinfo)
 	if (ret == MTK_ADAPTER_NOT_SUPPORT)
 		chr_err("[pe40]TA adapter_dev_get_status not support\n");
 	else {
-		if (TAstatus.ocp ||
-			TAstatus.otp ||
-			TAstatus.ovp) {
+		if (TAstatus.ocp || TAstatus.otp || TAstatus.ovp) {
 
 			chr_err("[pe40_err]TA protect: ocp:%d otp:%d ovp:%d\n",
 				TAstatus.ocp,
@@ -983,7 +984,7 @@ err:
 
 int mtk_pe40_cc_state(struct charger_manager *pinfo)
 {
-	int ibus = 0, vbat, ibat, vbus, compare_ibus;
+	int ibus = 0, vbat, ibat, vbus, compare_ibus = 0;
 	int icl, ccl, ccl2, cv, max_icl;
 	struct mtk_pe40 *pe40;
 	int ret;

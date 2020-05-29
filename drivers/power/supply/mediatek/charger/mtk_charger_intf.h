@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -90,6 +90,8 @@ do {								\
 #define CHG_BAT_LT_STATUS	(1 << 5)
 #define CHG_TYPEC_WD_STATUS	(1 << 6)
 
+#define MAX_STEP_CHG_ENTRIES	4
+
 /* HVDCP type */
 enum hvdcp_status{
 	HVDCP_NULL,
@@ -103,6 +105,20 @@ enum hvdcp3_type {
 	HVDCP3_CLASSB_27W,
 	USB_PD,
 	HVDCP2_TYPE,
+};
+
+/* quick charge type */
+enum quick_charge_type {
+	QUICK_CHARGE_NORMAL = 0,
+	QUICK_CHARGE_FAST,
+	QUICK_CHARGE_FLASH,
+	QUICK_CHARGE_TURBE,
+	QUICK_CHARGE_MAX,
+};
+
+struct quick_charge {
+	enum power_supply_type adap_type;
+	enum quick_charge_type adap_cap;
 };
 
 /*wireless charger type*/
@@ -144,6 +160,11 @@ enum sw_jeita_state_enum {
 	TEMP_T2_TO_T3,
 	TEMP_T3_TO_T4,
 	TEMP_ABOVE_T4
+};
+struct range_data {
+	u32 low_threshold;
+	u32 high_threshold;
+	u32 value;
 };
 
 struct sw_jeita_data {
@@ -395,10 +416,14 @@ struct charger_manager {
 
 	/* pd */
 	struct mtk_pdc pdc;
+	bool disable_pd_dual;
 
 	/* Ra Rp detection */
 	bool ra_detected;
 	int	rp_lvl;
+
+	/* Wireless charger*/
+	bool is_wireless_charger;
 
 	int pd_type;
 	//struct tcpc_device *tcpc;
@@ -435,6 +460,8 @@ struct charger_manager {
 	bool is_input_suspend;
 
 	struct power_supply	*usb_psy;
+	struct power_supply	*battery_psy;
+	struct power_supply	*wireless_psy;
 
 	/*delay work*/
 	struct delayed_work	pd_hard_reset_work;
@@ -449,6 +476,9 @@ struct charger_manager {
 	int	 *thermal_mitigation_qc3;
 	int	 *thermal_mitigation_qc2;
 	int	 *thermal_mitigation_pd_base;
+
+	/*cycle count cv*/
+	struct range_data	cycle_count_cv_cfg[MAX_STEP_CHG_ENTRIES];
 };
 
 
@@ -509,6 +539,7 @@ extern int mtk_get_dynamic_cv(struct charger_manager *info, unsigned int *cv);
 extern bool is_dual_charger_supported(struct charger_manager *info);
 extern int charger_enable_vbus_ovp(struct charger_manager *pinfo, bool enable);
 extern bool is_typec_adapter(struct charger_manager *info);
+extern int charger_manager_get_quick_charge_type(void);
 
 /* pmic API */
 extern unsigned int upmu_get_rgs_chrdet(void);

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -695,17 +695,19 @@ int charger_manager_set_input_suspend(int suspend)
 	if (pinfo == NULL)
 		return false;
 
-	if (suspend) {
-		charger_dev_enable(pinfo->chg1_dev, false);
-		charger_dev_enable(pinfo->chg2_dev, false);
-		charger_dev_enable_powerpath(pinfo->chg1_dev, false);
-		pinfo->is_input_suspend = true;
-	} else {
-		charger_dev_enable(pinfo->chg1_dev, true);
-		charger_dev_enable(pinfo->chg2_dev, true);
-		charger_dev_enable_powerpath(pinfo->chg1_dev, true);
-		pinfo->is_input_suspend = false;
+	if (pinfo->is_input_suspend == suspend) {
+		pr_info("%s same setting, return.\n", __func__);
+		return false;
 	}
+
+	if (suspend)
+		pinfo->is_input_suspend = true;
+	else
+		pinfo->is_input_suspend = false;
+
+	_charger_manager_enable_charging(pinfo->chg1_consumer,
+				0, !suspend);
+
 	if (pinfo->usb_psy)
 		power_supply_changed(pinfo->usb_psy);
 	return 0;
@@ -1017,6 +1019,60 @@ bool is_typec_adapter(struct charger_manager *info)
 	return false;
 }
 
+struct quick_charge adapter_cap[10] = {
+	{ POWER_SUPPLY_TYPE_USB,        QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_DCP,    QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_CDP,    QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_ACA,    QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_FLOAT,  QUICK_CHARGE_NORMAL },
+	{ POWER_SUPPLY_TYPE_USB_PD,       QUICK_CHARGE_FAST },
+	{ POWER_SUPPLY_TYPE_USB_HVDCP,    QUICK_CHARGE_FAST },
+	{ POWER_SUPPLY_TYPE_USB_HVDCP_3,  QUICK_CHARGE_FAST },
+	{ POWER_SUPPLY_TYPE_WIRELESS,     QUICK_CHARGE_FAST },
+	{0, 0},
+};
+
+static int smblib_get_quick_charge_type(struct charger_manager *info)
+{
+	int i = 0;
+	union power_supply_propval pval = {0, };
+
+	if(!info) {
+		pr_err("get quick charge type failed.\n");
+		return -EINVAL;
+	}
+
+	power_supply_get_property(info->battery_psy,
+			POWER_SUPPLY_PROP_STATUS, &pval);
+	if (pval.intval == POWER_SUPPLY_STATUS_DISCHARGING)
+		return 0;
+
+	power_supply_get_property(info->usb_psy,
+			POWER_SUPPLY_PROP_REAL_TYPE, &pval);
+	pr_info("Get real type:%d.\n", pval.intval);
+	while (adapter_cap[i].adap_type != 0) {
+		if (pval.intval == adapter_cap[i].adap_type) {
+			return adapter_cap[i].adap_cap;
+		}
+		i++;
+	}
+
+	return 0;
+}
+
+int charger_manager_get_quick_charge_type(void)
+{
+	if (pinfo == NULL)
+		return 0;
+
+	/* quick charge type detected is too fast to
+	 * update real type */
+//	mdelay(1500);
+	msleep(1500);
+
+	return smblib_get_quick_charge_type(pinfo);
+}
+
 int charger_get_vbus(void)
 {
 	int ret = 0;
@@ -1071,7 +1127,7 @@ void do_sw_jeita_state_machine(struct charger_manager *info)
 
 			sw_jeita->sm = TEMP_T3_TO_T4;
 			info->swjeita_enable_dual_charging = false;
-			info->data.ac_charger_current = 2200000;
+			info->data.ac_charger_current = 2200000; //0.5c 2200ma
 		}
 	} else if (info->battery_temp >= info->data.temp_t2_thres) {
 		if (((sw_jeita->sm == TEMP_T3_TO_T4)
@@ -1112,7 +1168,7 @@ void do_sw_jeita_state_machine(struct charger_manager *info)
 
 			sw_jeita->sm = TEMP_T1_TO_T2;
 			info->swjeita_enable_dual_charging = false;
-			info->data.ac_charger_current = 1320000;
+			info->data.ac_charger_current = 1320000; //0.3c 1320ma
 		}
 	} else if (info->battery_temp >= info->data.temp_t0_thres) {
 		if ((sw_jeita->sm == TEMP_BELOW_T0)
@@ -1130,7 +1186,7 @@ void do_sw_jeita_state_machine(struct charger_manager *info)
 
 			sw_jeita->sm = TEMP_T0_TO_T1;
 			info->swjeita_enable_dual_charging = false;
-			info->data.ac_charger_current = 440000;
+			info->data.ac_charger_current = 440000; //0.1c 440ma
 		}
 	} else {
 		chr_err("[SW_JEITA] Battery below low Temperature(%d) !!\n",
@@ -1451,12 +1507,16 @@ static int mtk_charger_plug_out(struct charger_manager *info)
 	info->hvdcp_type = HVDCP_NULL;
 	info->hvdcp_check_count = 0;
 	info->usb_state = 0;
+	info->is_wireless_charger = false;
+
 	if (info->plug_out != NULL)
 		info->plug_out(info);
 
 	charger_dev_set_input_current(info->chg1_dev, 100000);
 	charger_dev_set_mivr(info->chg1_dev, info->data.min_charger_voltage);
 	charger_dev_plug_out(info->chg1_dev);
+
+	power_supply_changed(pinfo->wireless_psy);
 	return 0;
 }
 
@@ -1606,6 +1666,10 @@ static void mtk_battery_notify_UI_test(struct charger_manager *info)
 		info->notify_code = CHG_BAT_LT_STATUS;
 		pr_debug("[%s] CASE6: VBATTEMP_LOW\n", __func__);
 		break;
+	case 7:
+		info->notify_code = CHG_TYPEC_WD_STATUS;
+		pr_debug("[%s] CASE7: Moisture Detection\n", __func__);
+		break;
 	default:
 		pr_debug("[%s] Unknown BN_TestMode Code: %x\n",
 			__func__, info->notify_test_mode);
@@ -1678,7 +1742,7 @@ static void check_dynamic_mivr(struct charger_manager *info)
 static void mtk_chg_get_tchg(struct charger_manager *info)
 {
 	int ret;
-	int tchg_min, tchg_max;
+	int tchg_min = -127, tchg_max = -127;
 	struct charger_data *pdata;
 
 	pdata = &info->chg1_data;
@@ -1811,7 +1875,7 @@ static void kpoc_power_off_check(struct charger_manager *info)
 			vbus = battery_get_vbus();
 			if (vbus >= 0 && vbus < 2500 && !mt_charger_plugin()) {
 				chr_err("Unplug Charger/USB in KPOC mode, shutdown\n");
-
+//				kernel_power_off();
 			}
 		}
 	}
@@ -1967,6 +2031,73 @@ static int charger_routine_thread(void *arg)
 	return 0;
 }
 
+static int read_range_data_from_node(struct device_node *node,
+		const char *prop_str, struct range_data *ranges,
+		u32 max_threshold, u32 max_value)
+{
+	int rc = 0, i, length, per_tuple_length, tuples;
+
+	rc = of_property_count_elems_of_size(node, prop_str, sizeof(u32));
+	if (rc < 0) {
+		pr_err("Count %s failed, rc=%d\n", prop_str, rc);
+		return rc;
+	}
+
+	length = rc;
+	per_tuple_length = sizeof(struct range_data) / sizeof(u32);
+	if (length % per_tuple_length) {
+		pr_err("%s length (%d) should be multiple of %d\n",
+				prop_str, length, per_tuple_length);
+		return -EINVAL;
+	}
+	tuples = length / per_tuple_length;
+
+	if (tuples > MAX_STEP_CHG_ENTRIES) {
+		pr_err("too many entries(%d), only %d allowed\n",
+				tuples, MAX_STEP_CHG_ENTRIES);
+		return -EINVAL;
+	}
+
+	rc = of_property_read_u32_array(node, prop_str,
+			(u32 *)ranges, length);
+	if (rc) {
+		pr_err("Read %s failed, rc=%d", prop_str, rc);
+		return rc;
+	}
+
+	for (i = 0; i < tuples; i++) {
+		if (ranges[i].low_threshold >
+				ranges[i].high_threshold) {
+			pr_err("%s thresholds should be in ascendant ranges\n",
+						prop_str);
+			rc = -EINVAL;
+			goto clean;
+		}
+
+		if (i != 0) {
+			if (ranges[i - 1].high_threshold >
+					ranges[i].low_threshold) {
+				pr_err("%s thresholds should be in ascendant ranges\n",
+							prop_str);
+				rc = -EINVAL;
+				goto clean;
+			}
+		}
+
+		if (ranges[i].low_threshold > max_threshold)
+			ranges[i].low_threshold = max_threshold;
+		if (ranges[i].high_threshold > max_threshold)
+			ranges[i].high_threshold = max_threshold;
+		if (ranges[i].value > max_value)
+			ranges[i].value = max_value;
+	}
+
+	return rc;
+clean:
+	memset(ranges, 0, tuples * sizeof(struct range_data));
+	return rc;
+}
+
 static int mtk_charger_parse_dt(struct charger_manager *info,
 				struct device *dev)
 {
@@ -2009,6 +2140,7 @@ static int mtk_charger_parse_dt(struct charger_manager *info,
 	info->enable_type_c = of_property_read_bool(np, "enable_type_c");
 	info->enable_dynamic_mivr =
 			of_property_read_bool(np, "enable_dynamic_mivr");
+	info->disable_pd_dual = of_property_read_bool(np, "disable_pd_dual");
 
 	info->enable_hv_charging = true;
 
@@ -2857,6 +2989,12 @@ static int mtk_charger_parse_dt(struct charger_manager *info,
 			return rc;
 		}
 	}
+	rc = read_range_data_from_node(np,
+			"mi,cycle-count-cv",
+			info->cycle_count_cv_cfg,
+			MI_CYCLE_COUNT_MAX, BATTERY_CV_MAX);
+	if (rc < 0)
+		pr_debug("Read mi,cycle-count-cv failed  rc=%d\n", rc);
 
 	return 0;
 }
@@ -3358,6 +3496,13 @@ void notify_adapter_event(enum adapter_type type, enum adapter_event evt,
 			mutex_unlock(&pinfo->charger_pd_lock);
 			power_supply_changed(pinfo->usb_psy);
 			break;
+		case MTK_WIRELESS_CHARGER:
+			chr_err("is wireless charger = %d\n", *(bool *)val);
+			mutex_lock(&pinfo->charger_pd_lock);
+			pinfo->is_wireless_charger = *(bool *)val;
+			mutex_unlock(&pinfo->charger_pd_lock);
+			power_supply_changed(pinfo->wireless_psy);
+			break;
 		case MTK_TYPEC_HRESET_STATUS:
 			chr_err("hreset status = %d\n", *(bool *)val);
 			mutex_lock(&pinfo->charger_pd_lock);
@@ -3449,6 +3594,15 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 			_wake_up_charger(pinfo);
 			break;
 		};
+	case TCP_NOTIFY_RA_DETECT:
+		chr_err("One ra detected = %d\n", noti->ra_detect.detected);
+		/* To do */
+		break;
+	case TCP_NOTIFY_WIRELESS_CHARGER:
+		chr_err("is wireless charger = %d\n",
+			noti->wireless_charger.is_wireless_charger);
+		/* To do */
+		break;
 	}
 	return NOTIFY_OK;
 }
@@ -3458,6 +3612,16 @@ static int proc_dump_log_show(struct seq_file *m, void *v)
 {
 	struct adapter_power_cap cap;
 	int i;
+
+	cap.nr = 0;
+	cap.pdp = 0;
+	for (i = 0; i < ADAPTER_CAP_MAX_NR; i++) {
+		cap.max_mv[i] = 0;
+		cap.min_mv[i] = 0;
+		cap.ma[i] = 0;
+		cap.type[i] = 0;
+		cap.pwr_limit[i] = 0;
+	}
 
 	if (pinfo->pd_type == MTK_PD_CONNECT_PE_READY_SNK_APDO) {
 		seq_puts(m, "********** PD APDO cap Dump **********\n");
@@ -3654,11 +3818,20 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	mutex_unlock(&consumer_mutex);
 	info->chg1_consumer =
 		charger_manager_get_by_name(&pdev->dev, "charger_port1");
-	/* Get usb power supply */
+	/* Get power supply */
 	info->usb_psy = power_supply_get_by_name("usb");
 	if (!info->usb_psy) {
-		chr_err("%s: get power supply failed\n", __func__);
+		chr_err("%s: get usb power supply failed\n", __func__);
 	}
+	info->battery_psy = power_supply_get_by_name("battery");
+	if (!info->battery_psy) {
+		chr_err("%s: get battery power supply failed\n", __func__);
+	}
+	info->wireless_psy = power_supply_get_by_name("wireless");
+	if (!info->wireless_psy) {
+		chr_err("%s: get battery power supply failed\n", __func__);
+	}
+
 	INIT_DELAYED_WORK(&info->pd_hard_reset_work, smblib_pd_hard_reset_work);
 	info->init_done = true;
 	_wake_up_charger(info);
