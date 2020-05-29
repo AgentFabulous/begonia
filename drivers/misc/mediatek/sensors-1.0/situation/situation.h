@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -52,7 +52,7 @@ struct situation_control_path {
 		int64_t maxBatchReportLatencyNs);
 	int (*flush)(void);
 	int (*set_cali)(uint8_t *data, uint8_t count);
-
+	//bool is_report_input_direct;
 	bool is_support_wake_lock;
 	bool is_support_batch;
 };

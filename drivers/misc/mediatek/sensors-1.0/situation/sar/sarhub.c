@@ -1,7 +1,7 @@
 /* sarhub motion sensor driver
  *
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -280,11 +280,11 @@ static int sarhub_local_init(void)
 	struct situation_control_path ctl = {0};
 	struct situation_data_path data = {0};
 	int err = 0;
+
 	struct sarhub_ipi_data *obj;
 
 	pr_debug("%s\n", __func__);
 	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
-
 	if (!obj) {
 		err = -ENOMEM;
 		goto exit;
