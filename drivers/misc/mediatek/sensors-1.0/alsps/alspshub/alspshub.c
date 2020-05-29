@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -26,6 +26,7 @@
 #define ALS_CALI_INFO_SET_SCALE 0
 #define AMBIENT_LCD_BACKLIGHT_HIGH 13
 #define AMBIENT_LCD_BACKLIGHT_LOW 14
+#define AMBIENT_FROM_PROXIMITY 15
 
 #define AMBIENT_LCD_BACKLIGHT_VALUE 100
 
@@ -50,6 +51,8 @@ struct alspshub_ipi_data {
 	int32_t		backlight_low;
 	int32_t		high_bias;
 	int32_t		low_bias;
+	int32_t		ch0_ps;
+	int32_t		ch1_ps;
 	atomic_t	ps_thd_val_high;
 	atomic_t	ps_thd_val_low;
 	ulong		enable;
@@ -301,16 +304,94 @@ static void alspshub_init_done_work(struct work_struct *work)
 {
 	struct alspshub_ipi_data *obj = obj_ipi_data;
 	int err = 0;
+#if XIAOMI_FACTORY_CALIBRATION
+	int32_t cfg_data[4] = {0};
+#else
 #ifndef MTK_OLD_FACTORY_CALIBRATION
 	int32_t cfg_data[2] = {0};
 #endif
-
+#endif
 	if (atomic_read(&obj->scp_init_done) == 0) {
 		pr_err("wait for nvram to set calibration\n");
 		return;
 	}
 	if (atomic_xchg(&obj->first_ready_after_boot, 1) == 0)
 		return;
+#if XIAOMI_FACTORY_CALIBRATION
+	spin_lock(&calibration_lock);
+	cfg_data[0] = obj->ps_thd_cali[0];
+	cfg_data[1] = obj->ps_thd_cali[1];
+	cfg_data[2] = obj->ps_thd_cali[2];
+	cfg_data[3] = obj->ps_thd_cali[3];
+	spin_unlock(&calibration_lock);
+	pr_info("alspshub_init_done_work 1 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+	err = sensor_cfg_to_hub(ID_PROXIMITY,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub ps fail\n");
+
+	cfg_data[0] = AMBIENT_LCD_BACKLIGHT_HIGH;
+	cfg_data[1] = obj->backlight_high;
+	cfg_data[2] = obj->high_bias;
+	cfg_data[3] = 0;
+	err = sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	pr_info("alspshub_init_done_work 2 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+	msleep(20);
+
+	cfg_data[0] = AMBIENT_LCD_BACKLIGHT_LOW;
+	cfg_data[1] = obj->backlight_low;
+	cfg_data[2] = obj->low_bias;
+	cfg_data[3] = 0;
+	err = sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	pr_info("alspshub_init_done_work 3 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+	msleep(20);
+
+	spin_lock(&calibration_lock);
+	cfg_data[0] = ALS_CALI_INFO_SET_SCALE;
+	cfg_data[1] = atomic_read(&obj->als_cali);
+	spin_unlock(&calibration_lock);
+	err = sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	pr_info("alspshub_init_done_work 4 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+	msleep(20);
+
+	cfg_data[0] = AMBIENT_FROM_PROXIMITY;
+	cfg_data[1] = obj->ch0_ps;
+	cfg_data[2] = obj->ch1_ps;
+	cfg_data[3] = 0;
+	err = sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	pr_info("alspshub_init_done_work 4 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+#else
 #ifdef MTK_OLD_FACTORY_CALIBRATION
 	err = sensor_set_cmd_to_hub(ID_PROXIMITY,
 		CUST_ACTION_SET_CALI, &obj->ps_cali);
@@ -334,6 +415,7 @@ static void alspshub_init_done_work(struct work_struct *work)
 		(uint8_t *)cfg_data, sizeof(cfg_data));
 	if (err < 0)
 		pr_err("sensor_cfg_to_hub als fail\n");
+#endif
 #endif
 }
 static int ps_recv_data(struct data_unit_t *event, void *reserved)
@@ -479,6 +561,9 @@ static int alshub_factory_set_cali(PS_CALI_DATA cali)
 		obj->low_bias = cali.threshold2;
 	} else if (cfg_data[0] == ALS_CALI_INFO_SET_SCALE) {
 		atomic_set(&obj->als_cali, cali.threshold1);
+	} else if (cfg_data[0] == AMBIENT_FROM_PROXIMITY) {
+		obj->ch0_ps = cali.threshold1;
+		obj->ch1_ps = cali.threshold2;
 	}
 
 	err = sensor_cfg_to_hub(ID_LIGHT,
@@ -796,6 +881,9 @@ static int als_set_cali(uint8_t *data, uint8_t count)
 		spin_unlock(&calibration_lock);
 		pr_info("als_set_cali buf: %d!\n", buf[1]);
 		pr_info("als_set_cali *offset: %d!\n", atomic_read(&obj->als_cali));
+	} else if (cfg_data[0] == AMBIENT_FROM_PROXIMITY) {
+		obj->ch0_ps = cfg_data[1];
+		obj->ch1_ps = cfg_data[2];
 	}
 
 	return sensor_cfg_to_hub(ID_LIGHT,
@@ -974,8 +1062,8 @@ static int ps_set_cali(uint8_t *data, uint8_t count)
 	struct alspshub_ipi_data *obj = obj_ipi_data;
 
 	spin_lock(&calibration_lock);
-
-
+	//atomic_set(&obj->ps_thd_val_low, buf[0]);
+	//atomic_set(&obj->ps_thd_val_high, buf[1]);
 	obj->ps_thd_cali[0] = buf[0];
 	obj->ps_thd_cali[1] = buf[1];
 	obj->ps_thd_cali[2] = buf[2];
@@ -1051,7 +1139,6 @@ static int alspshub_probe(struct platform_device *pdev)
 	clear_bit(CMC_BIT_ALS, &obj->enable);
 	clear_bit(CMC_BIT_PS, &obj->enable);
 	init_completion(&obj->ps_calibration_done);
-
 	scp_power_monitor_register(&scp_ready_notifier);
 	err = scp_sensorHub_data_registration(ID_PROXIMITY, ps_recv_data);
 	if (err < 0) {

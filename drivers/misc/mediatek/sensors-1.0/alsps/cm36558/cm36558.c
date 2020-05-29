@@ -23,6 +23,7 @@
 #include <linux/of_irq.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
+#include <linux/sched/clock.h>
 #include "cust_alsps.h"
 #include "cm36558.h"
 #include "alsps.h"
@@ -1057,7 +1058,7 @@ int CM36558_setup_eint(struct i2c_client *client)
 		}
 
 		enable_irq_wake(CM36558_obj->irq);
-		enable_irq(CM36558_obj->irq);
+		/*enable_irq(CM36558_obj->irq);*/
 	} else {
 		pr_err("null irq node!!\n");
 		return -EINVAL;
@@ -1292,6 +1293,9 @@ static int ps_enable_nodata(int en)
 		pr_err("als_enable_nodata is failed!!\n");
 		return -1;
 	}
+	/*Report default ps value(far away) when enable ps*/
+	if (en != 0)
+		ps_data_report(1, 3);
 	return 0;
 }
 

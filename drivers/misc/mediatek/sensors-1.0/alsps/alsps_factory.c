@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -42,7 +42,7 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 	void __user *ptr = (void __user *)arg;
 	int data = 0;
 	uint32_t enable = 0;
-
+	//int threshold_data[4] = {0};
 	PS_CALI_DATA thd_cali = {0};
 	PS_CALI_DATA als_cali = {0};
 
