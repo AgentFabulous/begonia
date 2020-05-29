@@ -109,7 +109,7 @@ static int check_md_header_v3(int md_id, void *parse_addr,
 	bool md_sys_match = false;
 	bool md_size_check = false;
 	int idx;
-	unsigned int md_size;
+	unsigned int md_size = 0;
 	unsigned char *start, *ptr;
 	int region_id, domain_id; /* add for v4 v5 */
 	/* struct md_check_header_v3 *head = &md_img_header_v3[md_id]; */
@@ -344,7 +344,7 @@ static int md_check_header_parser(int md_id, void *parse_addr,
 	bool md_plat_check = false;
 	bool md_sys_match = false;
 	bool md_size_check = false;
-	unsigned int md_size;
+	unsigned int md_size = 0;
 	unsigned int header_size;
 	int idx, header_up;
 	unsigned char *start, *ptr;
@@ -596,12 +596,16 @@ static int md_check_header_parser(int md_id, void *parse_addr,
 
 	/* ARM7 only avilable after check header v5 */
 	if (head->header_verno >= 5) {
-		image->arm7_offset = headv5->arm7_img_offset;
-		image->arm7_size = headv5->arm7_img_size;
-		CCCI_UTIL_INF_MSG_WITH_ID(md_id,
-			"load_image: check_header_v5, arm7_offset = 0x%08X, arm_size = 0x%08X\n",
-			image->arm7_offset,
-			image->arm7_size);
+		if (headv5) {
+			image->arm7_offset = headv5->arm7_img_offset;
+			image->arm7_size = headv5->arm7_img_size;
+			CCCI_UTIL_INF_MSG_WITH_ID(md_id,
+				"load_image: check_header_v5, arm7_offset = 0x%08X, arm_size = 0x%08X\n",
+				image->arm7_offset,
+				image->arm7_size);
+		} else
+			CCCI_UTIL_INF_MSG_WITH_ID(md_id,
+				"load_image: headv5 is null.\n");
 	}
 
 	CCCI_UTIL_INF_MSG_WITH_ID(md_id,
@@ -627,7 +631,7 @@ static int check_md_header(int md_id, void *parse_addr,
 	bool md_plat_check = false;
 	bool md_sys_match = false;
 	bool md_size_check = false;
-	unsigned int md_size;
+	unsigned int md_size = 0;
 	unsigned int header_size;
 	int idx;
 	unsigned char *start, *ptr;
