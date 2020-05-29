@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -53,7 +53,7 @@
 #define MT6360_ENABLE_TORCH 1
 #define MT6360_ENABLE_FLASH 2
 
-
+// ALPS04314229 single Flash dual LED
 #define SINGLE_FLASH_DUAL_LED 1
 
 #ifdef SINGLE_FLASH_DUAL_LED
@@ -234,7 +234,6 @@ static int mt6360_enable(void)
 			ret |= flashlight_set_mode(
 				flashlight_dev_ch2, FLASHLIGHT_MODE_OFF);
 	}
-
 	if (ret < 0)
 		pr_info("Failed to enable.\n");
 
@@ -292,7 +291,7 @@ static int mt6360_disable_all(void)
 	}
 
 	ret |= flashlight_set_mode(flashlight_dev_ch1,
-			FLASHLIGHT_MODE_DUAL_OFF);
+		FLASHLIGHT_MODE_DUAL_OFF);
 
 	if (ret < 0)
 		pr_info("Failed to disable.\n");
@@ -940,9 +939,9 @@ static void mt6360_torch_brightness_set(struct led_classdev *led_cdev,
 		mt6360_set_driver(0);
 		return;
 	} else {
-		arg.level = 3;
+		arg.level = 3; //torch current 125ma
 	}
-
+//torch mode
 
 	if (0 == strcmp(led_cdev->name, "torch-light0")) {
 		arg.channel = MT6360_CHANNEL_CH1;
@@ -960,7 +959,7 @@ static void mt6360_torch_brightness_set(struct led_classdev *led_cdev,
 		}
 	}
 
-
+//	mt6360_set_driver(1);
 
 #if 1
 	if (arg.channel == MT6360_CHANNEL_CH1) {
@@ -978,7 +977,7 @@ static void mt6360_torch_brightness_set(struct led_classdev *led_cdev,
 	}
 #endif
 
-
+//	mt6360_enable();
 	}
 
 	return;
@@ -1009,7 +1008,7 @@ static void mt6360_torch2_brightness_set(struct led_classdev *led_cdev,
 		mt6360_set_driver(0);
 		return;
 	} else if ((value > 3) || (value < 255)) {
-		arg.level = 3;
+		arg.level = 3; //torch current 200ma
 	}
 
 	mt6360_set_driver(1);
@@ -1104,8 +1103,8 @@ static int32_t mtk_flashlight_create_flash_classdev(struct platform_device *pdev
 	int32_t i = 0;
 
 	for (i = 0; i <= pdata->channel_num; i++) {
-
-
+		//mt6360_flash_brightness_set(&mtk_flash_led[i],
+			//LED_OFF);
 			rc = led_classdev_register(&pdev->dev,
 				&mtk_flash_led[i]);
 			if (rc) {

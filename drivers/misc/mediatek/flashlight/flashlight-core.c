@@ -2,7 +2,7 @@
  * Flashlight Core
  *
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Author: Simon Wang <Simon-TCH.Wang@mediatek.com>
  *
@@ -118,7 +118,7 @@ static int fl_set_level(struct flashlight_dev *fdev, int level)
 	}
 
 	/* update device status */
-
+	//fdev->level = level;
 
 	return 0;
 }
