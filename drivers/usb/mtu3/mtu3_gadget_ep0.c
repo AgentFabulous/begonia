@@ -2,7 +2,7 @@
  * mtu3_gadget_ep0.c - MediaTek USB3 DRD peripheral driver ep0 handling
  *
  * Copyright (c) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Author:  Chunfeng.Yun <chunfeng.yun@mediatek.com>
  *
@@ -16,6 +16,8 @@
  * GNU General Public License for more details.
  *
  */
+
+#include <linux/usb/composite.h>
 
 #include "mtu3.h"
 
@@ -800,9 +802,6 @@ static int ep0_queue(struct mtu3_ep *mep, struct mtu3_request *mreq)
 	dev_dbg(mtu->dev, "%s %s (ep0_state: %s), len#%d\n", __func__,
 		mep->name, decode_ep0_state(mtu), mreq->request.length);
 
-	if (!list_empty(&mep->req_list))
-		return -EBUSY;
-
 	switch (mtu->ep0_state) {
 	case MU3D_EP0_STATE_SETUP:
 	case MU3D_EP0_STATE_RX:	/* control-OUT data */
@@ -813,6 +812,9 @@ static int ep0_queue(struct mtu3_ep *mep, struct mtu3_request *mreq)
 			decode_ep0_state(mtu));
 		return -EINVAL;
 	}
+
+	if (!list_empty(&mep->req_list))
+		return -EBUSY;
 
 	list_add_tail(&mreq->list, &mep->req_list);
 

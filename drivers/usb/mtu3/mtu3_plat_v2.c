@@ -87,6 +87,7 @@ ssize_t musb_cmode_store(struct device *dev, struct device_attribute *attr,
 {
 	unsigned int cmode;
 	struct ssusb_mtk *ssusb;
+	struct extcon_dev *edev;
 
 	if (!dev) {
 		pr_info("dev is null!!\n");
@@ -99,6 +100,8 @@ ssize_t musb_cmode_store(struct device *dev, struct device_attribute *attr,
 		pr_info("ssusb is null!!\n");
 		return count;
 	}
+
+	edev = (&ssusb->otg_switch)->edev;
 
 	if (sscanf(buf, "%ud", &cmode) == 1) {
 		if (cmode >= CABLE_MODE_MAX)
@@ -121,8 +124,12 @@ ssize_t musb_cmode_store(struct device *dev, struct device_attribute *attr,
 				ssusb_set_mailbox(&ssusb->otg_switch,
 					MTU3_VBUS_VALID);
 			} else {	/* IPO bootup, enable USB */
-				ssusb_set_mailbox(&ssusb->otg_switch,
-					MTU3_CMODE_VBUS_VALID);
+				if (extcon_get_state(edev, EXTCON_USB_HOST))
+					ssusb_set_mailbox(&ssusb->otg_switch,
+						   MTU3_ID_GROUND);
+				else
+					ssusb_set_mailbox(&ssusb->otg_switch,
+						   MTU3_CMODE_VBUS_VALID);
 			}
 			msleep(200);
 		}
@@ -630,7 +637,7 @@ static int mtu3_probe(struct platform_device *pdev)
 #ifdef CONFIG_MTK_BOOT
 	if (get_boot_mode() == META_BOOT) {
 		dev_info(dev, "in special mode %d\n", get_boot_mode());
-		/*mtu3_cable_mode = CABLE_MODE_FORCEON;*/
+		mtu3_cable_mode = CABLE_MODE_FORCEON;
 	}
 #endif
 
@@ -725,10 +732,8 @@ static const struct dev_pm_ops mtu3_pm_ops = {
 #ifdef CONFIG_OF
 
 static const struct of_device_id mtu3_of_match[] = {
-	{.compatible = "mediatek,mt6758-mtu3",},
-	{.compatible = "mediatek,mt3967-mtu3",},
-	{.compatible = "mediatek,mt6779-mtu3",},
 	{.compatible = "mediatek,mt6785-mtu3",},
+	{.compatible = "mediatek,mt6771-mtu3",},
 	{},
 };
 

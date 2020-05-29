@@ -2,7 +2,7 @@
  * mtu3_qmu.c - Queue Management Unit driver for device controller
  *
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Author: Chunfeng Yun <chunfeng.yun@mediatek.com>
  *

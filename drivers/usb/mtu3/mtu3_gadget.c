@@ -579,7 +579,7 @@ static int mtu3_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	struct mtu3 *mtu = gadget_to_mtu3(gadget);
 	unsigned long flags;
 
-	dev_dbg(mtu->dev, "%s (%s) for %sactive device\n", __func__,
+	dev_info(mtu->dev, "%s (%s) for %sactive device\n", __func__,
 		is_on ? "on" : "off", mtu->is_active ? "" : "in");
 
 	/* we'd rather not pullup unless the device is active. */
