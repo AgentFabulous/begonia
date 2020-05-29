@@ -3590,7 +3590,7 @@ static kal_uint32 slim_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 
 
 static kal_uint32 get_resolution(
-	MSDK_SENSOR_RESOLUTION_INFO_STRUCT *sensor_resolution)
+	MSDK_SENSOR_RESOLUTION_INFO_STRUCT * sensor_resolution)
 {
 
 	sensor_resolution->SensorFullWidth =

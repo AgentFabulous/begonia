@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,22 +22,16 @@
 #include "imgsensor_hw.h"
 #include "linux/regulator/consumer.h"
 
-#include <mt-plat/upmu_common.h>
-
-char *imgsensor_sensor_idx_name[IMGSENSOR_SENSOR_IDX_MAX_NUM] = {
-	IMGSENSOR_SENSOR_IDX_NAME_MAIN,
-	IMGSENSOR_SENSOR_IDX_NAME_SUB,
-	IMGSENSOR_SENSOR_IDX_NAME_MAIN2,
-	IMGSENSOR_SENSOR_IDX_NAME_SUB2,
-	IMGSENSOR_SENSOR_IDX_NAME_MAIN3
-};
-
+#include <mt-plat/upmu_common.h> //XIAOMI: libin16 add
 enum IMGSENSOR_RETURN imgsensor_hw_init(struct IMGSENSOR_HW *phw)
 {
 	struct IMGSENSOR_HW_SENSOR_POWER      *psensor_pwr;
 	struct IMGSENSOR_HW_CFG               *pcust_pwr_cfg;
 	struct IMGSENSOR_HW_CUSTOM_POWER_INFO *ppwr_info;
 	int i, j;
+	char str_prop_name[LENGTH_FOR_SNPRINTF];
+	struct device_node *of_node
+		= of_find_compatible_node(NULL, NULL, "mediatek,imgsensor");
 
 	mutex_init(&phw->common.pinctrl_mutex);
 
@@ -54,7 +48,8 @@ enum IMGSENSOR_RETURN imgsensor_hw_init(struct IMGSENSOR_HW *phw)
 		psensor_pwr = &phw->sensor_pwr[i];
 
 		pcust_pwr_cfg = imgsensor_custom_config;
-		while (pcust_pwr_cfg->sensor_idx != i)
+		while (pcust_pwr_cfg->sensor_idx != i &&
+		       pcust_pwr_cfg->sensor_idx != IMGSENSOR_SENSOR_IDX_NONE)
 			pcust_pwr_cfg++;
 
 		if (pcust_pwr_cfg->sensor_idx == IMGSENSOR_SENSOR_IDX_NONE)
@@ -70,6 +65,21 @@ enum IMGSENSOR_RETURN imgsensor_hw_init(struct IMGSENSOR_HW *phw)
 
 			psensor_pwr->id[ppwr_info->pin] = j;
 			ppwr_info++;
+		}
+	}
+
+	for (i = 0; i < IMGSENSOR_SENSOR_IDX_MAX_NUM; i++) {
+		memset(str_prop_name, 0, sizeof(str_prop_name));
+		snprintf(str_prop_name,
+					sizeof(str_prop_name),
+					"cam%d_%s",
+					i,
+					"enable_sensor");
+		if (of_property_read_string(
+			of_node, str_prop_name,
+			&phw->enable_sensor_by_index[i]) < 0) {
+			PK_DBG("Property cust-sensor not defined\n");
+			phw->enable_sensor_by_index[i] = NULL;
 		}
 	}
 
@@ -105,13 +115,26 @@ static enum IMGSENSOR_RETURN imgsensor_hw_power_sequence(
 	static struct regulator *ldo2_reg;
 	static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 30);
 
-	while (ppwr_seq->idx != NULL &&
-		ppwr_seq < ppower_sequence + IMGSENSOR_HW_SENSOR_MAX_NUM &&
-		strcmp(ppwr_seq->idx, pcurr_idx)) {
+#ifdef CONFIG_FPGA_EARLY_PORTING  /*for FPGA*/
+	if (1) {
+		PK_DBG("FPGA return true for power control\n");
+		return IMGSENSOR_RETURN_SUCCESS;
+	}
+#endif
+
+	while (ppwr_seq < ppower_sequence + IMGSENSOR_HW_SENSOR_MAX_NUM &&
+		ppwr_seq->name != NULL) {
+		if (!strcmp(ppwr_seq->name, PLATFORM_POWER_SEQ_NAME)) {
+			if (sensor_idx == ppwr_seq->_idx)
+				break;
+		} else {
+			if (!strcmp(ppwr_seq->name, pcurr_idx))
+				break;
+		}
 		ppwr_seq++;
 	}
 
-	if (ppwr_seq->idx == NULL)
+	if (ppwr_seq->name == NULL)
 		return IMGSENSOR_RETURN_ERROR;
 
 	ppwr_info = ppwr_seq->pwr_info;
@@ -190,45 +213,22 @@ enum IMGSENSOR_RETURN imgsensor_hw_power(
 {
 	enum IMGSENSOR_SENSOR_IDX sensor_idx = psensor->inst.sensor_idx;
 	char *curr_sensor_name = psensor->inst.psensor_list->name;
+	char str_index[LENGTH_FOR_SNPRINTF];
 
-#if defined(CONFIG_IMGSENSOR_MAIN)  || \
-		defined(CONFIG_IMGSENSOR_SUB)   || \
-		defined(CONFIG_IMGSENSOR_MAIN2) || \
-		defined(CONFIG_IMGSENSOR_SUB2)  || \
-		defined(CONFIG_IMGSENSOR_MAIN3)
+	PK_DBG("sensor_idx %d, power %d curr_sensor_name %s, enable list %s\n",
+		sensor_idx,
+		pwr_status,
+		curr_sensor_name,
+		phw->enable_sensor_by_index[sensor_idx] == NULL
+		? "NULL"
+		: phw->enable_sensor_by_index[sensor_idx]);
 
-	char *pcustomize_sensor = NULL;
-
-	switch (sensor_idx) {
-	case IMGSENSOR_SENSOR_IDX_MAIN:
-		pcustomize_sensor = IMGSENSOR_STRINGIZE(CONFIG_IMGSENSOR_MAIN);
-		break;
-	case IMGSENSOR_SENSOR_IDX_SUB:
-		pcustomize_sensor = IMGSENSOR_STRINGIZE(CONFIG_IMGSENSOR_SUB);
-		break;
-	case IMGSENSOR_SENSOR_IDX_MAIN2:
-		pcustomize_sensor = IMGSENSOR_STRINGIZE(CONFIG_IMGSENSOR_MAIN2);
-		break;
-	case IMGSENSOR_SENSOR_IDX_SUB2:
-		pcustomize_sensor = IMGSENSOR_STRINGIZE(CONFIG_IMGSENSOR_SUB2);
-		break;
-	case IMGSENSOR_SENSOR_IDX_MAIN3:
-		pcustomize_sensor = IMGSENSOR_STRINGIZE(CONFIG_IMGSENSOR_MAIN3);
-		break;
-	default:
-		break;
-	}
-
-	if (strlen(pcustomize_sensor) > 2 &&
-		!strstr(pcustomize_sensor, curr_sensor_name))
+	if (phw->enable_sensor_by_index[sensor_idx] &&
+	!strstr(phw->enable_sensor_by_index[sensor_idx], curr_sensor_name))
 		return IMGSENSOR_RETURN_ERROR;
-#endif
-
-	PK_DBG("sensor_idx %d, power %d curr_sensor_name %s\n",
-		sensor_idx, pwr_status,
-		curr_sensor_name);
 
 
+	// XIAOMI: libin16 add --start
 	if (NULL != strstr("ov8856", curr_sensor_name)) {
 		if (pwr_status == IMGSENSOR_HW_POWER_STATUS_ON)
 			pmic_config_interface(PMIC_RG_BUCK_VS2_VOTER_EN_SET_ADDR, 0x1,
@@ -237,14 +237,14 @@ enum IMGSENSOR_RETURN imgsensor_hw_power(
 			pmic_config_interface(PMIC_RG_BUCK_VS2_VOTER_EN_CLR_ADDR, 0x1,
 				PMIC_RG_BUCK_VS2_VOTER_EN_CLR_MASK, PMIC_RG_BUCK_VS2_VOTER_EN_CLR_SHIFT);
 	}
-
+	// XIAOMI: libin16 add --end
 
 	imgsensor_hw_power_sequence(
 			phw,
 			sensor_idx,
 			pwr_status,
 			platform_power_sequence,
-			imgsensor_sensor_idx_name[sensor_idx]);
+			str_index);
 
 	imgsensor_hw_power_sequence(
 			phw,

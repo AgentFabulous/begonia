@@ -621,7 +621,6 @@ static struct ISP_RAW_INT_STATUS g_ISPIntStatus_SMI[ISP_IRQ_TYPE_AMOUNT];
 /* ISP_CAM_A_IDX-ISP_CAM_C_IDX, each has 13 CQ thread. */
 static unsigned int g_cqBaseAddr[ISP_CAM_C_IDX+1][13] = { { 0 } };
 static unsigned int g_cqDoneStatus[ISP_CAM_C_IDX+1] = {0};
-static union FBC_CTRL_1 g_fbc_ctrl2[ISP_CAM_C_IDX+1][_cam_max_];
 
 static unsigned int g_DmaErr_CAM[ISP_IRQ_TYPE_AMOUNT][_cam_max_] = {{0} };
 
@@ -1737,8 +1736,8 @@ static int ISP_ReadReg(struct ISP_REG_IO_STRUCT *pRegIo)
 	void __iomem *regBase;
 
 	/*  */
-	struct ISP_REG_STRUCT reg;
-	struct ISP_REG_STRUCT *pData = (struct ISP_REG_STRUCT *)pRegIo->pData;
+	struct ISP_REG_STRUCT *pReg = NULL;
+	struct ISP_REG_STRUCT *pTmp = NULL;
 
 	if ((pRegIo->pData == NULL) ||
 		(pRegIo->Count == 0) ||
@@ -1749,7 +1748,27 @@ static int ISP_ReadReg(struct ISP_REG_IO_STRUCT *pRegIo)
 		goto EXIT;
 	}
 
-	switch (pData->module) {
+	pReg = kmalloc((pRegIo->Count) *
+		sizeof(struct ISP_REG_STRUCT), GFP_ATOMIC);
+
+	if (pReg == NULL) {
+		LOG_DBG(
+		"ERROR: kmalloc failed,(process, pid, tgid)=(%s, %d, %d)\n",
+		current->comm,
+		current->pid,
+		current->tgid);
+		Ret = -ENOMEM;
+		goto EXIT;
+	}
+
+	if (copy_from_user(pReg, (void __user *)pRegIo->pData,
+		sizeof(struct ISP_REG_STRUCT) * pRegIo->Count) != 0) {
+		LOG_NOTICE("copy_from_user failed\n");
+		Ret = -EFAULT;
+		goto EXIT;
+	}
+
+	switch (pReg->module) {
 	case ISP_CAM_A_IDX:
 		regBase = ISP_CAM_A_BASE;
 		break;
@@ -1781,7 +1800,7 @@ static int ISP_ReadReg(struct ISP_REG_IO_STRUCT *pRegIo)
 		regBase = ISP_CAM_UNI_BASE;
 		break;
 	default:
-		LOG_NOTICE("Unsupported module(%x)!!!\n", pData->module);
+		LOG_NOTICE("Unsupported module(%x)!!!\n", pReg->module);
 		Ret = -EFAULT;
 		goto EXIT;
 	}
@@ -1791,34 +1810,31 @@ static int ISP_ReadReg(struct ISP_REG_IO_STRUCT *pRegIo)
 	else
 		ispRange = PAGE_SIZE;
 
+	pTmp = pReg;
 	for (i = 0; i < pRegIo->Count; i++) {
-		if (get_user(reg.Addr,
-			(unsigned int *)&pData->Addr) != 0) {
-			LOG_NOTICE("get_user failed\n");
-			Ret = -EFAULT;
-			goto EXIT;
-		}
-
-		if ((regBase + reg.Addr) <
+		if ((regBase + pTmp->Addr) <
 			(regBase + ispRange)) {
-			reg.Val = ISP_RD32(regBase + reg.Addr);
+			pTmp->Val = ISP_RD32(regBase + pTmp->Addr);
 		} else {
 			LOG_NOTICE("Wrong address(0x%lx)\n",
-				(unsigned long)(regBase + reg.Addr));
-			reg.Val = 0;
+				(unsigned long)(regBase + pTmp->Addr));
+			pTmp->Val = 0;
 		}
-
-		if (put_user(reg.Val,
-			(unsigned int *) &(pData->Val)) != 0) {
-			LOG_NOTICE("put_user failed\n");
-			Ret = -EFAULT;
-			goto EXIT;
-		}
-		pData++;
+		pTmp++;
 		/*  */
 	}
 	/*  */
+
+	if (copy_to_user((void __user *)pRegIo->pData, pReg,
+		sizeof(struct ISP_REG_STRUCT) * pRegIo->Count) != 0) {
+		LOG_NOTICE("copy to user fail");
+		Ret = -EFAULT;
+	}
 EXIT:
+	if (pReg != NULL) {
+		kfree(pReg);
+		pReg = NULL;
+	}
 	return Ret;
 }
 
@@ -2229,12 +2245,12 @@ static int ISP_REGISTER_IRQ_USERKEY(char *userName)
 	int length = 0;
 
 	if (userName == NULL) {
-		pr_err("userName is NULL\n");
+		LOG_NOTICE("userName is NULL\n");
 	} else {
 		/* get UserName from user space */
 		length = strnlen(userName, USERKEY_STR_LEN);
 		if (length == 0) {
-			pr_err("userName address is not valid\n");
+			LOG_NOTICE("userName address is not valid\n");
 			return key;
 		}
 
@@ -2341,6 +2357,10 @@ static int ISP_FLUSH_IRQ(struct ISP_WAIT_IRQ_STRUCT *irqinfo)
 		irqinfo->EventInfo.Status;
 	spin_unlock_irqrestore(&(IspInfo.SpinLockIrq[irqinfo->Type]), flags);
 
+	LOG_INF("FLUSH_IRQ: IrqInfo.Status=0x%x",
+		IspInfo.IrqInfo.Status[irqinfo->Type][
+		irqinfo->EventInfo.St_type][
+		irqinfo->EventInfo.UserKey]);
 	/* 2. force to wake up the user that are waiting for that signal */
 	if (ISP_CheckUseCamWaitQ(irqinfo->Type,
 		irqinfo->EventInfo.St_type,
@@ -2597,17 +2617,20 @@ static int ISP_WaitIrq(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 			goto NON_CLEAR_WAIT;
 		}
 	}
-#ifdef ENABLE_WAITIRQ_LOG
-	LOG_INF("%s,%s", "before wait: Clear(%d) Type(%d) StType(%d)",
-		" Sts(0x%08X) WaitSts(0x%08X) Timeout(%d) userKey(%d)\n",
-		WaitIrq->EventInfo.Clear,
-		WaitIrq->Type,
-		WaitIrq->EventInfo.St_type,
-		irqStatus,
-		WaitIrq->EventInfo.Status,
-		WaitIrq->EventInfo.Timeout,
-		WaitIrq->EventInfo.UserKey);
-#endif
+//#ifdef ENABLE_WAITIRQ_LOG
+	if (WaitIrq->EventInfo.UserKey == 1) {
+		LOG_INF("Before wait: C:%d T:%d StT:%d Sts:0x%08X\n",
+			WaitIrq->EventInfo.Clear,
+			WaitIrq->Type,
+			WaitIrq->EventInfo.St_type,
+			irqStatus);
+
+		LOG_INF("WSts:0x%08X Timeout:%d key:%d\n",
+			WaitIrq->EventInfo.Status,
+			WaitIrq->EventInfo.Timeout,
+			WaitIrq->EventInfo.UserKey);
+	}
+//#endif
 	/* 2. start to wait signal */
 	if (log_on)
 		LOG_NOTICE("+ start to wait signal\n");
@@ -2704,7 +2727,7 @@ static int ISP_WaitIrq(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 		Ret = -EFAULT;
 		goto EXIT;
 	}
-#ifdef ENABLE_WAITIRQ_LOG
+//#ifdef ENABLE_WAITIRQ_LOG
 	else {
 		/* Store irqinfo status in here to
 		 * redeuce time of spin_lock_irqsave
@@ -2720,17 +2743,19 @@ static int ISP_WaitIrq(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 		spin_unlock_irqrestore(&(IspInfo.SpinLockIrq[
 			WaitIrq->Type]), flags);
 
-		LOG_INF(
-		"Done WaitIrq Clear(%d) Type(%d) StType(%d) Status(0x%08X) WaitStatus(0x%08X) Timeout(%d) key(%d)\n",
-		WaitIrq->EventInfo.Clear,
-		WaitIrq->Type,
-		WaitIrq->EventInfo.St_type,
-		irqStatus,
-		WaitIrq->EventInfo.Status,
-		WaitIrq->EventInfo.Timeout,
-		WaitIrq->EventInfo.UserKey);
+		if (WaitIrq->EventInfo.UserKey == 1) {
+			LOG_INF("Done WaitIrq Clear(%d) Type(%d) StType(%d)\n",
+				WaitIrq->EventInfo.Clear,
+				WaitIrq->Type,
+				WaitIrq->EventInfo.St_type);
+			LOG_INF("Sts(0x%08X)WStatus(0x%08X)Time(%d)key(%d)\n",
+				irqStatus,
+				WaitIrq->EventInfo.Status,
+				WaitIrq->EventInfo.Timeout,
+				WaitIrq->EventInfo.UserKey);
+		}
 	}
-#endif
+//#endif
 
 NON_CLEAR_WAIT:
 	/* 3. get interrupt and update time related
@@ -2911,6 +2936,8 @@ EXIT:
 		IspInfo.SpinLockIrq[
 			WaitIrq->Type]), flags);
 
+	if (WaitIrq->EventInfo.UserKey == 1)
+		LOG_INF("ret = 0x%x\n", Ret);
 
 	return Ret;
 }
@@ -8312,142 +8339,37 @@ static void ISP_RecordCQAddr(enum ISP_DEV_NODE_ENUM regModule)
 			g_cqBaseAddr[i][12] = ISP_RD32(
 				CAM_REG_CQ_THR12_BASEADDR(i));
 }
-static void Set_CQ_immediate(unsigned int tmp_module)
+
+unsigned int CQ_Recover(unsigned int ErrStatus,
+	enum ISP_IRQ_TYPE_ENUM irg_module)
 {
-	union CAMCQ_CQ_CTL_ cq_ctrl;
-
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR0_CTL(tmp_module));
-
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
-		ISP_WR32(CAM_REG_CQ_THR0_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR1_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
-		ISP_WR32(CAM_REG_CQ_THR1_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR4_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
-		ISP_WR32(CAM_REG_CQ_THR4_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR5_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
-		ISP_WR32(CAM_REG_CQ_THR5_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR7_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
-		ISP_WR32(CAM_REG_CQ_THR7_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR8_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
-		ISP_WR32(CAM_REG_CQ_THR8_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR10_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
-		ISP_WR32(CAM_REG_CQ_THR10_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR12_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
-		ISP_WR32(CAM_REG_CQ_THR12_CTL(tmp_module), cq_ctrl.Raw);
-	}
-}
-
-static void Set_CQ_continuous(unsigned int tmp_module)
-{
-	union CAMCQ_CQ_CTL_ cq_ctrl;
-
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR0_CTL(tmp_module));
-
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
-		ISP_WR32(CAM_REG_CQ_THR0_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR1_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
-		ISP_WR32(CAM_REG_CQ_THR1_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR4_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
-		ISP_WR32(CAM_REG_CQ_THR4_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR5_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
-		ISP_WR32(CAM_REG_CQ_THR5_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR7_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
-		ISP_WR32(CAM_REG_CQ_THR7_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR8_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
-		ISP_WR32(CAM_REG_CQ_THR8_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR10_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
-		ISP_WR32(CAM_REG_CQ_THR10_CTL(tmp_module), cq_ctrl.Raw);
-	}
-	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR12_CTL(tmp_module));
-	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
-		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
-		ISP_WR32(CAM_REG_CQ_THR12_CTL(tmp_module), cq_ctrl.Raw);
-	}
-}
-
-static int CQ_Recover_final(unsigned int reg_module,
-unsigned int *reg_module_array, unsigned int reg_module_count)
-{
-	unsigned int i = 0;
-	unsigned int tmp_module = ISP_CAM_A_IDX;
-
-	/* 10. enable double buffer */
-	for (i = 0; i < reg_module_count; i++) {
-		tmp_module = reg_module_array[i];
-		ISP_WR32(CAM_REG_CTL_MISC(tmp_module),
-			(ISP_RD32(CAM_REG_CTL_MISC(tmp_module)) | 0x10));
-		LOG_NOTICE("en double buf CAM%d for CQ recover", tmp_module);
-	}
-	/* 11. enable TG CMOS & viewFinder */
-	ISP_WR32(CAM_REG_TG_SEN_MODE(reg_module),
-		(ISP_RD32(CAM_REG_TG_SEN_MODE(reg_module)) | 0x1));
-	ISP_WR32(CAM_REG_TG_VF_CON(reg_module),
-		(ISP_RD32(CAM_REG_TG_VF_CON(reg_module)) | 0x1));
-	LOG_NOTICE("turn on TG VF, CMOS to do CQ recover 0x%x, 0x%x",
-		(unsigned int)ISP_RD32(CAM_REG_TG_SEN_MODE(reg_module)),
-		(unsigned int)ISP_RD32(CAM_REG_TG_VF_CON(reg_module)));
-
-	return 0;
-}
-
-unsigned int CQ_Recover_start(enum ISP_IRQ_TYPE_ENUM irg_module,
-unsigned int *reg_module, unsigned int *reg_module_array,
-unsigned int *reg_module_count)
-{
-		union CAMCTL_TWIN_STATUS_ twinStatus;
+	if (ErrStatus & CQ_VS_ERR_ST) {
+		unsigned int val;
 		unsigned int  DmaEnStatus[ISP_CAM_C_IDX+1][_cam_max_];
+		union FBC_CTRL_1 fbc_ctrl2[ISP_CAM_C_IDX+1][_cam_max_];
+		union CAMCQ_CQ_CTL_ cq_ctrl;
+		union CAMCTL_START_ en_ctlStart;
+		union CAMCTL_RAW_INT2_STATUS_ DmaStatus2;
+		union CAMCTL_TWIN_STATUS_ twinStatus;
+		unsigned long long  sec = 0, usec = 0, m_sec = 0, m_usec = 0;
+		unsigned long long  timeoutMs = 5000000;/*5ms*/
+		unsigned int reg_module = ISP_CAM_A_IDX;
+		unsigned int reg_module_array[3];
+		unsigned int reg_module_count;
 		unsigned int i = 0, tmp_module = 0;
+		unsigned int cq_done = 0;
+		int reset_count = 100;
+		bool ret = MTRUE;
 
 		switch (irg_module) {
 		case ISP_IRQ_TYPE_INT_CAM_A_ST:
-			*reg_module = ISP_CAM_A_IDX;
+			reg_module = ISP_CAM_A_IDX;
 			break;
 		case ISP_IRQ_TYPE_INT_CAM_B_ST:
-			*reg_module = ISP_CAM_B_IDX;
+			reg_module = ISP_CAM_B_IDX;
 			break;
 		case ISP_IRQ_TYPE_INT_CAM_C_ST:
-			*reg_module = ISP_CAM_C_IDX;
+			reg_module = ISP_CAM_C_IDX;
 			break;
 		default:
 			LOG_NOTICE("Wrong IRQ module: %d",
@@ -8455,8 +8377,8 @@ unsigned int *reg_module_count)
 			break;
 		}
 		LOG_NOTICE("+CQ recover");
-		reg_module_array[0] = *reg_module;
-		twinStatus.Raw = ISP_RD32(CAM_REG_CTL_TWIN_STATUS(*reg_module));
+		reg_module_array[0] = reg_module;
+		twinStatus.Raw = ISP_RD32(CAM_REG_CTL_TWIN_STATUS(reg_module));
 
 		if (twinStatus.Bits.TWIN_EN == MTRUE) {
 			if (((reg_module_array[0] == ISP_CAM_A_IDX) &&
@@ -8465,7 +8387,7 @@ unsigned int *reg_module_count)
 				(twinStatus.Bits.MASTER_MODULE != CAM_B)) ||
 				((reg_module_array[0] == ISP_CAM_C_IDX) &&
 				(twinStatus.Bits.MASTER_MODULE != CAM_C)))
-				return -1;
+				goto EXIT_CQ_RECOVER;
 			for (i = 0; i < twinStatus.Bits.SLAVE_CAM_NUM; i++) {
 				if (i == 0) {
 					switch (twinStatus.Bits.TWIN_MODULE) {
@@ -8481,7 +8403,7 @@ unsigned int *reg_module_count)
 					default:
 					LOG_NOTICE(
 					"twin module is invalid! recover fail");
-					return -1;
+					goto EXIT_CQ_RECOVER;
 					}
 				} else if (i == 1) {
 					switch (twinStatus.Bits.TRIPLE_MODULE) {
@@ -8497,113 +8419,116 @@ unsigned int *reg_module_count)
 					default:
 					LOG_NOTICE(
 					"twin module is invalid! recover fail");
-					return -1;
+					goto EXIT_CQ_RECOVER;
 					}
 				}
 			}
-			*reg_module_count = twinStatus.Bits.SLAVE_CAM_NUM + 1;
+			reg_module_count = twinStatus.Bits.SLAVE_CAM_NUM + 1;
 		} else {
-			*reg_module_count = 1;
+			reg_module_count = 1;
 		}
+		val = ISP_RD32(CAM_REG_DCM_STATUS(reg_module));
 
-		for (i = 0; i < *reg_module_count; i++) {
+		//if ((val & 0x100) && (!(val & 0x80)))
+		/**/
+		for (i = 0; i < reg_module_count; i++) {
 			tmp_module = reg_module_array[i];
 			ISP_GetDmaPortsStatus(tmp_module,
 				&DmaEnStatus[tmp_module][0]);
 			if (DmaEnStatus[tmp_module][_aao_]) {
-				g_fbc_ctrl2[tmp_module][_aao_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_aao_].Raw = ISP_RD32(
 					CAM_REG_FBC_AAO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_aao_].Raw = 0;
+				fbc_ctrl2[tmp_module][_aao_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_afo_]) {
-				g_fbc_ctrl2[tmp_module][_afo_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_afo_].Raw = ISP_RD32(
 					CAM_REG_FBC_AFO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_afo_].Raw = 0;
+				fbc_ctrl2[tmp_module][_afo_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_flko_]) {
-				g_fbc_ctrl2[tmp_module][_flko_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_flko_].Raw = ISP_RD32(
 					CAM_REG_FBC_FLKO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_flko_].Raw = 0;
+				fbc_ctrl2[tmp_module][_flko_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_pdo_]) {
-				g_fbc_ctrl2[tmp_module][_pdo_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_pdo_].Raw = ISP_RD32(
 					CAM_REG_FBC_PDO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_pdo_].Raw = 0;
+				fbc_ctrl2[tmp_module][_pdo_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_pso_]) {
-				g_fbc_ctrl2[tmp_module][_pso_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_pso_].Raw = ISP_RD32(
 					CAM_REG_FBC_PSO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_pso_].Raw = 0;
+				fbc_ctrl2[tmp_module][_pso_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_imgo_]) {
-				g_fbc_ctrl2[tmp_module][_imgo_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_imgo_].Raw = ISP_RD32(
 					CAM_REG_FBC_IMGO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_imgo_].Raw = 0;
+				fbc_ctrl2[tmp_module][_imgo_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_rrzo_]) {
-				g_fbc_ctrl2[tmp_module][_rrzo_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_rrzo_].Raw = ISP_RD32(
 					CAM_REG_FBC_RRZO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_rrzo_].Raw = 0;
+				fbc_ctrl2[tmp_module][_rrzo_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_ufeo_]) {
-				g_fbc_ctrl2[tmp_module][_ufeo_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_ufeo_].Raw = ISP_RD32(
 					CAM_REG_FBC_UFEO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_ufeo_].Raw = 0;
+				fbc_ctrl2[tmp_module][_ufeo_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_ufgo_]) {
-				g_fbc_ctrl2[tmp_module][_ufgo_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_ufgo_].Raw = ISP_RD32(
 					CAM_REG_FBC_UFGO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_ufgo_].Raw = 0;
+				fbc_ctrl2[tmp_module][_ufgo_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_rsso_]) {
-				g_fbc_ctrl2[tmp_module][_rsso_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_rsso_].Raw = ISP_RD32(
 					CAM_REG_FBC_RSSO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_rsso_].Raw = 0;
+				fbc_ctrl2[tmp_module][_rsso_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_lmvo_]) {
-				g_fbc_ctrl2[tmp_module][_lmvo_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_lmvo_].Raw = ISP_RD32(
 					CAM_REG_FBC_LMVO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_lmvo_].Raw = 0;
+				fbc_ctrl2[tmp_module][_lmvo_].Raw = 0;
 			}
 
 			if (DmaEnStatus[tmp_module][_lcso_]) {
-				g_fbc_ctrl2[tmp_module][_lcso_].Raw = ISP_RD32(
+				fbc_ctrl2[tmp_module][_lcso_].Raw = ISP_RD32(
 					CAM_REG_FBC_LCSO_CTL2(tmp_module));
 			} else {
-				g_fbc_ctrl2[tmp_module][_lcso_].Raw = 0;
+				fbc_ctrl2[tmp_module][_lcso_].Raw = 0;
 			}
 		}
 
 	/* 2. turn off TG viewFinder, CMOS */
-	ISP_WR32(CAM_REG_TG_VF_CON(*reg_module),
-		(ISP_RD32(CAM_REG_TG_VF_CON(*reg_module)) & 0xFFFFFFFE));
-	ISP_WR32(CAM_REG_TG_SEN_MODE(*reg_module),
-		(ISP_RD32(CAM_REG_TG_SEN_MODE(*reg_module)) & 0xFFFFFFFE));
+	ISP_WR32(CAM_REG_TG_VF_CON(reg_module),
+		(ISP_RD32(CAM_REG_TG_VF_CON(reg_module)) & 0xFFFFFFFE));
+	ISP_WR32(CAM_REG_TG_SEN_MODE(reg_module),
+		(ISP_RD32(CAM_REG_TG_SEN_MODE(reg_module)) & 0xFFFFFFFE));
 	LOG_NOTICE("disable viewfinder & cmos to do CQ recover");
 
 	/* 3. disable double buffer */
-	for (i = 0; i < *reg_module_count; i++) {
+	for (i = 0; i < reg_module_count; i++) {
 		tmp_module = reg_module_array[i];
 		ISP_WR32(CAM_REG_CTL_MISC(tmp_module),
 			(ISP_RD32(CAM_REG_CTL_MISC(tmp_module)) & 0xFFFFFFEF));
@@ -8613,36 +8538,20 @@ unsigned int *reg_module_count)
 
 	LOG_NOTICE("start HW recover due to CQ over Vsync ...\n");
 	LOG_NOTICE("fbc:imgo:0x%x,rrzo:0x%x,ufeo:0x%x, ufgo:0x%x\n",
-			g_fbc_ctrl2[*reg_module][_imgo_].Raw,
-			g_fbc_ctrl2[*reg_module][_rrzo_].Raw,
-			g_fbc_ctrl2[*reg_module][_ufeo_].Raw,
-			g_fbc_ctrl2[*reg_module][_ufgo_].Raw);
+			fbc_ctrl2[reg_module][_imgo_].Raw,
+			fbc_ctrl2[reg_module][_rrzo_].Raw,
+			fbc_ctrl2[reg_module][_ufeo_].Raw,
+			fbc_ctrl2[reg_module][_ufgo_].Raw);
 	LOG_NOTICE("rsso:0x%x,lmvo:0x%x,lcso:0x%x\n",
-			g_fbc_ctrl2[*reg_module][_rsso_].Raw,
-			g_fbc_ctrl2[*reg_module][_lmvo_].Raw,
-			g_fbc_ctrl2[*reg_module][_lcso_].Raw);
+			fbc_ctrl2[reg_module][_rsso_].Raw,
+			fbc_ctrl2[reg_module][_lmvo_].Raw,
+			fbc_ctrl2[reg_module][_lcso_].Raw);
 	LOG_NOTICE("fbc:aao:0x%x,afo:0x%x,flko:0x%x,pdo:0x%x,pso:0x%x\n",
-			g_fbc_ctrl2[*reg_module][_aao_].Raw,
-			g_fbc_ctrl2[*reg_module][_afo_].Raw,
-			g_fbc_ctrl2[*reg_module][_flko_].Raw,
-			g_fbc_ctrl2[*reg_module][_pdo_].Raw,
-			g_fbc_ctrl2[*reg_module][_pso_].Raw);
-	return 0;
-}
-
-unsigned int CQ_Recover_middle(unsigned int reg_module,
-unsigned int *reg_module_array, unsigned int reg_module_count)
-{
-	union CAMCQ_CQ_CTL_ cq_ctrl;
-	union CAMCTL_START_ en_ctlStart;
-	union CAMCTL_RAW_INT2_STATUS_ DmaStatus2;
-	unsigned int  DmaEnStatus[ISP_CAM_C_IDX+1][_cam_max_];
-	unsigned long long  sec = 0, usec = 0, m_sec = 0, m_usec = 0;
-	unsigned long long  timeoutMs = 5000;/*5ms*/
-	unsigned int i = 0, tmp_module = 0;
-	unsigned int cq_done = 0;
-	int reset_count = 100;
-	bool ret = MTRUE;
+			fbc_ctrl2[reg_module][_aao_].Raw,
+			fbc_ctrl2[reg_module][_afo_].Raw,
+			fbc_ctrl2[reg_module][_flko_].Raw,
+			fbc_ctrl2[reg_module][_pdo_].Raw,
+			fbc_ctrl2[reg_module][_pso_].Raw);
 
 	do {
 		/* Start Reset Flow */
@@ -8662,67 +8571,65 @@ unsigned int *reg_module_array, unsigned int reg_module_count)
 
 		for (i = 0; i < reg_module_count; i++) {
 			tmp_module = reg_module_array[i];
-			ISP_GetDmaPortsStatus(tmp_module,
-				&DmaEnStatus[tmp_module][0]);
 			/**/
 			if (DmaEnStatus[tmp_module][_aao_]) {
 				ISP_WR32(CAM_REG_FBC_AAO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_aao_].Raw);
+				fbc_ctrl2[tmp_module][_aao_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_afo_]) {
 				ISP_WR32(CAM_REG_FBC_AFO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_afo_].Raw);
+				fbc_ctrl2[tmp_module][_afo_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_flko_]) {
 				ISP_WR32(CAM_REG_FBC_FLKO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_flko_].Raw);
+				fbc_ctrl2[tmp_module][_flko_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_pdo_]) {
 				ISP_WR32(CAM_REG_FBC_PDO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_pdo_].Raw);
+				fbc_ctrl2[tmp_module][_pdo_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_pso_]) {
 				ISP_WR32(CAM_REG_FBC_PSO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_pso_].Raw);
+				fbc_ctrl2[tmp_module][_pso_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_imgo_]) {
 				ISP_WR32(CAM_REG_FBC_IMGO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_imgo_].Raw);
+				fbc_ctrl2[tmp_module][_imgo_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_rrzo_]) {
 				ISP_WR32(CAM_REG_FBC_RRZO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_rrzo_].Raw);
+				fbc_ctrl2[tmp_module][_rrzo_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_ufeo_]) {
 				ISP_WR32(CAM_REG_FBC_UFEO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_ufeo_].Raw);
+				fbc_ctrl2[tmp_module][_ufeo_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_ufgo_]) {
 				ISP_WR32(CAM_REG_FBC_UFGO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_ufgo_].Raw);
+				fbc_ctrl2[tmp_module][_ufgo_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_rsso_]) {
 				ISP_WR32(CAM_REG_FBC_RSSO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_rsso_].Raw);
+				fbc_ctrl2[tmp_module][_rsso_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_lmvo_]) {
 				ISP_WR32(CAM_REG_FBC_LMVO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_lmvo_].Raw);
+				fbc_ctrl2[tmp_module][_lmvo_].Raw);
 			}
 
 			if (DmaEnStatus[tmp_module][_lcso_]) {
 				ISP_WR32(CAM_REG_FBC_LCSO_CTL2(tmp_module),
-				g_fbc_ctrl2[tmp_module][_lcso_].Raw);
+				fbc_ctrl2[tmp_module][_lcso_].Raw);
 			}
 		}
 
@@ -8801,7 +8708,47 @@ unsigned int *reg_module_array, unsigned int reg_module_count)
 	}
 
 	/* 7. set CQ immediate mode */
-	Set_CQ_immediate(tmp_module);
+
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR0_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
+		ISP_WR32(CAM_REG_CQ_THR0_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR1_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
+		ISP_WR32(CAM_REG_CQ_THR1_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR4_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
+		ISP_WR32(CAM_REG_CQ_THR4_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR5_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
+		ISP_WR32(CAM_REG_CQ_THR5_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR7_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
+		ISP_WR32(CAM_REG_CQ_THR7_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR8_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
+		ISP_WR32(CAM_REG_CQ_THR8_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR10_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
+		ISP_WR32(CAM_REG_CQ_THR10_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR12_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x1;
+		ISP_WR32(CAM_REG_CQ_THR12_CTL(tmp_module), cq_ctrl.Raw);
+	}
 
 	/* 8. CQ immediate trigger */
 
@@ -9102,8 +9049,66 @@ unsigned int *reg_module_array, unsigned int reg_module_count)
 
 
 	/* 9. set CQ continuous mode */
-	Set_CQ_continuous(tmp_module);
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR0_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
+		ISP_WR32(CAM_REG_CQ_THR0_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR1_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
+		ISP_WR32(CAM_REG_CQ_THR1_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR4_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
+		ISP_WR32(CAM_REG_CQ_THR4_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR5_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
+		ISP_WR32(CAM_REG_CQ_THR5_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR7_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
+		ISP_WR32(CAM_REG_CQ_THR7_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR8_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
+		ISP_WR32(CAM_REG_CQ_THR8_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR10_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
+		ISP_WR32(CAM_REG_CQ_THR10_CTL(tmp_module), cq_ctrl.Raw);
+	}
+	cq_ctrl.Raw = (unsigned int)ISP_RD32(CAM_REG_CQ_THR12_CTL(tmp_module));
+	if (cq_ctrl.Bits.CAMCQ_CQ_EN == 0x1) {
+		cq_ctrl.Bits.CAMCQ_CQ_MODE = 0x2;
+		ISP_WR32(CAM_REG_CQ_THR12_CTL(tmp_module), cq_ctrl.Raw);
+	}
 
+	/* 10. enable double buffer */
+	for (i = 0; i < reg_module_count; i++) {
+		tmp_module = reg_module_array[i];
+		ISP_WR32(CAM_REG_CTL_MISC(tmp_module),
+			(ISP_RD32(CAM_REG_CTL_MISC(tmp_module)) | 0x10));
+		LOG_NOTICE("en double buf CAM%d for CQ recover", tmp_module);
+	}
+	/* 11. enable TG CMOS & viewFinder */
+	ISP_WR32(CAM_REG_TG_SEN_MODE(reg_module),
+		(ISP_RD32(CAM_REG_TG_SEN_MODE(reg_module)) | 0x1));
+	ISP_WR32(CAM_REG_TG_VF_CON(reg_module),
+		(ISP_RD32(CAM_REG_TG_VF_CON(reg_module)) | 0x1));
+	LOG_NOTICE("turn on TG VF, CMOS to do CQ recover 0x%x, 0x%x",
+		(unsigned int)ISP_RD32(CAM_REG_TG_SEN_MODE(reg_module)),
+		(unsigned int)ISP_RD32(CAM_REG_TG_VF_CON(reg_module)));
+EXIT_CQ_RECOVER:
+		LOG_NOTICE("-CQ recover");
+		/**/
+	}
 	return 0;
 }
 #endif
@@ -9630,28 +9635,8 @@ static void SMI_INFO_DUMP(enum ISP_IRQ_TYPE_ENUM irq_module)
 		if (g_ISPIntStatus_SMI[irq_module].ispIntErr &
 			CQ_VS_ERR_ST) {
 #if Sylvia_WAM_CQ_ERR
-			unsigned int reg_module_array[3];
-			unsigned int reg_module_count;
-			unsigned int reg_module = ISP_CAM_A_IDX;
-			unsigned int ret = 0;
-			/**/
-			if (g_ISPIntStatus_SMI[irq_module].ispIntErr &
-				CQ_VS_ERR_ST) {
-				ret = CQ_Recover_start(irq_module, &reg_module,
-					reg_module_array, &reg_module_count);
-				if (ret == -1)
-					goto EXIT_CQ_RECOVER;
-				ret = CQ_Recover_middle(reg_module,
-					reg_module_array, reg_module_count);
-				if (ret == -1)
-					goto EXIT_CQ_RECOVER;
-				ret = CQ_Recover_final(reg_module,
-					reg_module_array, reg_module_count);
-				if (ret == -1)
-					goto EXIT_CQ_RECOVER;
-EXIT_CQ_RECOVER:
-				LOG_NOTICE("-CQ recover");
-			}
+			CQ_Recover(g_ISPIntStatus_SMI[irq_module].ispIntErr,
+				irq_module);
 #endif
 			LOG_NOTICE("ERR:SMI_DUMP by module:%d\n", irq_module);
 			smi_debug_bus_hang_detect(false, ISP_DEV_NAME);

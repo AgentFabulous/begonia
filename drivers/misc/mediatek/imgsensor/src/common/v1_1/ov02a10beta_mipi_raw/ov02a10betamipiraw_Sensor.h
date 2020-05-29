@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018-2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -102,8 +101,8 @@ struct imgsensor_info_struct {
 
 	/*slim video for VT scenario relative information*/
 	struct imgsensor_mode_struct slim_video;
-	struct imgsensor_mode_struct custom1;
-	struct imgsensor_mode_struct custom2;
+	struct imgsensor_mode_struct custom1;	//custom1 scenario relative information
+	struct imgsensor_mode_struct custom2;	//custom2 scenario relative information
 	kal_uint8  ae_shut_delay_frame;	/*shutter delay frame for AE cycle*/
 
 	/*sensor gain delay frame for AE cycle*/

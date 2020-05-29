@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -76,7 +75,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 2592, /*//0x0A20*/
 		.grabwindow_height = 1940, /*//0x0794*/
-
+		//grabwindow_height should be 16's N times
 		.mipi_data_lp2hs_settle_dc = 0x22,
 		.max_framerate = 300,
 		.mipi_pixel_rate = 240000000,
@@ -89,7 +88,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 2592, /*//0x0A20*/
 		.grabwindow_height = 1940, /*//0x0794*/
-
+		//grabwindow_height should be 16's N times*/
 		.mipi_data_lp2hs_settle_dc = 0x22,
 		.max_framerate = 300,
 		.mipi_pixel_rate = 240000000,
@@ -126,7 +125,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 2592, /*//0x0A20*/
 		.grabwindow_height = 1940, /*//0x0794*/
-
+		//grabwindow_height should be 16's N times
 		.mipi_data_lp2hs_settle_dc = 0x22,
 		.max_framerate = 300,
 		.mipi_pixel_rate = 240000000,
@@ -198,14 +197,14 @@ static struct imgsensor_info_struct imgsensor_info = {
 	/* 0,MIPI_SETTLEDELAY_AUTO; 1,MIPI_SETTLEDELAY_MANNUAL */
 	.mipi_settle_delay_mode = 1,
 	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_4CELL_BAYER_Gb,
-
+	//.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_Gr,
 	.mclk = 24,	/* mclk value, suggest 24 or 26 for 24Mhz or 26Mhz */
 	.mipi_lane_num = SENSOR_MIPI_4_LANE,
-
+	//.i2c_speed = 1000, /*support 1MHz write*/
 	/* record sensor support all write id addr,
 	 * only supprt 4 must end with 0xff
 	 */
-
+	//.i2c_addr_table = { 0x20, 0x5a, 0xff},
 	.i2c_addr_table = { 0x5a, 0xff},
 };
 
@@ -246,7 +245,7 @@ static struct imgsensor_struct imgsensor = {
 
 };
 
-
+//int chip_id;
 /* VC_Num, VC_PixelNum, ModeSelect, EXPO_Ratio, ODValue, RG_STATSMODE */
 /* VC0_ID, VC0_DataType, VC0_SIZEH, VC0_SIZE,
  * VC1_ID, VC1_DataType, VC1_SIZEH, VC1_SIZEV
@@ -368,7 +367,7 @@ static kal_uint16 read_eeprom_module_id(kal_uint32 addr)
 
 	char pu_send_cmd[2] = { (char)(addr >> 8), (char)(addr & 0xFF) };
 
-	iReadRegI2C(pu_send_cmd, 2, (u8 *) &get_byte, 1, 0xA4);
+	iReadRegI2C(pu_send_cmd, 2, (u8 *) &get_byte, 1, 0xA4);//Sunny
 
 	return get_byte;
 }
@@ -1282,7 +1281,7 @@ static kal_uint16 addr_data_pair_init_3t1[] = {
 static void sensor_init(void)
 {
 	/* initial sequence */
-
+	// Convert from : "InitGlobal.sset"
 	LOG_INF("[%s] +", __FUNCTION__);
 
 	write_cmos_sensor(0x6028, 0x4000);
@@ -1656,8 +1655,8 @@ static void normal_video_setting(kal_uint16 currefps)
 	table_write_cmos_sensor(addr_data_pair_video_3t1,
 		sizeof(addr_data_pair_video_3t1) / sizeof(kal_uint16));
 
-
-
+//	table_write_cmos_sensor(addr_data_pair_pre_3t1,
+//		sizeof(addr_data_pair_pre_3t1) / sizeof(kal_uint16));
 
 	LOG_INF("[%s] -", __FUNCTION__);
 }
@@ -1780,7 +1779,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
 	kal_uint8 i = 0;
 	kal_uint8 retry = 2;
-
+//	kal_uint16 sp8spFlag = 0;
 
 	/* sensor have two i2c address 0x6c 0x6d & 0x21 0x20,
 	 *we should detect the module used i2c address
@@ -2536,7 +2535,7 @@ static kal_uint32 get_sensor_temperature(void)
 	return temperature_convert;
 }
 #if 1
-#define FOUR_CELL_SIZE 3072
+#define FOUR_CELL_SIZE 3072//size = 3072 = 0xc00
 static int Is_Read_4Cell;
 static char Four_Cell_Array[FOUR_CELL_SIZE + 2];
 
@@ -2588,8 +2587,8 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id, UINT8 *fe
 	MSDK_SENSOR_REG_INFO_STRUCT *sensor_reg_data =
 		(MSDK_SENSOR_REG_INFO_STRUCT *) feature_para;
 
-
-
+//	LOG_INF("feature_id = %d[%s]\n", feature_id, features[feature_id-SENSOR_FEATURE_START]);
+//	LOG_INF_U("feature_id = %d[%s]\n", feature_id, features[feature_id-SENSOR_FEATURE_START]);
 	switch (feature_id) {
 	case SENSOR_FEATURE_GET_PERIOD:
 		*feature_return_para_16++ = imgsensor.line_length;

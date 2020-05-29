@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -40,8 +40,6 @@
 #include <linux/init.h>
 #include <linux/ktime.h>
 /* ------------------------- */
-
-#include <archcounter_timesync.h>
 
 #include "lens_info.h"
 #include "lens_list.h"
@@ -138,8 +136,6 @@ static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	 LC898217AFB_Release, LC898217AFB_GetFileName, NULL},
 	{1, AFDRV_LC898217AFC, LC898217AFC_SetI2Cclient, LC898217AFC_Ioctl,
 	 LC898217AFC_Release, LC898217AFC_GetFileName, NULL},
-	{1, AFDRV_LC898229AF, LC898229AF_SetI2Cclient, LC898229AF_Ioctl,
-	 LC898229AF_Release, LC898229AF_GetFileName, NULL},
 	{1, AFDRV_LC898122AF, LC898122AF_SetI2Cclient, LC898122AF_Ioctl,
 	 LC898122AF_Release, LC898122AF_GetFileName, NULL},
 	{1, AFDRV_WV511AAF, WV511AAF_SetI2Cclient, WV511AAF_Ioctl,
@@ -183,12 +179,6 @@ void AFRegulatorCtrl(int Stage)
 				#if defined(CONFIG_MACH_MT6765)
 				regVCAMAF =
 					regulator_get(lens_device, "vldo28");
-				#elif defined(CONFIG_MACH_MT6785)
-				if (strncmp(CONFIG_ARCH_MTK_PROJECT,
-					"k85v1", 5) == 0) {
-					regVCAMAF =
-					regulator_get(lens_device, "vcamio");
-				}
 				#else
 				regVCAMAF =
 					regulator_get(lens_device, "vcamaf");
@@ -341,56 +331,6 @@ static long AF_SetMotorName(__user struct stAF_MotorName *pstMotorName)
 	return i4RetValue;
 }
 
-
-static long AF_ControlParam(unsigned long a_u4Param)
-{
-	long i4RetValue = -1;
-	__user struct stAF_CtrlCmd *pCtrlCmd =
-			(__user struct stAF_CtrlCmd *)a_u4Param;
-	struct stAF_CtrlCmd CtrlCmd;
-
-	if (copy_from_user(&CtrlCmd, pCtrlCmd, sizeof(struct stAF_CtrlCmd)))
-		LOG_INF("copy to user failed\n");
-
-	switch (CtrlCmd.i8CmdID) {
-	case CONVERT_CCU_TIMESTAMP:
-		{
-		long long monotonicTime = 0;
-		long long hwTickCnt     = 0;
-
-		hwTickCnt     = CtrlCmd.i8Param[0];
-		monotonicTime = archcounter_timesync_to_monotonic(hwTickCnt);
-		/* ns */
-		CtrlCmd.i8Param[0] = monotonicTime;
-
-		hwTickCnt     = CtrlCmd.i8Param[1];
-		monotonicTime = archcounter_timesync_to_monotonic(hwTickCnt);
-		/* ns */
-		CtrlCmd.i8Param[1] = monotonicTime;
-
-		#if 0
-		hwTickCnt     = arch_counter_get_cntvct(); /* Global timer */
-		monotonicTime = archcounter_timesync_to_monotonic(hwTickCnt);
-		do_div(monotonicTime, 1000); /* ns to us */
-		CtrlCmd.i8Param[1] = monotonicTime;
-		#endif
-		}
-		i4RetValue = 1;
-		break;
-	default:
-		i4RetValue = -1;
-		break;
-	}
-
-	if (i4RetValue > 0) {
-		if (copy_to_user(pCtrlCmd, &CtrlCmd,
-			sizeof(struct stAF_CtrlCmd)))
-			LOG_INF("copy to user failed\n");
-	}
-
-	return i4RetValue;
-}
-
 static inline int64_t getCurNS(void)
 {
 	int64_t ns;
@@ -464,7 +404,7 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 			   sizeof(struct stAF_MotorName)))
 		LOG_INF("copy to user failed when getting motor information\n");
 
-	/* LOG_INF("GETDRVNAME : driver name(%s)\n", stMotorName.uMotorName); */
+	/* LOG_INF("set driver name(%s)\n", stMotorName.uMotorName); */
 
 	for (i = 0; i < MAX_NUM_OF_LENS; i++) {
 		if (g_stAF_DrvList[i].uEnable != 1)
@@ -473,7 +413,7 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 		LOG_INF("Search Motor Name : %s\n", g_stAF_DrvList[i].uDrvName);
 		if (strcmp(stMotorName.uMotorName,
 			   g_stAF_DrvList[i].uDrvName) == 0) {
-			LOG_INF("Motor Name : %s\n", stMotorName.uMotorName);
+			/* LOG_INF("Name : %s\n", stMotorName.uMotorName); */
 			pstAF_CurDrv = &g_stAF_DrvList[i];
 			break;
 		}
@@ -489,8 +429,7 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 			pstAF_CurDrv->pAF_GetFileName(
 					MotorFileName.uMotorName);
 			i4RetValue = 1;
-			LOG_INF("GETDRVNAME : get file name(%s)\n",
-				MotorFileName.uMotorName);
+
 			if (copy_to_user(
 				    pstMotorName, &MotorFileName,
 				    sizeof(struct stAF_MotorName)))
@@ -550,18 +489,12 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 		}
 		break;
 
-	case AFIOC_X_CTRLPARA:
-		if (AF_ControlParam(a_u4Param) <= 0) {
-			if (g_pstAF_CurDrv)
+	default:
+		if (g_pstAF_CurDrv) {
+			if (g_pstAF_CurDrv->pAF_Ioctl)
 				i4RetValue = g_pstAF_CurDrv->pAF_Ioctl(
 					a_pstFile, a_u4Command, a_u4Param);
 		}
-		break;
-
-	default:
-		if (g_pstAF_CurDrv)
-			i4RetValue = g_pstAF_CurDrv->pAF_Ioctl(
-				a_pstFile, a_u4Command, a_u4Param);
 		break;
 	}
 
@@ -601,7 +534,6 @@ static int AF_Open(struct inode *a_pstInode, struct file *a_pstFile)
 	spin_unlock(&g_AF_SpinLock);
 
 #if !defined(CONFIG_MTK_LEGACY)
-	AFRegulatorCtrl(0);
 	AFRegulatorCtrl(1);
 #endif
 
@@ -797,6 +729,10 @@ static int AF_i2c_probe(struct i2c_client *client,
 	}
 
 	spin_lock_init(&g_AF_SpinLock);
+
+#if !defined(CONFIG_MTK_LEGACY)
+	AFRegulatorCtrl(0);
+#endif
 
 	LOG_INF("Attached!!\n");
 

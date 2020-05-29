@@ -1029,9 +1029,11 @@ signed int CmdqRSCHW(struct frame *frame)
 
 
 #if 1
-	cmdqRecCreate(CMDQ_SCENARIO_ISP_RSC, &handle);
+	cmdqRecCreate(CMDQ_SCENARIO_KERNEL_CONFIG_GENERAL, &handle);
 
 	cmdqRecSetEngine(handle, engineFlag);
+
+	cmdqRecReset(handle);
 
 	cmdqRecWrite(handle, RSC_INT_CTL_HW, 0x1, CMDQ_REG_MASK);
 	/* RSC Interrupt read-clear mode */
@@ -1118,9 +1120,10 @@ signed int CmdqRSCHW(struct frame *frame)
 			(w_bvo * h_bvo)) * trig_num * 30 / 1000000;
 	cmdq_task_update_property(handle, &dma_bandwidth, sizeof(unsigned int));
 #endif
-
-	cmdq_task_flush_async_destroy(handle);	/* flush and destry in cmdq*/
-
+	/* non-blocking API, Please  use cmdqRecFlushAsync() */
+	cmdqRecFlushAsync(handle);
+	cmdqRecReset(handle);	/* reset the handle to reuse */
+	cmdqRecDestroy(handle);	/* recycle the memory */
 #endif
 	return 0;
 }
@@ -1398,6 +1401,11 @@ static signed int RSC_ReadReg(struct RSC_REG_IO_STRUCT *pRegIo)
 	/* unsigned int* pData = (unsigned int*)pRegIo->Data; */
 	struct RSC_REG_STRUCT *pData = (struct RSC_REG_STRUCT *) pRegIo->pData;
 
+	if (g_u4EnableClockCount == 0) {
+		LOG_ERR("register access with disabled clock\n");
+		goto EXIT;
+	}
+
 	for (i = 0; i < pRegIo->Count; i++) {
 		if (get_user(reg.Addr, (unsigned int *) &pData->Addr) != 0) {
 			LOG_ERR("get_user failed");
@@ -1491,6 +1499,11 @@ static signed int RSC_WriteReg(struct RSC_REG_IO_STRUCT *pRegIo)
 	if (RSCInfo.DebugMask & RSC_DBG_WRITE_REG)
 		LOG_DBG("Data(0x%p), Count(%d)\n", (pRegIo->pData),
 							(pRegIo->Count));
+
+	if (g_u4EnableClockCount == 0) {
+		LOG_ERR("register access with disabled clock\n");
+		goto EXIT;
+	}
 
 	pData = kmalloc((pRegIo->Count) * sizeof(struct RSC_REG_STRUCT),
 								GFP_ATOMIC);
@@ -2637,7 +2650,7 @@ EXIT:
  ******************************************************************************/
 static signed int RSC_mmap(struct file *pFile, struct vm_area_struct *pVma)
 {
-	long length = 0;
+	unsigned long length = 0;
 	unsigned int pfn = 0x0;
 
 	length = pVma->vm_end - pVma->vm_start;
@@ -2935,8 +2948,6 @@ static signed int RSC_probe(struct platform_device *pDev)
 							cmdq_pm_qos_stop);
 #endif
 
-		seqlock_init(&(rsc_reqs.seqlock));
-
 	}
 
 EXIT:
@@ -3146,7 +3157,7 @@ static struct platform_driver RSCDriver = {
 		}
 };
 
-
+#ifdef RSC_PROCFS
 static int rsc_dump_read(struct seq_file *m, void *v)
 {
 	int i, j;
@@ -3237,7 +3248,7 @@ static const struct file_operations rsc_dump_proc_fops = {
 	.open = proc_rsc_dump_open,
 	.read = seq_read,
 };
-
+#endif
 
 static int rsc_reg_read(struct seq_file *m, void *v)
 {
@@ -3436,9 +3447,11 @@ static signed int __init RSC_Init(void)
 	void *tmp;
 	/* FIX-ME: linux-3.10 procfs API changed */
 	/* use proc_create */
+
+#ifdef RSC_PROCFS
 	struct proc_dir_entry *proc_entry;
 	struct proc_dir_entry *isp_rsc_dir;
-
+#endif
 
 	int i;
 	/*  */
@@ -3466,6 +3479,7 @@ static signed int __init RSC_Init(void)
 	LOG_DBG("ISP_RSC_BASE: %lx\n", ISP_RSC_BASE);
 #endif
 
+#ifdef RSC_PROCFS
 	isp_rsc_dir = proc_mkdir("rsc", NULL);
 	if (!isp_rsc_dir) {
 		LOG_ERR("[%s]: fail to mkdir /proc/rsc\n", __func__);
@@ -3478,7 +3492,7 @@ static signed int __init RSC_Init(void)
 
 	proc_entry = proc_create("rsc_reg", 0644, isp_rsc_dir,
 							&rsc_reg_proc_fops);
-
+#endif
 
 	/* isr log */
 	if (PAGE_SIZE <

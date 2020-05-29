@@ -1397,7 +1397,7 @@ static kal_uint32 close(void)
 	pr_debug("E\n");
 
 	/*No Need to implement this function */
-
+	write_cmos_sensor(0x0100, 0x00);
 	return ERROR_NONE;
 }				/*    close  */
 

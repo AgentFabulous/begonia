@@ -85,6 +85,7 @@
 
 #ifndef EP_MARK_SMI
 #include <smi_public.h>
+/*for SMI BW debug log*/
 #endif
 
 #include "inc/camera_isp.h"

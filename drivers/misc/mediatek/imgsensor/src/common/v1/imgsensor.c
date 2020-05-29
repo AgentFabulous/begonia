@@ -82,6 +82,8 @@ static DEFINE_MUTEX(gimgsensor_mutex);
 struct IMGSENSOR  gimgsensor;
 struct IMGSENSOR *pgimgsensor = &gimgsensor;
 
+/*prevent imgsensor race condition in vulunerbility test*/
+struct mutex imgsensor_mutex;
 
 
 DEFINE_MUTEX(pinctrl_mutex);
@@ -170,6 +172,7 @@ imgsensor_sensor_open(struct IMGSENSOR_SENSOR *psensor)
 #ifdef CONFIG_MTK_CCU
 	struct ccu_sensor_info ccuSensorInfo;
 	enum IMGSENSOR_SENSOR_IDX sensor_idx = psensor->inst.sensor_idx;
+	struct i2c_client *pi2c_client = NULL;
 #endif
 
 	IMGSENSOR_FUNCTION_ENTRY();
@@ -218,6 +221,14 @@ imgsensor_sensor_open(struct IMGSENSOR_SENSOR *psensor)
 
 			ccuSensorInfo.sensor_name_string =
 			    (char *)(psensor_inst->psensor_name);
+
+			pi2c_client = psensor_inst->i2c_cfg.pinst->pi2c_client;
+			if (pi2c_client)
+				ccuSensorInfo.i2c_id =
+					(((struct mt_i2c *) i2c_get_adapdata(
+						pi2c_client->adapter))->id);
+			else
+				ccuSensorInfo.i2c_id = -1;
 
 			ccu_set_sensor_info(sensor_idx, &ccuSensorInfo);
 #endif
@@ -482,7 +493,7 @@ int imgsensor_set_driver(struct IMGSENSOR_SENSOR *psensor)
 #define TOSTRING(value)           #value
 #define STRINGIZE(stringizedName) TOSTRING(stringizedName)
 
-	char *psensor_list_config = NULL;
+	char *psensor_list_config = NULL, *psensor_list = NULL;
 	char *sensor_configs = STRINGIZE(CONFIG_CUSTOM_KERNEL_IMGSENSOR);
 
 	static int orderedSearchList[MAX_NUM_OF_SUPPORT_SENSOR] = {-1};
@@ -498,7 +509,7 @@ int imgsensor_set_driver(struct IMGSENSOR_SENSOR *psensor)
 	imgsensor_i2c_filter_msg(&psensor_inst->i2c_cfg, true);
 
 	if (get_search_list) {
-		psensor_list_config =
+		psensor_list = psensor_list_config =
 		    kmalloc(strlen(sensor_configs)-1, GFP_KERNEL);
 
 		if (psensor_list_config) {
@@ -532,7 +543,7 @@ int imgsensor_set_driver(struct IMGSENSOR_SENSOR *psensor)
 			}
 			get_search_list = false;
 		}
-		kfree(psensor_list_config);
+		kfree(psensor_list);
 	}
 
 
@@ -1343,6 +1354,7 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	case SENSOR_FEATURE_SET_PDAF_REG_SETTING:
 	case SENSOR_FEATURE_SET_STREAMING_SUSPEND:
 	case SENSOR_FEATURE_SET_STREAMING_RESUME:
+	case SENSOR_FEATURE_SET_SENSOR_SYNC_MODE:
 		if (copy_from_user(
 		    (void *)pFeaturePara,
 		    (void *) pFeatureCtrl->pFeaturePara,
@@ -1398,6 +1410,10 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	case SENSOR_FEATURE_SINGLE_FOCUS_MODE:
 	case SENSOR_FEATURE_CANCEL_AF:
 	case SENSOR_FEATURE_CONSTANT_AF:
+	case SENSOR_FEATURE_GET_AE_EFFECTIVE_FRAME_FOR_LE:
+	case SENSOR_FEATURE_GET_AE_FRAME_MODE_FOR_LE:
+	case SENSOR_FEATURE_GET_SENSOR_SYNC_MODE_CAPACITY:
+	case SENSOR_FEATURE_GET_SENSOR_SYNC_MODE:
 	default:
 		break;
 	}
@@ -1451,6 +1467,10 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	case SENSOR_FEATURE_GET_SENSOR_N3D_STREAM_TO_VSYNC_TIME:
 	case SENSOR_FEATURE_GET_PERIOD:
 	case SENSOR_FEATURE_GET_PIXEL_CLOCK_FREQ:
+	case SENSOR_FEATURE_GET_AE_EFFECTIVE_FRAME_FOR_LE:
+	case SENSOR_FEATURE_GET_AE_FRAME_MODE_FOR_LE:
+	case SENSOR_FEATURE_GET_SENSOR_SYNC_MODE_CAPACITY:
+	case SENSOR_FEATURE_GET_SENSOR_SYNC_MODE:
 	{
 		ret = imgsensor_sensor_feature_control(
 		    psensor,
@@ -2001,6 +2021,7 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	case SENSOR_FEATURE_SET_PDAF_REG_SETTING:
 	case SENSOR_FEATURE_SET_STREAMING_SUSPEND:
 	case SENSOR_FEATURE_SET_STREAMING_RESUME:
+	case SENSOR_FEATURE_SET_SENSOR_SYNC_MODE:
 		break;
 	/* copy to user */
 	case SENSOR_FEATURE_SET_DRIVER:
@@ -2054,6 +2075,10 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	case SENSOR_FEATURE_SET_PDAF:
 	case SENSOR_FEATURE_SET_SHUTTER_FRAME_TIME:
 	case SENSOR_FEATURE_SET_PDFOCUS_AREA:
+	case SENSOR_FEATURE_GET_AE_EFFECTIVE_FRAME_FOR_LE:
+	case SENSOR_FEATURE_GET_AE_FRAME_MODE_FOR_LE:
+	case SENSOR_FEATURE_GET_SENSOR_SYNC_MODE_CAPACITY:
+	case SENSOR_FEATURE_GET_SENSOR_SYNC_MODE:
 		if (copy_to_user(
 		    (void __user *) pFeatureCtrl->pFeaturePara,
 		    (void *)pFeaturePara,
@@ -2505,6 +2530,8 @@ CAMERA_HW_Ioctl_EXIT:
 
 static int imgsensor_open(struct inode *a_pstInode, struct file *a_pstFile)
 {
+	mutex_lock(&imgsensor_mutex);
+
 	if (atomic_read(&pgimgsensor->imgsensor_open_cnt) == 0)
 		imgsensor_clk_enable_all(&pgimgsensor->clk);
 
@@ -2513,12 +2540,17 @@ static int imgsensor_open(struct inode *a_pstInode, struct file *a_pstFile)
 	    "%s %d\n",
 	    __func__,
 	    atomic_read(&pgimgsensor->imgsensor_open_cnt));
+
+	mutex_unlock(&imgsensor_mutex);
+
 	return 0;
 }
 
 static int imgsensor_release(struct inode *a_pstInode, struct file *a_pstFile)
 {
 	enum IMGSENSOR_SENSOR_IDX i = IMGSENSOR_SENSOR_IDX_MIN_NUM;
+
+	mutex_lock(&imgsensor_mutex);
 
 	atomic_dec(&pgimgsensor->imgsensor_open_cnt);
 	if (atomic_read(&pgimgsensor->imgsensor_open_cnt) == 0) {
@@ -2538,6 +2570,9 @@ static int imgsensor_release(struct inode *a_pstInode, struct file *a_pstFile)
 	    "%s %d\n",
 	    __func__,
 	    atomic_read(&pgimgsensor->imgsensor_open_cnt));
+
+	mutex_unlock(&imgsensor_mutex);
+
 	return 0;
 }
 
@@ -2705,6 +2740,9 @@ static int __init imgsensor_init(void)
 		pr_err("failed to register CAMERA_HW driver\n");
 		return -ENODEV;
 	}
+
+	/*prevent imgsensor race condition in vulunerbility test*/
+	mutex_init(&imgsensor_mutex);
 
 #ifdef CONFIG_CAM_TEMPERATURE_WORKQUEUE
 	memset((void *)&cam_temperature_wq, 0, sizeof(cam_temperature_wq));

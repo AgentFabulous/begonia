@@ -1,6 +1,6 @@
 #
 # Copyright (C) 2015 MediaTek Inc.
-# Copyright (C) 2019 XiaoMi, Inc.
+# Copyright (C) 2020 XiaoMi, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -30,7 +30,6 @@ ifeq ($(CONFIG_MTK_LENS_BU63165AF_SUPPORT), y)
 else
   subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/main/common/bu63169af/inc
 endif
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync/
 
 ifeq ($(CONFIG_MTK_LENS_USE_MODULE), y)
 
@@ -100,7 +99,6 @@ obj-y  += common/lc898217af/
 obj-y  += common/lc898217afa/
 obj-y  += common/lc898217afb/
 obj-y  += common/lc898217afc/
-obj-y  += common/lc898229af/
 obj-y  += common/lc898122af/
 obj-y  += common/wv511aaf/
 obj-y  += common/ak7371af/

@@ -49,6 +49,7 @@
  */
 #define FDVT_INT_ST                 (1<<0)
 
+extern void mt_irq_dump_status(int irq);
 
 struct FDVT_REG_STRUCT {
 	unsigned int module;
@@ -133,6 +134,7 @@ struct FDVT_MetaDataToGCE {
 	unsigned int rotateDegree;
 	unsigned short featureTH;
 	unsigned short SecMemType;
+	bool isReleased;
 };
 #define FDVT_MetaDataToGCE struct FDVT_MetaDataToGCE
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,13 +19,6 @@
 #define __IMGSENSOR_CFG_TABLE_H__
 
 #define IMGSENSOR_DEV_NAME "kd_camera_hw"
-
-#define IMGSENSOR_SENSOR_IDX_NAME_MAIN  "0"
-#define IMGSENSOR_SENSOR_IDX_NAME_SUB   "1"
-#define IMGSENSOR_SENSOR_IDX_NAME_MAIN2 "2"
-#define IMGSENSOR_SENSOR_IDX_NAME_SUB2  "3"
-#define IMGSENSOR_SENSOR_IDX_NAME_MAIN3 "4"
-
 
 #define IMGSENSOR_HW_POWER_INFO_MAX	12
 #define IMGSENSOR_HW_SENSOR_MAX_NUM	12

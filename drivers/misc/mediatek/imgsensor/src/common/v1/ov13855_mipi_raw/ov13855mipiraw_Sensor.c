@@ -1545,7 +1545,7 @@ static kal_uint32 slim_video(
 }
 
 static kal_uint32 get_resolution(
-		MSDK_SENSOR_RESOLUTION_INFO_STRUCT *sensor_resolution)
+	MSDK_SENSOR_RESOLUTION_INFO_STRUCT * sensor_resolution)
 {
 	sensor_resolution->SensorFullWidth =
 		imgsensor_info.cap.grabwindow_width;

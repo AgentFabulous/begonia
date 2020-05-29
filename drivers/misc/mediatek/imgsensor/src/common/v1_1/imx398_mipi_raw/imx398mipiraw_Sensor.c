@@ -134,7 +134,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.framelength = 944,
 		.startx = 0,
 		.starty = 0,
-		.grabwindow_width = 1476,
+		.grabwindow_width = 1472,
 		.grabwindow_height = 832,
 		.mipi_data_lp2hs_settle_dc = 30,
 		.max_framerate = 1150,
@@ -147,7 +147,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.framelength = 902,
 		.startx = 0,
 		.starty = 0,
-		.grabwindow_width = 1476,
+		.grabwindow_width = 1472,
 		.grabwindow_height = 832,
 		.mipi_data_lp2hs_settle_dc = 30,
 		.max_framerate = 1200,
@@ -358,9 +358,9 @@ static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[10] = {
 	{4656, 3496, 0000, 0000, 4656, 3496, 4656, 3496,
 		0000, 0000, 4656, 3496, 0000, 0000, 4656, 2608},/* video */
 	{4656, 3496, 0000, 492, 4656, 2500, 2216, 834,
-		0000, 0000, 2216, 834, 370, 0000, 1476, 832},/* hs video */
+		0000, 0000, 2216, 834, 370, 0000, 1472, 832},/* hs video */
 	{4656, 3496, 0000, 492, 4656, 2500, 2216, 834,
-		0000, 0000, 2216, 834, 370, 0000, 1476, 832},/* slim video */
+		0000, 0000, 2216, 834, 370, 0000, 1472, 832},/* slim video */
 	{4656, 3496, 0000, 0000, 4656, 3496, 2328, 1748,
 		0000, 0000, 2328, 1748, 0000, 0000, 2328, 1748},/* Custom1 */
 	{4656, 3496, 0000, 0000, 4656, 3496, 2328, 1748,
@@ -2970,7 +2970,7 @@ kal_uint16 addr_data_pair_hs_video_imx398[] = {
 	0x0112, 0x0A,
 	0x0113, 0x0A,
 	0x034C, 0x05,
-	0x034D, 0xC4,
+	0x034D, 0xC0,
 	0x034E, 0x03,
 	0x034F, 0x42,
 	0x0401, 0x01,
@@ -3066,7 +3066,7 @@ kal_uint16 addr_data_pair_slim_video_imx398[] = {
 	0x0112, 0x0A,
 	0x0113, 0x0A,
 	0x034C, 0x05,
-	0x034D, 0xC4,
+	0x034D, 0xC0,
 	0x034E, 0x03,
 	0x034F, 0x42,
 	0x0401, 0x01,
@@ -3960,6 +3960,9 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		(MSDK_SENSOR_REG_INFO_STRUCT *) feature_para;
 
 	switch (feature_id) {
+	case SENSOR_FEATURE_GET_OFFSET_TO_START_OF_EXPOSURE:
+		*(MUINT32 *)(uintptr_t)(*(feature_data + 1)) = 0;
+		break;
 	case SENSOR_FEATURE_GET_PIXEL_CLOCK_FREQ_BY_SCENARIO:
 		switch (*feature_data) {
 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:

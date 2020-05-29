@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,7 +22,7 @@
  * Debug configuration
  ******************************************************************************/
 #define PREFIX "[imgsensor]"
-
+#define PLATFORM_POWER_SEQ_NAME "platform_power_seq"
 #define DEBUG_CAMERA_HW_K
 #ifdef DEBUG_CAMERA_HW_K
 #define PK_DBG(fmt, arg...)  pr_debug(PREFIX fmt, ##arg)
@@ -39,7 +39,7 @@
 #define IMGSENSOR_TOSTRING(value)           #value
 #define IMGSENSOR_STRINGIZE(stringizedName) IMGSENSOR_TOSTRING(stringizedName)
 
-
+//XIAOMI: libin16 add for open mipi switch
 #define MIPI_SWITCH
 
 enum IMGSENSOR_ARCH {
@@ -53,5 +53,6 @@ enum IMGSENSOR_RETURN {
 	IMGSENSOR_RETURN_ERROR   = -1,
 };
 
+#define LENGTH_FOR_SNPRINTF 256
 #endif
 

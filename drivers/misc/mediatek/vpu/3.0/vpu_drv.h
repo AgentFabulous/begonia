@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -409,7 +408,7 @@ struct vpu_lock_power {
 	enum VPU_OPP_PRIORIYY priority;
 };
 
-#ifdef CONFIG_GZ_SUPPORT_SDSP
+#ifdef CONFIG_MTK_GZ_SUPPORT_SDSP
 extern int mtee_sdsp_enable(u32 on);
 #endif
 

@@ -291,7 +291,7 @@ static int nr_MFB_devs;
 #endif
 
 
-static unsigned int g_MfbEnableClockCount;
+static unsigned int g_u4EnableClockCount;
 static unsigned int g_u4MfbCnt;
 
 /* maximum number for supporting user to do interrupt operation */
@@ -1838,9 +1838,9 @@ static void MFB_EnableClock(bool En)
 #endif
 
 	if (En) {		/* Enable clock. */
-		/* log_dbg("Dpe clock enbled. g_MfbEnableClockCount: %d.", */
-		/*	g_MfbEnableClockCount); */
-		switch (g_MfbEnableClockCount) {
+		/* log_dbg("Dpe clock enbled. g_u4EnableClockCount: %d.", */
+		/*	g_u4EnableClockCount); */
+		switch (g_u4EnableClockCount) {
 		case 0:
 #if !defined(CONFIG_MTK_LEGACY) && defined(CONFIG_COMMON_CLK) /*CCF*/
 #ifndef EP_NO_CLKMGR
@@ -1868,16 +1868,16 @@ static void MFB_EnableClock(bool En)
 			break;
 		}
 		spin_lock(&(MFBInfo.SpinLockMFB));
-		g_MfbEnableClockCount++;
+		g_u4EnableClockCount++;
 		spin_unlock(&(MFBInfo.SpinLockMFB));
 	} else {		/* Disable clock. */
 
-		/* log_dbg("Dpe clock disabled. g_MfbEnableClockCount: %d.", */
-		/*	g_MfbEnableClockCount); */
+		/* log_dbg("Dpe clock disabled. g_u4EnableClockCount: %d.", */
+		/*	g_u4EnableClockCount); */
 		spin_lock(&(MFBInfo.SpinLockMFB));
-		g_MfbEnableClockCount--;
+		g_u4EnableClockCount--;
 		spin_unlock(&(MFBInfo.SpinLockMFB));
-		switch (g_MfbEnableClockCount) {
+		switch (g_u4EnableClockCount) {
 		case 0:
 #if !defined(CONFIG_MTK_LEGACY) && defined(CONFIG_COMMON_CLK) /*CCF*/
 #ifndef EP_NO_CLKMGR
@@ -1948,22 +1948,9 @@ static signed int MFB_ReadReg(MFB_REG_IO_STRUCT *pRegIo)
 	/* unsigned int* pData = (unsigned int*)pRegIo->Data; */
 	MFB_REG_STRUCT *pData = (MFB_REG_STRUCT *) pRegIo->pData;
 
-	if (g_MfbEnableClockCount == 0) {
-		log_err("Try to read register without init MFB, abort!\n");
-		goto EXIT;
-	}
-
-	if ((pRegIo->pData == NULL) || (pRegIo->Count == 0) ||
-		(pRegIo->Count > (MFB_REG_RANGE>>2))) {
-		log_inf("MFB ReadReg pRegIo->pData is NULL, Count:%d!!\n",
-		pRegIo->Count);
-		Ret = -EFAULT;
-		goto EXIT;
-	}
-
 	for (i = 0; i < pRegIo->Count; i++) {
 		if (get_user(reg.Addr, (unsigned int *) &pData->Addr) != 0) {
-			log_err("get_user failed\n");
+			log_err("get_user failed");
 			Ret = -EFAULT;
 			goto EXIT;
 		}
@@ -1975,7 +1962,7 @@ static signed int MFB_ReadReg(MFB_REG_IO_STRUCT *pRegIo)
 			reg.Val = MFB_RD32(ISP_MFB_BASE + reg.Addr);
 		} else {
 			log_err(
-			    "Wrong address(0x%p), MFB_BASE(0x%p), Addr(0x%lx)\n",
+			    "Wrong address(0x%p), MFB_BASE(0x%p), Addr(0x%lx)",
 			    (ISP_MFB_BASE + reg.Addr),
 			    ISP_MFB_BASE,
 			    (unsigned long)reg.Addr);
@@ -1986,7 +1973,7 @@ static signed int MFB_ReadReg(MFB_REG_IO_STRUCT *pRegIo)
 		/*	value()0x%x\n",MFB_ADDR_CAMINF + reg.Addr,reg.Val); */
 
 		if (put_user(reg.Val, (unsigned int *) &(pData->Val)) != 0) {
-			log_err("put_user failed\n");
+			log_err("put_user failed");
 			Ret = -EFAULT;
 			goto EXIT;
 		}
@@ -2060,11 +2047,6 @@ static signed int MFB_WriteReg(MFB_REG_IO_STRUCT *pRegIo)
 	if (MFBInfo.DebugMask & MFB_DBG_WRITE_REG)
 		log_dbg("Data(0x%p), Count(%d)\n",
 			(pRegIo->pData), (pRegIo->Count));
-
-	if (g_MfbEnableClockCount == 0) {
-		log_err("Try to write register without init MFB, abort!\n");
-		goto EXIT;
-	}
 
 	if ((pRegIo->pData == NULL) || (pRegIo->Count == 0) ||
 	    (pRegIo->Count > (MFB_REG_RANGE>>2))) {
@@ -2376,7 +2358,6 @@ static long MFB_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 			Ret = MFB_DumpReg();
 			break;
 		}
-	/*
 	case MFB_DUMP_ISR_LOG:
 		{
 			unsigned int currentPPB = m_CurrentPPB;
@@ -2395,7 +2376,6 @@ static long MFB_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 				MFB_IRQ_TYPE_INT_MFB_ST, currentPPB, _LOG_ERR);
 			break;
 		}
-	*/
 	case MFB_READ_REGISTER:
 		{
 			if (copy_from_user(&RegIo, (void *)Param,
@@ -3252,7 +3232,7 @@ static long MFB_ioctl_compat(
 	case MFB_DEQUE:
 	case MFB_RESET:
 	case MFB_DUMP_REG:
-	/* case MFB_DUMP_ISR_LOG: */
+	case MFB_DUMP_ISR_LOG:
 		return filp->f_op->unlocked_ioctl(filp, cmd, arg);
 	default:
 		return -ENOIOCTLCMD;
@@ -3335,7 +3315,7 @@ static signed int MFB_open(struct inode *pInode, struct file *pFile)
 	/* Enable clock */
 	MFB_EnableClock(MTRUE);
 	g_u4MfbCnt = 0;
-	log_dbg("MFB open g_MfbEnableClockCount: %d", g_MfbEnableClockCount);
+	log_dbg("MFB open g_u4EnableClockCount: %d", g_u4EnableClockCount);
 	/*  */
 
 	for (i = 0; i < MFB_IRQ_TYPE_AMOUNT; i++)
@@ -3400,7 +3380,7 @@ static signed int MFB_release(struct inode *pInode, struct file *pFile)
 
 	/* Disable clock. */
 	MFB_EnableClock(MFALSE);
-	log_dbg("MFB release g_MfbEnableClockCount: %d", g_MfbEnableClockCount);
+	log_dbg("MFB release g_u4EnableClockCount: %d", g_u4EnableClockCount);
 
 	/*  */
 EXIT:
@@ -3416,7 +3396,7 @@ EXIT:
  ******************************************************************************/
 static signed int MFB_mmap(struct file *pFile, struct vm_area_struct *pVma)
 {
-	long length = 0;
+	unsigned long length = 0;
 	unsigned int pfn = 0x0;
 
 	length = pVma->vm_end - pVma->vm_start;
@@ -3878,7 +3858,7 @@ static signed int MFB_suspend(struct platform_device *pDev, pm_message_t Mesg)
 
 	bPass1_On_In_Resume_TG1 = 0;
 
-	if (g_MfbEnableClockCount > 0) {
+	if (g_u4EnableClockCount > 0) {
 		MFB_EnableClock(MFALSE);
 		g_u4MfbCnt++;
 	}
@@ -3909,8 +3889,8 @@ int MFB_pm_suspend(struct device *device)
 	WARN_ON(pdev == NULL);
 
 	/* pr_debug("calling %s()\n", __func__); */
-	log_inf("MFB suspend g_MfbEnableClockCount: %d, g_u4MfbCnt: %d",
-		g_MfbEnableClockCount, g_u4MfbCnt);
+	log_inf("MFB suspend g_u4EnableClockCount: %d, g_u4MfbCnt: %d",
+		g_u4EnableClockCount, g_u4MfbCnt);
 
 	return MFB_suspend(pdev, PMSG_SUSPEND);
 }
@@ -3922,8 +3902,8 @@ int MFB_pm_resume(struct device *device)
 	WARN_ON(pdev == NULL);
 
 	/* pr_debug("calling %s()\n", __func__); */
-	log_inf("MFB resume g_MfbEnableClockCount: %d, g_u4MfbCnt: %d",
-		g_MfbEnableClockCount, g_u4MfbCnt);
+	log_inf("MFB resume g_u4EnableClockCount: %d, g_u4MfbCnt: %d",
+		g_u4EnableClockCount, g_u4MfbCnt);
 
 	return MFB_resume(pdev);
 }
@@ -4029,7 +4009,7 @@ static int mfb_dump_read(struct seq_file *m, void *v)
 		}
 	}
 	seq_puts(m, "\n");
-	seq_printf(m, "Mfb Clock Count:%d\n", g_MfbEnableClockCount);
+	seq_printf(m, "Mfb Clock Count:%d\n", g_u4EnableClockCount);
 
 	seq_printf(m, "MFB:HWProcessIdx:%d, WriteIdx:%d, ReadIdx:%d\n",
 		   g_MFB_ReqRing.HWProcessIdx, g_MFB_ReqRing.WriteIdx,
@@ -4230,7 +4210,7 @@ static const struct file_operations mfb_reg_proc_fops = {
 int32_t MFB_ClockOnCallback(uint64_t engineFlag)
 {
 	/* log_dbg("MFB_ClockOnCallback"); */
-	/* log_dbg("+CmdqEn:%d", g_MfbEnableClockCount); */
+	/* log_dbg("+CmdqEn:%d", g_u4EnableClockCount); */
 	/* MFB_EnableClock(MTRUE); */
 
 	return 0;
@@ -4257,7 +4237,7 @@ int32_t MFB_ClockOffCallback(uint64_t engineFlag)
 {
 	/* log_dbg("MFB_ClockOffCallback"); */
 	/* MFB_EnableClock(MFALSE); */
-	/* log_dbg("-CmdqEn:%d", g_MfbEnableClockCount); */
+	/* log_dbg("-CmdqEn:%d", g_u4EnableClockCount); */
 	return 0;
 }
 
@@ -4268,8 +4248,8 @@ static signed int __init MFB_Init(void)
 	void *tmp;
 	/* FIX-ME: linux-3.10 procfs API changed */
 	/* use proc_create */
-	/* struct proc_dir_entry *proc_entry; */
-	/* struct proc_dir_entry *isp_mfb_dir; */
+	struct proc_dir_entry *proc_entry;
+	struct proc_dir_entry *isp_mfb_dir;
 
 
 	int i;
@@ -4298,20 +4278,20 @@ static signed int __init MFB_Init(void)
 	log_dbg("ISP_MFB_BASE: %lx\n", ISP_MFB_BASE);
 #endif
 
-	/* isp_mfb_dir = proc_mkdir("mfb", NULL); */
-	/* if (!isp_mfb_dir) { */
-	/* log_err("[%s]: fail to mkdir /proc/mfb\n", __func__); */
-	/* return 0; */
-	/* } */
+	isp_mfb_dir = proc_mkdir("mfb", NULL);
+	if (!isp_mfb_dir) {
+		log_err("[%s]: fail to mkdir /proc/mfb\n", __func__);
+		return 0;
+	}
 
 	/* proc_entry = proc_create("pll_test", 0644, */
-	/* isp_mfb_dir, &pll_test_proc_fops); */
+	/*	isp_mfb_dir, &pll_test_proc_fops); */
 
-	/* proc_entry = proc_create("mfb_dump", 0444, */
-	/* isp_mfb_dir, &mfb_dump_proc_fops); */
+	proc_entry = proc_create("mfb_dump", 0444,
+		isp_mfb_dir, &mfb_dump_proc_fops);
 
-	/* proc_entry = proc_create("mfb_reg", 0644, */
-	/* isp_mfb_dir, &mfb_reg_proc_fops); */
+	proc_entry = proc_create("mfb_reg", 0644,
+		isp_mfb_dir, &mfb_reg_proc_fops);
 
 
 	/* isr log */

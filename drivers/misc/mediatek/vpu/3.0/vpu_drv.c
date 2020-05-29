@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -177,7 +177,7 @@ enum m4u_callback_ret_t vpu_m4u_fault_callback(int port,
 	unsigned int mva, void *data)
 #else
 enum mtk_iommu_callback_ret_t vpu_m4u_fault_callback(int port,
-	unsigned int mva, void *data)
+	unsigned long mva, void *data)
 #endif
 {
 	LOG_DBG("[m4u] fault callback: port=%d, mva=0x%x", port, mva);
@@ -313,13 +313,12 @@ int vpu_put_request_to_pool(struct vpu_user *user, struct vpu_request *req)
 			if (IS_ERR(handle)) {
 				LOG_WRN("[vpu_drv] %s=0x%p failed and return\n",
 					"import ion handle", handle);
-				if (cnt > 0)
-					for (k = 0; k < cnt; k++) {
-						ion_free(my_ion_client,
-							(struct ion_handle *)
-							((uintptr_t)(req->buf_ion_infos[cnt])));
-						LOG_WRN("free cnt[%d] ion handle\n", cnt);
-					}
+				for (k = 0; k < cnt; k++) {
+					ion_free(my_ion_client,
+						(struct ion_handle *)
+						(req->buf_ion_infos[k]));
+					LOG_WRN("free cnt[%d] ion handle\n", k);
+				}
 				return -EINVAL;
 			} else {
 				if (g_vpu_log_level > Log_STATE_MACHINE)
@@ -845,7 +844,7 @@ static int vpu_open(struct inode *inode, struct file *flip)
 {
 	int ret = 0, i = 0;
 	bool not_support_vpu = true;
-	struct vpu_user *user;
+	struct vpu_user *user = NULL;
 
 	for (i = 0 ; i < MTK_VPU_CORE ; i++) {
 		if (vpu_device->vpu_hw_support[i]) {
@@ -1119,10 +1118,11 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 					&u_req->power_param.boost_value);
 		ret |= get_user(req->priority,
 					&u_req->priority);
+
 		if (req->priority >= VPU_REQ_MAX_NUM_PRIORITY) {
 			LOG_ERR("%s: ENQUE: invalid priority (%d)\n",
 				__func__, req->priority);
-				req->priority = 0;
+			req->priority = 0;
 		}
 
 		/*opp_step counted by vpu driver*/
@@ -1527,7 +1527,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 
 		break;
 	}
-#ifdef CONFIG_GZ_SUPPORT_SDSP
+#ifdef CONFIG_MTK_GZ_SUPPORT_SDSP
 
 	case VPU_IOCTL_SDSP_SEC_LOCK:
 	{
@@ -1718,7 +1718,7 @@ static int vpu_probe(struct platform_device *pdev)
 	int core = 0;
 	struct device *dev;
 	struct device_node *node;
-	unsigned int irq_info[3]; /* Record interrupts info from device tree */
+	unsigned int irq_info[3] = {0};
 	struct device_node *smi_node = NULL;
 	struct device_node *ipu_conn_node = NULL;
 	struct device_node *ipu_vcore_node = NULL;

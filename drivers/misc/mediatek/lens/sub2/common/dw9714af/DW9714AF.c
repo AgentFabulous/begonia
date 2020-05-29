@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -116,16 +116,12 @@ static inline int getAFInfo(__user struct stAF_MotorInfo *pstMotorInfo)
 /* initAF include driver initialization and standby mode */
 static int initAF(void)
 {
-	char puSendCmd0[2] = {0xED, 0xAB};
-	char puSendCmd1[2] = {0x02, 0x01};
-	char puSendCmd2[2] = {0x02, 0x00};
-	char puSendCmd3[2] = {0x03, 0x00};
-	char puSendCmd4[2] = {0x04, 0xD4};
-	char puSendCmd5[2] = {0x06, 0x84};
-	char puSendCmd6[2] = {0x07, 0x01};
-	char puSendCmd7[2] = {0x08, 0x20};
-
 	int i4RetValue = 0;
+	char puSendCmdArray[10][2] = {
+	{0xED, 0xAB}, {0x02, 0x01}, {0x02, 0x00}, {0xFE, 0xFE}, {0x03, 0x00},
+	{0x04, 0xE2}, {0xFE, 0xFE}, {0x06, 0x84}, {0x07, 0x01}, {0x08, 0x20}
+	};
+	unsigned char cmd_number;
 
 	LOG_INF("+\n");
 	if (*g_pAF_Opened == 1) {
@@ -134,47 +130,15 @@ static int initAF(void)
 
 		g_pstAF_I2Cclient->addr = g_pstAF_I2Cclient->addr >> 1;
 
-		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd0, 2);
-		if (i4RetValue < 0) {
-			LOG_INF("I2C send failed!!\n");
-			return -1;
-		}
-		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd1, 2);
-		if (i4RetValue < 0) {
-			LOG_INF("I2C send failed!!\n");
-			return -1;
-		}
-		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd2, 2);
-		if (i4RetValue < 0) {
-			LOG_INF("I2C send failed!!\n");
-			return -1;
-		}
-		mdelay(1);
+		for (cmd_number = 0; cmd_number < 10; cmd_number++) {
+			if (puSendCmdArray[cmd_number][0] != 0xFE) {
+				i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmdArray[cmd_number], 2);
 
-		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd3, 2);
-		if (i4RetValue < 0) {
-			LOG_INF("I2C send failed!!\n");
-			return -1;
-		}
-		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd4, 2);
-		if (i4RetValue < 0) {
-			LOG_INF("I2C send failed!!\n");
-			return -1;
-		}
-		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd5, 2);
-		if (i4RetValue < 0) {
-			LOG_INF("I2C send failed!!\n");
-			return -1;
-		}
-		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd6, 2);
-		if (i4RetValue < 0) {
-			LOG_INF("I2C send failed!!\n");
-			return -1;
-		}
-		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd7, 2);
-		if (i4RetValue < 0) {
-			LOG_INF("I2C send failed!!\n");
-			return -1;
+				if (i4RetValue < 0)
+					return -1;
+			} else {
+				mdelay(1);
+			}
 		}
 
 		spin_lock(g_pAF_SpinLock);
@@ -274,20 +238,22 @@ int DW9714AF_Release_Sub2(struct inode *a_pstInode, struct file *a_pstFile)
 			return -1;
 		}
 		while (g_u4CurrPosition > 0) {
-			if (g_u4CurrPosition > 300) {
+			if (g_u4CurrPosition >= 400) {
+				g_u4CurrPosition -= 200;
+			} else if (g_u4CurrPosition >= 300) {
 				g_u4CurrPosition -= 100;
-			} else if (g_u4CurrPosition > 240) {
-				g_u4CurrPosition -= 60;
-			} else if (g_u4CurrPosition > 210) {
+			} else if (g_u4CurrPosition >= 250) {
+				g_u4CurrPosition -= 50;
+			} else if (g_u4CurrPosition >= 210) {
 				g_u4CurrPosition -= 30;
-			} else if (g_u4CurrPosition > 170) {
+			} else if (g_u4CurrPosition >= 150) {
 				g_u4CurrPosition -= 20;
 			} else {
 				g_u4CurrPosition = 0;
 			}
 
 			s4AF_WriteReg(g_u4CurrPosition);
-			mdelay(5);
+			mdelay(10);
 
 		}
 		i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd1, 2); /* Power down mode */

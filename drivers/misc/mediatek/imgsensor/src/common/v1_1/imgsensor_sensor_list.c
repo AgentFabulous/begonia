@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -45,6 +45,9 @@ struct IMGSENSOR_SENSOR_LIST
 #endif
 #if defined(GC2375AF_MIPI_RAW)
 {GC2375AF_SENSOR_ID, SENSOR_DRVNAME_GC2375AF_MIPI_RAW, GC2375AF_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC5035_MIPI_RAW)
+{GC5035_SENSOR_ID, SENSOR_DRVNAME_GC5035_MIPI_RAW, GC5035_MIPI_RAW_SensorInit},
 #endif
 #if defined(GC2375BETA_MIPI_RAW)
 {GC2375BETA_SENSOR_ID, SENSOR_DRVNAME_GC2375BETA_MIPI_RAW, GC2375BETA_MIPI_RAW_SensorInit},

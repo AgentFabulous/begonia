@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -46,7 +46,7 @@ static unsigned long g_u4AF_MACRO = 1023;
 static unsigned long g_u4TargetPosition;
 static unsigned long g_u4CurrPosition;
 
-static const unsigned short PaceBoundary[4] = {20, 60, 100, 140};
+static const unsigned short PaceBoundary[4] = {20, 60, 100, 140}; //Boundary in DAC code
 
 static int s4AF_WriteReg(u16 a_u2Data)
 {
@@ -93,16 +93,16 @@ static inline int getAFInfo(__user struct stAF_MotorInfo *pstMotorInfo)
 static int initdrv(void)
 {
 	int i4RetValue = 0;
-	char puSendCmdArray[7][2] = {
+	char puSendCmdArray[8][2] = {
 	{0x02, 0x01}, {0x02, 0x00}, {0xFE, 0xFE},
-	{0x02, 0x02}, {0x06, 0x40}, {0x07, 0x60}, {0xFE, 0xFE},
+	{0x02, 0x02}, {0x06, 0x80}, {0x07, 0x6D}, {0x11, 0x07}, {0xFE, 0xFE},
 	};
 	unsigned char cmd_number;
 
 	LOG_INF("InitDrv[1] %p, %p\n", &(puSendCmdArray[1][0]), puSendCmdArray[1]);
 	LOG_INF("InitDrv[2] %p, %p\n", &(puSendCmdArray[2][0]), puSendCmdArray[2]);
 
-	for (cmd_number = 0; cmd_number < 7; cmd_number++) {
+	for (cmd_number = 0; cmd_number < 8; cmd_number++) {
 		if (puSendCmdArray[cmd_number][0] != 0xFE) {
 			i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmdArray[cmd_number], 2);
 
