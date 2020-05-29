@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -227,6 +227,8 @@ enum Fg_kernel_cmds {
 	FG_KERNEL_CMD_BUILD_SEL_BATTEMP,
 	FG_KERNEL_CMD_UPDATE_AVG_BATTEMP,
 	FG_KERNEL_CMD_SAVE_DEBUG_PARAM,
+	FG_KERNEL_CMD_REQ_CHANGE_AGING_DATA,
+	FG_KERNEL_CMD_AG_LOG_TEST,
 
 	FG_KERNEL_CMD_FROM_USER_NUMBER
 
@@ -367,6 +369,13 @@ struct fuel_gauge_custom_data {
 	int aging_one_en;
 	int aging1_update_soc;
 	int aging1_load_soc;
+	int aging4_update_soc;
+	int aging4_load_soc;
+	int aging5_update_soc;
+	int aging5_load_soc;
+	int aging6_update_soc;
+	int aging6_load_soc;
+
 	int aging_temp_diff;
 	int aging_temp_low_limit;
 	int aging_temp_high_limit;
@@ -378,6 +387,9 @@ struct fuel_gauge_custom_data {
 
 	/* Aging Compensation 3*/
 	int aging_third_en;
+	int aging_4_en;
+	int aging_5_en;
+	int aging_6_en;
 
 
 	/* ui_soc */
@@ -675,6 +687,7 @@ struct simulator_log {
 
 struct mtk_battery {
 
+	int fix_coverity;
 	struct gauge_device *gdev;
 
 /*linux driver related*/

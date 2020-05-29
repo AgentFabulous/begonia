@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -62,6 +62,7 @@ static struct shutdown_controller sdc;
 static int g_vbat_lt;
 static int g_vbat_lt_lv1;
 static int shutdown_cond_flag;
+static int fix_coverity;
 
 static void wake_up_power_misc(struct shutdown_controller *sdd)
 {
@@ -179,6 +180,8 @@ int set_shutdown_cond(int shutdown_cond)
 	if (shutdown_cond_flag == 2 && shutdown_cond != LOW_BAT_VOLT)
 		return 0;
 
+	if (shutdown_cond_flag == 3 && shutdown_cond != DLPT_SHUTDOWN)
+		return 0;
 
 	switch (shutdown_cond) {
 	case OVERHEAT:
@@ -499,7 +502,11 @@ static int power_misc_routine_thread(void *arg)
 			bm_err("%s battery overheat~ power off\n",
 				__func__);
 			kernel_power_off();
+			fix_coverity = 1;
+			return 1;
 		}
+		if (fix_coverity == 1)
+			break;
 	}
 
 	return 0;

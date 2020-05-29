@@ -1,16 +1,16 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-* Copyright (C) 2019 XiaoMi, Inc.
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License version 2 as
-* published by the Free Software Foundation.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-* See http://www.gnu.org/licenses/gpl-2.0.html for more details.
-*/
+ * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ */
 
 /*****************************************************************************
  *
@@ -223,9 +223,16 @@ int gauge_enable_interrupt(int intr_number, int en)
 	if (gm.pmic_dev == NULL && gm.pdevice != NULL)
 		gm.pmic_dev = &gm.pdevice->dev;
 
+	if (gm.pmic_dev == NULL)
+		return -EINVAL;
+
 	irq = mt6358_irq_get_virq(gm.pmic_dev->parent, intr_number);
 
 	desc = irq_to_desc(irq);
+
+	if (!desc)
+		return -EINVAL;
+
 
 	mutex_lock(&gm.pmic_intr_mutex);
 	depth = desc->depth;
@@ -368,7 +375,7 @@ signed int battery_meter_get_VSense(void)
 static int bms_get_property(struct power_supply *psy,
 		enum power_supply_property psp, union power_supply_propval *val)
 {
-
+	//struct mt_charger *mtk_chg = power_supply_get_drvdata(psy);
 	int fgcurrent = 0;
 	bool b_ischarging = 0;
 
@@ -932,6 +939,20 @@ static void proc_dump_dtsi(struct seq_file *m)
 		fg_cust_data.aging1_update_soc);
 	seq_printf(m, "AGING1_LOAD_SOC = %d\n",
 		fg_cust_data.aging1_load_soc);
+
+	seq_printf(m, "AGING4_UPDATE_SOC = %d\n",
+		fg_cust_data.aging4_update_soc);
+	seq_printf(m, "AGING4_LOAD_SOC = %d\n",
+		fg_cust_data.aging4_load_soc);
+	seq_printf(m, "AGING5_UPDATE_SOC = %d\n",
+		fg_cust_data.aging5_update_soc);
+	seq_printf(m, "AGING5_LOAD_SOC = %d\n",
+		fg_cust_data.aging5_load_soc);
+	seq_printf(m, "AGING6_UPDATE_SOC = %d\n",
+		fg_cust_data.aging6_update_soc);
+	seq_printf(m, "AGING6_LOAD_SOC = %d\n",
+		fg_cust_data.aging6_load_soc);
+
 	seq_printf(m, "AGING_TEMP_DIFF = %d\n",
 		fg_cust_data.aging_temp_diff);
 	seq_printf(m, "AGING_100_EN = %d\n",
@@ -940,6 +961,12 @@ static void proc_dump_dtsi(struct seq_file *m)
 		fg_cust_data.aging_two_en);
 	seq_printf(m, "AGING_THIRD_EN = %d\n",
 		fg_cust_data.aging_third_en);
+	seq_printf(m, "AGING_4_EN = %d\n",
+		fg_cust_data.aging_4_en);
+	seq_printf(m, "AGING_5_EN = %d\n",
+		fg_cust_data.aging_5_en);
+	seq_printf(m, "AGING_6_EN = %d\n",
+		fg_cust_data.aging_6_en);
 	seq_printf(m, "DIFF_SOC_SETTING = %d\n",
 		fg_cust_data.diff_soc_setting);
 	seq_printf(m, "DIFF_BAT_TEMP_SETTING = %d\n",
@@ -1809,7 +1836,7 @@ int force_get_tbat(bool update)
 
 unsigned int battery_meter_get_fg_time(void)
 {
-	unsigned int time;
+	unsigned int time = 0;
 
 	gauge_dev_get_time(gm.gdev, &time);
 	return time;
@@ -1912,8 +1939,8 @@ static void nl_data_handler(struct sk_buff *skb)
 	else {
 		if (in_interrupt())
 			fgd_ret_msg = kmalloc(size, GFP_ATOMIC);
-		else
-			fgd_ret_msg = kmalloc(size, GFP_KERNEL);
+	else
+		fgd_ret_msg = kmalloc(size, GFP_KERNEL);
 	}
 
 	if (fgd_ret_msg == NULL) {
@@ -1923,9 +1950,6 @@ static void nl_data_handler(struct sk_buff *skb)
 		if (fgd_ret_msg == NULL)
 			return;
 	}
-
-	if (!fgd_ret_msg)
-		return;
 
 	memset(fgd_ret_msg, 0, size);
 
@@ -1960,8 +1984,8 @@ int wakeup_fg_algo(unsigned int flow_state)
 		else {
 			if (in_interrupt())
 				fgd_msg = kmalloc(size, GFP_ATOMIC);
-			else
-				fgd_msg = kmalloc(size, GFP_KERNEL);
+		else
+			fgd_msg = kmalloc(size, GFP_KERNEL);
 		}
 
 		if (fgd_msg == NULL) {
@@ -1970,11 +1994,6 @@ int wakeup_fg_algo(unsigned int flow_state)
 
 			if (fgd_msg == NULL)
 				return -1;
-		}
-
-		if (!fgd_msg) {
-/* bm_err("Error: wakeup_fg_algo() vmalloc fail!!!\n"); */
-			return -1;
 		}
 
 		bm_debug("[%s] malloc size=%d pid=%d cmd:%d\n",
@@ -2019,8 +2038,8 @@ int wakeup_fg_algo_cmd(unsigned int flow_state, int cmd, int para1)
 		else {
 			if (in_interrupt())
 				fgd_msg = kmalloc(size, GFP_ATOMIC);
-			else
-				fgd_msg = kmalloc(size, GFP_KERNEL);
+		else
+			fgd_msg = kmalloc(size, GFP_KERNEL);
 
 		}
 
@@ -2030,11 +2049,6 @@ int wakeup_fg_algo_cmd(unsigned int flow_state, int cmd, int para1)
 
 			if (fgd_msg == NULL)
 				return -1;
-		}
-
-		if (!fgd_msg) {
-/* bm_err("Error: wakeup_fg_algo() vmalloc fail!!!\n"); */
-			return -1;
 		}
 
 		bm_debug(
@@ -2127,6 +2141,15 @@ void fg_ocv_query_soc(int ocv)
 
 	bm_trace("[%s] ocv:%d\n",
 		__func__, ocv);
+}
+
+void fg_test_ag_cmd(int cmd)
+{
+	wakeup_fg_algo_cmd(
+		FG_INTR_KERNEL_CMD, FG_KERNEL_CMD_AG_LOG_TEST, cmd);
+
+	bm_err("[%s]FG_KERNEL_CMD_AG_LOG_TEST:%d\n",
+		__func__, cmd);
 }
 
 void exec_BAT_EC(int cmd, int param)
@@ -3106,6 +3129,30 @@ void exec_BAT_EC(int cmd, int param)
 				cmd);
 		}
 		break;
+	case 795:
+		{
+			wakeup_fg_algo_cmd(
+				FG_INTR_KERNEL_CMD,
+				FG_KERNEL_CMD_REQ_CHANGE_AGING_DATA,
+				param * 100);
+
+			bm_err(
+				"exe_BAT_EC cmd %d,change aging to=%d\n",
+				cmd, param);
+		}
+		break;
+	case 796:
+		{
+			bm_err(
+				"exe_BAT_EC cmd %d,FG_KERNEL_CMD_AG_LOG_TEST=%d\n",
+				cmd, param);
+
+			wakeup_fg_algo_cmd(
+				FG_INTR_KERNEL_CMD,
+				FG_KERNEL_CMD_AG_LOG_TEST, param);
+		}
+		break;
+
 
 	default:
 		bm_err(
@@ -3600,7 +3647,7 @@ struct device *dev, struct device_attribute *attr,
 	int ret_value = 8888;
 
 	ret_value = battery_get_bat_avg_current();
-	bm_err("[EM] FG_Battery_CurrentConsumption : %d mA\n", ret_value);
+	bm_err("[EM] FG_Battery_CurrentConsumption : %d .1mA\n", ret_value);
 	return sprintf(buf, "%d\n", ret_value);
 }
 
@@ -3745,6 +3792,8 @@ signed int battery_meter_meta_tool_cali_car_tune(int meta_current)
 static long compat_adc_cali_ioctl(
 struct file *filp, unsigned int cmd, unsigned long arg)
 {
+	int adc_out_datas[2] = { 1, 1 };
+
 	bm_notice("%s 32bit IOCTL, cmd=0x%08x\n",
 		__func__, cmd);
 	if (!filp->f_op || !filp->f_op->unlocked_ioctl) {
@@ -3752,6 +3801,9 @@ struct file *filp, unsigned int cmd, unsigned long arg)
 			__func__);
 		return -ENOTTY;
 	}
+
+	if (sizeof(arg) != sizeof(adc_out_datas))
+		return -EFAULT;
 
 	switch (cmd) {
 	case BAT_STATUS_READ:
@@ -3772,8 +3824,8 @@ struct file *filp, unsigned int cmd, unsigned long arg)
 	}
 		break;
 	default:
-		bm_err("%s unknown IOCTL: 0x%08x\n",
-			__func__, cmd);
+		bm_err("%s unknown IOCTL: 0x%08x, %d\n",
+			__func__, cmd, adc_out_datas[0]);
 		break;
 	}
 
@@ -3794,8 +3846,14 @@ static long adc_cali_ioctl(
 	int isdisNAFG = 0;
 
 	bm_notice("%s enter\n", __func__);
-
 	mutex_lock(&gm.fg_mutex);
+	user_data_addr = (int *)arg;
+	ret = copy_from_user(adc_in_data, user_data_addr, sizeof(adc_in_data));
+	if (adc_in_data[1] < 0) {
+		bm_err("%s unknown data: %d\n", __func__, adc_in_data[1]);
+		mutex_unlock(&gm.fg_mutex);
+		return -EFAULT;
+	}
 
 	switch (cmd) {
 	case TEST_ADC_CALI_PRINT:
@@ -3845,10 +3903,6 @@ static long adc_cali_ioctl(
 
 	case ADC_CHANNEL_READ:
 		/* g_ADC_Cali = KAL_FALSE; *//* 20100508 Infinity */
-		user_data_addr = (int *)arg;
-		ret = copy_from_user(
-				adc_in_data, user_data_addr, 8);
-
 		if (adc_in_data[0] == 0) {
 			/* I_SENSE */
 			adc_out_data[0] =
@@ -3947,34 +4001,42 @@ static long adc_cali_ioctl(
 #endif
 		/* add for meta tool------------------------------- */
 	case Get_META_BAT_VOL:
-		user_data_addr = (int *)arg;
-		ret = copy_from_user(adc_in_data, user_data_addr, 8);
 		adc_out_data[0] = battery_get_bat_voltage();
-		ret = copy_to_user(user_data_addr, adc_out_data, 8);
+		if (copy_to_user(user_data_addr, adc_out_data,
+			sizeof(adc_out_data))) {
+			mutex_unlock(&gm.fg_mutex);
+			return -EFAULT;
+		}
+
 		bm_notice("**** unlocked_ioctl :Get_META_BAT_VOL Done!\n");
 		break;
 	case Get_META_BAT_SOC:
-		user_data_addr = (int *)arg;
-		ret = copy_from_user(adc_in_data, user_data_addr, 8);
 		adc_out_data[0] = battery_get_uisoc();
-		ret = copy_to_user(user_data_addr, adc_out_data, 8);
+
+		if (copy_to_user(user_data_addr, adc_out_data,
+			sizeof(adc_out_data))) {
+			mutex_unlock(&gm.fg_mutex);
+			return -EFAULT;
+		}
+
 		bm_notice("**** unlocked_ioctl :Get_META_BAT_SOC Done!\n");
 		break;
 
 	case Get_META_BAT_CAR_TUNE_VALUE:
-		user_data_addr = (int *)arg;
-		ret = copy_from_user(adc_in_data, user_data_addr, 8);
 		adc_out_data[0] = fg_cust_data.car_tune_value;
 		bm_err("Get_BAT_CAR_TUNE_VALUE, res=%d\n", adc_out_data[0]);
-		ret = copy_to_user(user_data_addr, adc_out_data, 8);
+
+		if (copy_to_user(user_data_addr, adc_out_data,
+			sizeof(adc_out_data))) {
+			mutex_unlock(&gm.fg_mutex);
+			return -EFAULT;
+		}
+
 		bm_notice("**** unlocked_ioctl :Get_META_BAT_CAR_TUNE_VALUE Done!\n");
 		break;
 
 	case Set_META_BAT_CAR_TUNE_VALUE:
 		/* meta tool input: adc_in_data[1] (mA)*/
-		user_data_addr = (int *)arg;
-		ret = copy_from_user(adc_in_data, user_data_addr, 8);
-
 		/* Send cali_current to hal to calculate car_tune_value*/
 		temp_car_tune =
 			battery_meter_meta_tool_cali_car_tune(adc_in_data[1]);
@@ -3987,15 +4049,20 @@ static long adc_cali_ioctl(
 			temp_car_tune);
 
 		adc_out_data[0] = temp_car_tune;
-		ret = copy_to_user(user_data_addr, adc_out_data, 8);
+
+		if (copy_to_user(user_data_addr, adc_out_data,
+			sizeof(adc_out_data))) {
+			mutex_unlock(&gm.fg_mutex);
+			return -EFAULT;
+		}
+
+
 		bm_err("**** unlocked_ioctl Set_BAT_CAR_TUNE_VALUE[%d], result=%d, ret=%d\n",
 			adc_in_data[1], adc_out_data[0], ret);
 
 		break;
 
 	case Set_BAT_DISABLE_NAFG:
-		user_data_addr = (int *)arg;
-		ret = copy_from_user(adc_in_data, user_data_addr, 8);
 		isdisNAFG = adc_in_data[1];
 
 		if (isdisNAFG == 1) {
@@ -4015,8 +4082,6 @@ static long adc_cali_ioctl(
 
 		/* add bing meta tool------------------------------- */
 	case Set_CARTUNE_TO_KERNEL:
-		user_data_addr = (int *)arg;
-		ret = copy_from_user(adc_in_data, user_data_addr, 8);
 		temp_car_tune = adc_in_data[1];
 		if (temp_car_tune > 500 && temp_car_tune < 1500)
 			fg_cust_data.car_tune_value = temp_car_tune;
@@ -4027,7 +4092,8 @@ static long adc_cali_ioctl(
 	default:
 		bm_err("**** unlocked_ioctl unknown IOCTL: 0x%08x\n", cmd);
 		g_ADC_Cali = false;
-		break;
+		mutex_unlock(&gm.fg_mutex);
+		return -EINVAL;
 	}
 
 	mutex_unlock(&gm.fg_mutex);
@@ -4265,7 +4331,7 @@ void battery_shutdown(struct platform_device *dev)
 {
 	int fg_coulomb = 0;
 	int shut_car_diff = 0;
-	int verify_car;
+	int verify_car = 0;
 
 	fg_coulomb = gauge_get_coulomb();
 	if (gm.d_saved_car != 0) {
@@ -4279,6 +4345,7 @@ void battery_shutdown(struct platform_device *dev)
 		__func__,
 		gm.d_saved_car, fg_coulomb, shut_car_diff, verify_car);
 
+	gm.fix_coverity = 1;
 }
 
 static int battery_suspend(struct platform_device *dev, pm_message_t state)

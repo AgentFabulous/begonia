@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,6 +22,7 @@
 #include <linux/interrupt.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
+#include <linux/kthread.h>
 #include <linux/device.h>
 #include <linux/pm_wakeup.h>
 #include <linux/kdev_t.h>
@@ -34,6 +35,7 @@
 #include <linux/sched.h>
 #include <linux/writeback.h>
 #include <linux/seq_file.h>
+#include <linux/power_supply.h>
 #include <linux/time.h>
 #include <linux/uaccess.h>
 #include <linux/reboot.h>
@@ -107,7 +109,7 @@ static int mt_charger_online(struct mt_charger *mtk_chg)
 		if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
 		    boot_mode == LOW_POWER_OFF_CHARGING_BOOT) {
 			pr_notice("%s: Unplug Charger/USB\n", __func__);
-
+//			kernel_power_off();
 		}
 	}
 
@@ -264,7 +266,7 @@ static int mt_usb_get_property(struct power_supply *psy,
 		}
 		break;
 
-/*	case POWER_SUPPLY_PROP_HVDCP3_TYPE:
+	case POWER_SUPPLY_PROP_HVDCP3_TYPE:
 		if (charger_manager_pd_is_online())
 			val->intval = USB_PD;
 		else if (hvdcp_type_tmp == HVDCP)
@@ -274,7 +276,10 @@ static int mt_usb_get_property(struct power_supply *psy,
 		else
 			val->intval = HVDCP3_NONE;
 		break;
-*/	case POWER_SUPPLY_PROP_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_QUICK_CHARGE_TYPE:
+		val->intval = charger_manager_get_quick_charge_type();
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		val->intval = 500000;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
@@ -455,7 +460,8 @@ static enum power_supply_property mt_usb_properties[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_REAL_TYPE,
-
+	POWER_SUPPLY_PROP_HVDCP3_TYPE,
+	POWER_SUPPLY_PROP_QUICK_CHARGE_TYPE,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
@@ -479,7 +485,7 @@ static enum power_supply_property mt_main_properties[] = {
 static void tcpc_power_off_work_handler(struct work_struct *work)
 {
 	pr_info("%s\n", __func__);
-
+//	kernel_power_off();
 }
 
 static void charger_in_work_handler(struct work_struct *work)

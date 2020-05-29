@@ -1,15 +1,15 @@
 /*
- * Copyright (c) 2018 XiaoMi, Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ *  * Copyright (c) 2018 XiaoMi, Inc.
+ *  * Copyright (C) 2020 XiaoMi, Inc.
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 and
- *  only version 2 as published by the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
  *
- *  This program is distributed in the hope that it will be useful
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
@@ -600,7 +600,6 @@ static int smb1351_read_reg(struct smb1351_charger *chip, int reg, u8 *val)
 		*val = ret;
 	}
 	pm_relax(chip->dev);
-
 	pr_info("Reading 0x%02x=0x%02x\n", reg, *val);
 	return 0;
 }
@@ -1126,6 +1125,7 @@ static void smb1351_chg_hvdcp_det_work(struct work_struct *work)
 		cm->hvdcp_type = chip->hvdcp_type;
 		chip->mt_chg->usb_desc.type = POWER_SUPPLY_TYPE_USB_HVDCP;
 		power_supply_changed(chip->usb_psy);
+
 		pr_err("QC charger detected. hvdcp= %x.wireless_status = %d\n",
 					hvdcp_status, cm->wireless_status);
 	}
@@ -1193,7 +1193,7 @@ static int smblib_set_vbus_disable(struct smb1351_charger *chip,
 
 #define CONNECTOR_THERM_ABOVE		200	/* 20 Dec */
 #define CONNECTOR_THERM_HIG		500	/* 	50 Dec */
-#define CONNECTOR_THERM_TOO_HIG		700	/* 70 Dec */
+#define CONNECTOR_THERM_TOO_HIG		800	/* 80 Dec */
 #define CONNECTOR_THERM_MAX		1200	/* 120 Dec */
 
 static int smblib_set_sw_conn_therm_regulation(struct smb1351_charger *chip,
@@ -1769,7 +1769,7 @@ static int smb1351_get_voltage_now(struct smb1351_charger *chip, union power_sup
 		return rc;
 	}
 
-
+	//3500 mv + 20mv * index
 	val->intval = 3500 + (reg & STATUS_FLOAT_VOLTAGE_MASK) * 20;
 
 	return rc;
@@ -2558,6 +2558,9 @@ static int smb1351_enable_chg_type_det(struct charger_device *chg_dev, bool en)
 
 	if (!en) {
 		chip->chg_type = CHARGER_UNKNOWN;
+		chip->hvdcp_type = HVDCP_NULL;
+		cm->hvdcp_type = chip->hvdcp_type;
+		cm->pd_type = MTK_PD_CONNECT_NONE;
 		smb1351_psy_chg_type_changed(chip, true);
 		smb1351_set_usbsw_state(chip, USBSW_USB);
 		chip->bc12_en = false;

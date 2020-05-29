@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -49,6 +49,7 @@ enum adapter_event {
 	MTK_PD_CONNECT_TYPEC_ONLY_SNK,
 	MTK_TYPEC_WD_STATUS,
 	MTK_RA_DETECT,
+	MTK_WIRELESS_CHARGER,
 	MTK_TYPEC_HRESET_STATUS,
 };
 

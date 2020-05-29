@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,6 +14,10 @@
 
 #ifndef __MTK_CHARGER_INIT_H__
 #define __MTK_CHARGER_INIT_H__
+
+#define MI_CYCLE_COUNT_MAX 3999
+#define BATTERY_CV_MAX 4390000
+#define BATTERY_CV_MIN 4330000
 
 #define BATTERY_CV 4350000
 #define V_CHARGER_MAX 10500000 /* 10.5 V */

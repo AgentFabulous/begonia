@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -27,6 +27,7 @@ struct dual_switch_charging_alg_data {
 	unsigned int full_charging_time;
 
 	struct power_supply	*usb_psy;
+	struct power_supply	*charger_psy;
 	int	vbus_mv;
 	bool first_run;
 };

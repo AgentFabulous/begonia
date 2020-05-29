@@ -79,6 +79,23 @@ config SWCHR_POWER_PATH
 	  used to representing voltage of system
 	  or battery.
 
+config MTK_BQ24196_SUPPORT
+	bool "MediaTek Battery driver for TI BQ24196 charger IC"
+	help
+	  BQ24196 charger IC support
+	  This is to enable MediaTek supports to BQ24196.
+	  It depends on config MTK_SMART_BATTERY
+	  and config MTK_SWCHR_SUPPORT
+	  Set to Yes if BQ24196 is used.
+
+config MTK_BQ24296_SUPPORT
+	bool "MediaTek Battery driver for TI BQ24296 charger IC"
+	help
+	  This is to enable MediaTek supports to BQ24296 Charger IC.
+	  It depends on config MTK_SMART_BATTERY
+	  and config MTK_SWCHR_SUPPORT
+	  Set to Yes if BQ24296 is used.
+
 config CHARGER_RT9465
 	bool "Charger Driver for Richtek RT9465 Charger IC"
 	default n
@@ -88,6 +105,16 @@ config CHARGER_RT9465
 	  It is mainly used as slave IC for dual charger
 	  application.
 	  It depends on config MTK_CHARGER.
+
+config CHARGER_RT9458
+	bool "Charger Driver for Richtek RT9458 Charger IC"
+	default n
+	depends on MTK_SWCHR_SUPPORT
+	help
+	  Say Y to enable
+	  Richtek RT9458 driver.
+	  It depends on
+	  the config MTK_SWCHR_SUPPORT.
 
 config SMB1351_USB_CHARGER
 	bool "Charger Driver for SMB1351  Charger IC"
@@ -115,8 +142,8 @@ config CHARGER_RT9471
 	depends on MTK_CHARGER
 	help
 	  Say Yes to enable Richtek RT9471 driver.
-	  It supports both of RT9471/RT9471D,
-	  which RT9471D supports BC1.2
+	  It supports RT9470/RT9470D/RT9471/RT9471D,
+	  which RT9470D and RT9471D support BC1.2
 	  It depends on config MTK_CHARGER.
 
 config MTK_CHARGER_UNLIMITED
@@ -128,3 +155,19 @@ config MTK_CHARGER_UNLIMITED
 	  Say No to not release charging current restrictions.
 	  It is mainly used for long-term tests.
 	  It depends on config MTK_CHARGER.
+
+config CHARGER_HL7005
+	bool "Charger Driver for Halo HL7005 Charger IC"
+	depends on MTK_SWCHR_SUPPORT
+	help
+	  Say Y to enable
+	  Halo HL7005 driver.
+	  It depends on config MTK_SWCHR_SUPPORT.
+
+config CHARGER_BQ25601
+	bool "CHARGER_BQ25601"
+	help
+	  This is to enable MediaTek supports to BQ25601.
+	  It depends on config MTK_SMART_BATTERY
+	  and config MTK_SWCHR_SUPPORT
+	  Set to Yes if BQ25601 is used.
