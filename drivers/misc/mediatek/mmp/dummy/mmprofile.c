@@ -25,10 +25,7 @@
 
 #include <linux/uaccess.h>
 
-#include "mmprofile_internal.h"
-#include "mmprofile_function.h"
-#include "mmprofile_static_event.h"
-
+#include <mmprofile_internal.h>
 /* #pragma GCC optimize ("O0") */
 #define MMP_DEVNAME "mmp"
 

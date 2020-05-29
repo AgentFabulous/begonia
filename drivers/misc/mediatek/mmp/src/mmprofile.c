@@ -18,7 +18,7 @@
 #include <linux/cdev.h>
 #include <asm/page.h>
 #include <linux/io.h>
-#include <linux/sched/clock.h>
+
 #include <generated/autoconf.h>
 #include <linux/module.h>
 #include <linux/mm.h>
@@ -42,12 +42,10 @@
 #include <linux/ftrace.h>
 #include <linux/trace_events.h>
 #include <linux/bug.h>
-#include "mt-plat/aee.h"
+#include <linux/sched/clock.h>
 
 #define MMPROFILE_INTERNAL
-#include "mmprofile_internal.h"
-#include "mmprofile_function.h"
-#include "mmprofile_static_event.h"
+#include <mmprofile_internal.h>
 
 #ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
 #include <linux/exm_driver.h>
@@ -88,15 +86,6 @@ static bool mmp_trace_log_on;
 
 #define MMP_MSG(fmt, arg...) pr_info("MMP: %s(): "fmt"\n", __func__, ##arg)
 
-#define mmp_aee(string, args...) do {	\
-	char disp_name[100];						\
-	snprintf(disp_name, 100, "[MMP]"string, ##args); \
-	aee_kernel_warning_api(__FILE__, __LINE__, \
-		DB_OPT_DEFAULT | DB_OPT_MMPROFILE_BUFFER | \
-		DB_OPT_DISPLAY_HANG_DUMP | DB_OPT_DUMP_DISPLAY, \
-		disp_name, "[MMP] error"string, ##args);		\
-	pr_info("MMP error: "string, ##args);				\
-} while (0)
 struct mmprofile_regtable_t {
 	struct mmprofile_eventinfo_t event_info;
 	struct list_head list;
@@ -119,11 +108,6 @@ static struct mmprofile_event_t *p_mmprofile_ring_buffer;
 #ifdef CONFIG_MTK_ENG_BUILD
 static unsigned char *p_mmprofile_meta_buffer;
 #endif
-
-static struct mmp_static_event_t mmprofile_static_events[] = {
-	{MMP_ROOT_EVENT, "Root_Event", MMP_INVALID_EVENT},
-	{MMP_TOUCH_PANEL_EVENT, "TouchPanel_Event", MMP_ROOT_EVENT},
-};
 
 static struct mmprofile_global_t mmprofile_globals
 __aligned(PAGE_SIZE) = {
@@ -276,8 +260,8 @@ void mmprofile_get_dump_buffer(unsigned int start, unsigned long *p_addr,
 					src_pos = 0;
 				if (!virt_addr_valid(
 					&(p_regtable->event_info))) {
-					mmp_aee("pos=0x%x, src_pos=0x%x\n",
-						pos, src_pos);
+					//mmp_aee("pos=0x%x, src_pos=0x%x\n",
+					//	pos, src_pos);
 					pr_info("region_pos=0x%x, block_pos=0x%x\n",
 						region_pos, block_pos);
 					return;
@@ -822,8 +806,8 @@ static void mmprofile_log_int(mmp_event event, enum mmp_log_type type,
 	/*check vmalloc address is valid or not*/
 	if (!pfn_valid(vmalloc_to_pfn((struct mmprofile_event_t *)
 		&(p_mmprofile_ring_buffer[index])))) {
-		mmp_aee("write_pointer:0x%x,index:0x%x,line:%d\n",
-			mmprofile_globals.write_pointer, index, __LINE__);
+		//mmp_aee("write_pointer:0x%x,index:0x%x,line:%d\n",
+		//	mmprofile_globals.write_pointer, index, __LINE__);
 		pr_info("buffer_size_record:0x%x,new_buffer_size_record:0x%x\n",
 			mmprofile_globals.buffer_size_record,
 			mmprofile_globals.new_buffer_size_record);
@@ -847,9 +831,9 @@ static void mmprofile_log_int(mmp_event event, enum mmp_log_type type,
 			if (!pfn_valid(vmalloc_to_pfn
 				((struct mmprofile_event_t *)
 					&(p_mmprofile_ring_buffer[index])))) {
-				mmp_aee("write_pt:0x%x,index:0x%x,line:%d\n",
-					mmprofile_globals.write_pointer,
-					index, __LINE__);
+				//MMP_MSG("write_pt:0x%x,index:0x%x,line:%d\n",
+				//	mmprofile_globals.write_pointer,
+				//	index, __LINE__);
 				pr_info("buf_size:0x%x,new_buf_size:0x%x\n",
 					mmprofile_globals.buffer_size_record,
 				mmprofile_globals.new_buffer_size_record);
@@ -1557,14 +1541,12 @@ static ssize_t mmprofile_dbgfs_global_read(struct file *file, char __user *buf,
 		MMPROFILE_GLOBALS_SIZE);
 }
 
-#if 0
 static ssize_t mmprofile_dbgfs_global_write(struct file *file,
 	const char __user *buf, size_t size, loff_t *ppos)
 {
 	return simple_write_to_buffer(&mmprofile_globals,
 		MMPROFILE_GLOBALS_SIZE, ppos, buf, size);
 }
-#endif
 
 static const struct file_operations mmprofile_dbgfs_enable_fops = {
 	.read = mmprofile_dbgfs_enable_read,
@@ -1590,9 +1572,7 @@ static const struct file_operations mmprofile_dbgfs_buffer_fops = {
 
 static const struct file_operations mmprofile_dbgfs_global_fops = {
 	.read = mmprofile_dbgfs_global_read,
-#if 0
 	.write = mmprofile_dbgfs_global_write,
-#endif
 	.llseek = generic_file_llseek,
 };
 
