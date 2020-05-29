@@ -84,11 +84,6 @@
 #define UWK_CTL1_0P_LS_P	BIT(7)
 #define UWK_CTL1_IS_P		BIT(6)  /* polarity for ip sleep */
 
-#define PERI_SSUSB_SPM_CTRL		0x514
-/*#define PERI_SSUSB_SPM_CTRL		0x510 */
-#define RG_SSUSB_SPM_INT_EN		BIT(1)
-#define RG_SSUSB_IP_SLEEP_EN	BIT(4)
-
 /* test mode */
 #define HOST_CMD_TEST_J             0x1
 #define HOST_CMD_TEST_K             0x2
@@ -416,39 +411,25 @@ static void usb_wakeup_ip_sleep_en(struct xhci_hcd_mtk *mtk)
 	u32 tmp;
 	struct regmap *pericfg = mtk->pericfg;
 
-	if (mtk->uses_new_wakeup) {
-		regmap_read(pericfg, PERI_SSUSB_SPM_CTRL, &tmp);
-		tmp |= RG_SSUSB_SPM_INT_EN | RG_SSUSB_IP_SLEEP_EN;
-		regmap_write(pericfg, PERI_SSUSB_SPM_CTRL, tmp);
-		regmap_read(pericfg, PERI_SSUSB_SPM_CTRL, &tmp);
-		dev_dbg(mtk->dev, "%s(): WK_CTRL=%#x\n", __func__, tmp);
-	} else {
-		regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
-		tmp &= ~UWK_CTL1_IS_P;
-		tmp &= ~(UWK_CTL1_IS_C(0xf));
-		tmp |= UWK_CTL1_IS_C(0x8);
-		regmap_write(pericfg, PERI_WK_CTRL1, tmp);
-		regmap_write(pericfg, PERI_WK_CTRL1, tmp | UWK_CTL1_IS_E);
+	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
+	tmp &= ~UWK_CTL1_IS_P;
+	tmp &= ~(UWK_CTL1_IS_C(0xf));
+	tmp |= UWK_CTL1_IS_C(0x8);
+	regmap_write(pericfg, PERI_WK_CTRL1, tmp);
+	regmap_write(pericfg, PERI_WK_CTRL1, tmp | UWK_CTL1_IS_E);
 
-		regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
-		dev_dbg(mtk->dev, "%s(): WK_CTRL1[P6,E25,C26:29]=%#x\n",
-			__func__, tmp);
-	}
+	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
+	dev_dbg(mtk->dev, "%s(): WK_CTRL1[P6,E25,C26:29]=%#x\n",
+		__func__, tmp);
 }
 
 static void usb_wakeup_ip_sleep_dis(struct xhci_hcd_mtk *mtk)
 {
 	u32 tmp;
 
-	if (mtk->uses_new_wakeup) {
-		regmap_read(mtk->pericfg, PERI_SSUSB_SPM_CTRL, &tmp);
-		tmp &= ~(RG_SSUSB_SPM_INT_EN | RG_SSUSB_IP_SLEEP_EN);
-		regmap_write(mtk->pericfg, PERI_SSUSB_SPM_CTRL, tmp);
-	} else {
-		regmap_read(mtk->pericfg, PERI_WK_CTRL1, &tmp);
-		tmp &= ~UWK_CTL1_IS_E;
-		regmap_write(mtk->pericfg, PERI_WK_CTRL1, tmp);
-	}
+	regmap_read(mtk->pericfg, PERI_WK_CTRL1, &tmp);
+	tmp &= ~UWK_CTL1_IS_E;
+	regmap_write(mtk->pericfg, PERI_WK_CTRL1, tmp);
 }
 
 /*
@@ -459,9 +440,6 @@ static void usb_wakeup_line_state_en(struct xhci_hcd_mtk *mtk)
 {
 	u32 tmp;
 	struct regmap *pericfg = mtk->pericfg;
-
-	if (mtk->uses_new_wakeup)
-		return;
 
 	/* line-state of u2-port0 */
 	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
@@ -484,9 +462,6 @@ static void usb_wakeup_line_state_dis(struct xhci_hcd_mtk *mtk)
 {
 	u32 tmp;
 	struct regmap *pericfg = mtk->pericfg;
-
-	if (mtk->uses_new_wakeup)
-		return;
 
 	/* line-state of u2-port0 */
 	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
@@ -547,13 +522,12 @@ static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
 		dev_err(dev, "fail to get pericfg regs\n");
 		return PTR_ERR(mtk->pericfg);
 	}
+
 	return 0;
 }
 
 static int xhci_mtk_setup(struct usb_hcd *hcd);
-
-static const struct xhci_driver_overrides xhci_mtk_overrides = {
-	.extra_priv_size = sizeof(struct xhci_hcd),
+static const struct xhci_driver_overrides xhci_mtk_overrides __initconst = {
 	.reset = xhci_mtk_setup,
 };
 
@@ -746,8 +720,6 @@ static int xhci_mtk_probe(struct platform_device *pdev)
 	}
 
 	mtk->lpm_support = of_property_read_bool(node, "usb3-lpm-capable");
-	mtk->uses_new_wakeup = of_property_read_bool(node,
-		"mediatek,new-wakeup");
 
 	ret = usb_wakeup_of_property_parse(mtk, node);
 	if (ret)
@@ -911,7 +883,8 @@ static int xhci_mtk_remove(struct platform_device *dev)
 
 	xhci->xhc_state |= XHCI_STATE_REMOVING;
 
-	usb_remove_hcd(xhci->shared_hcd);
+	usb_remove_hcd(shared_hcd);
+	xhci->shared_hcd = NULL;
 	xhci_mtk_phy_power_off(mtk);
 	xhci_mtk_phy_exit(mtk);
 	device_init_wakeup(&dev->dev, false);
@@ -926,6 +899,7 @@ static int xhci_mtk_remove(struct platform_device *dev)
 	xhci_mtk_ldos_disable(mtk);
 	pm_runtime_put_noidle(&dev->dev);
 	pm_runtime_disable(&dev->dev);
+
 	return 0;
 }
 
@@ -995,10 +969,10 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
 	xhci_mtk_host_enable(mtk);
 
 	xhci_dbg(xhci, "%s: restart port polling\n", __func__);
-	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
-	usb_hcd_poll_rh_status(hcd);
 	set_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
 	usb_hcd_poll_rh_status(xhci->shared_hcd);
+	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
+	usb_hcd_poll_rh_status(hcd);
 	return 0;
 }
 
@@ -1018,6 +992,7 @@ static const struct dev_pm_ops xhci_mtk_phone_pm_ops = {
 #ifdef CONFIG_OF
 static const struct of_device_id mtk_xhci_of_match[] = {
 	{ .compatible = "mediatek,mt8173-xhci"},
+	{ .compatible = "mediatek,mtk-xhci"},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, mtk_xhci_of_match);

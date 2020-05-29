@@ -62,7 +62,7 @@
 
 /* number of tx and rx requests to allocate */
 #define TX_REQ_MAX 4
-#define RX_REQ_MAX 4
+#define RX_REQ_MAX 2
 #define INTR_REQ_MAX 5
 
 /* ID for Microsoft MTP OS String */
@@ -585,7 +585,6 @@ static void mtp_complete_in(struct usb_ep *ep, struct usb_request *req)
 	wake_up(&dev->write_wq);
 }
 
-static struct completion usb_read_completion;
 static atomic_t usb_rdone;
 static int64_t usb_rcnt;
 static int64_t vfs_wcnt;
@@ -604,14 +603,11 @@ static void mtp_complete_out(struct usb_ep *ep, struct usb_request *req)
 		rx_cont_abort = true;
 	}
 
-#ifdef CONFIG_MEDIATEK_SOLUTION
 	if (mtp_rx_boost)
 		usb_boost();
-#endif
 
 	wake_up(&dev->read_wq);
 	atomic_inc(&usb_rdone);
-	complete(&usb_read_completion);
 }
 
 static void mtp_complete_intr(struct usb_ep *ep, struct usb_request *req)
@@ -1294,21 +1290,13 @@ static void vfs_write_work(struct work_struct *data)
 	MTP_RX_DBG("write_cnt<%lld>, read_cnt<%lld>, req_cnt<%lld>\n",
 			vfs_wcnt, usb_rcnt, req_cnt);
 
-	for (;;) {
-		wait_for_completion_interruptible(&usb_read_completion);
-
-		/* unbind case */
-		if (rx_cont_abort)
-			goto exit;
-
-		/* cancel case */
+	while (!rx_cont_abort && (vfs_wcnt != req_cnt)) {
 		if (dev->state != STATE_BUSY) {
 			rx_cont_abort = true;
 			MTP_RX_DBG("state<%d>\n", dev->state);
-			goto exit;
+			break;
 		}
-		/* deal with what we have */
-		while (atomic_read(&usb_rdone) > 0) {
+		if (atomic_read(&usb_rdone) > 0) {
 			int rc;
 
 			write_req = dev->rx_req[index];
@@ -1317,9 +1305,8 @@ static void vfs_write_work(struct work_struct *data)
 			MTP_RX_DBG("write_req<%p>, len<%d>, usb_rdone<%d>\n",
 					write_req, write_req->actual,
 					atomic_read(&usb_rdone));
-#ifdef CONFIG_MEDIATEK_SOLUTION
+
 			usb_boost();
-#endif
 			monitor_in(MTP_VFS_W);
 			if (mtp_skip_vfs_write) {
 				rc = write_req->actual;
@@ -1352,7 +1339,7 @@ static void vfs_write_work(struct work_struct *data)
 				if (unlikely(rc)) {
 					rx_cont_abort = true;
 					MTP_RX_DBG("rc<%d>\n", rc);
-					goto exit;
+					break;
 				}
 				usb_rcnt += read_req->length;
 				MTP_RX_DBG("v_wcnt%lld,u_rcnt%lld,req%lld\n",
@@ -1360,12 +1347,7 @@ static void vfs_write_work(struct work_struct *data)
 						req_cnt);
 			}
 		}
-		/* check done or not */
-		if (vfs_wcnt == req_cnt)
-			goto exit;
-
-	} /* for (;;) */
-exit:
+	};
 	MTP_RX_DBG("write_cnt<%lld>, read_cnt<%lld>, req_cnt<%lld>\n",
 			vfs_wcnt, usb_rcnt, req_cnt);
 }
@@ -1387,7 +1369,6 @@ void trigger_rx_cont(void)
 	atomic_set(&usb_rdone, 0);
 	usb_rcnt = vfs_wcnt = 0;
 	rx_cont_abort = false;
-	init_completion(&usb_read_completion);
 
 	mb(); /* make all related status reset and sync */
 
@@ -1906,7 +1887,6 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 				dev->state = STATE_CANCELED;
 				wake_up(&dev->read_wq);
 				wake_up(&dev->write_wq);
-				complete(&usb_read_completion);
 			}
 			spin_unlock_irqrestore(&dev->lock, flags);
 
@@ -2032,10 +2012,6 @@ mtp_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	struct usb_request *req;
 	int i;
 
-	pr_info("%s before flush\n", __func__);
-	flush_workqueue(dev->wq);
-	pr_info("%s after flush\n", __func__);
-
 	mtp_string_defs[INTERFACE_STRING_INDEX].id = 0;
 	while ((req = mtp_req_get(dev, &dev->tx_idle)))
 		mtp_request_free(req, dev->ep_in);
@@ -2130,8 +2106,6 @@ static int __mtp_setup(struct mtp_instance *fi_mtp)
 	atomic_set(&dev->ioctl_excl, 0);
 	INIT_LIST_HEAD(&dev->tx_idle);
 	INIT_LIST_HEAD(&dev->intr_idle);
-
-	init_completion(&usb_read_completion);
 
 	dev->wq = create_singlethread_workqueue("f_mtp");
 	if (!dev->wq) {

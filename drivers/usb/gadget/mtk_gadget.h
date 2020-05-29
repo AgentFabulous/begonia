@@ -16,7 +16,6 @@
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
 extern char *serial_string;
 extern int serial_idx;
-extern unsigned int usb2jtag_mode(void);
 #endif
 extern void composite_setup_complete(struct usb_ep *ep,
 		struct usb_request *req);

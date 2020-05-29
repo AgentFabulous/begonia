@@ -132,7 +132,6 @@ struct xhci_hcd_mtk {
 	int num_phys;
 	int wakeup_src;
 	bool lpm_support;
-	bool uses_new_wakeup; /* tmp solution for mt2712 */
 	struct dentry *debugfs_root;
 };
 

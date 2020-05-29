@@ -1070,3 +1070,4 @@ void disconnect_check(struct mtu3 *mtu)
 	}
 	pr_info("speed <%d>\n", mtu->g.speed);
 }
+
