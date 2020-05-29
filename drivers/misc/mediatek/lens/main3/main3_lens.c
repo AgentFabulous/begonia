@@ -35,8 +35,6 @@
 #include <linux/ktime.h>
 /* ------------------------- */
 
-#include <archcounter_timesync.h>
-
 #include "lens_info.h"
 #include "lens_list.h"
 
@@ -132,7 +130,7 @@ static long AF_SetMotorName(__user struct stAF_MotorName *pstMotorName)
 		if (g_stAF_DrvList[i].uEnable != 1)
 			break;
 
-		/* LOG_INF("Search : %s\n", g_stAF_DrvList[i].uDrvName); */
+		LOG_INF("Search Motor Name : %s\n", g_stAF_DrvList[i].uDrvName);
 		if (strcmp(stMotorName.uMotorName,
 			   g_stAF_DrvList[i].uDrvName) == 0) {
 			LOG_INF("Motor Name : %s\n", stMotorName.uMotorName);
@@ -143,56 +141,6 @@ static long AF_SetMotorName(__user struct stAF_MotorName *pstMotorName)
 			break;
 		}
 	}
-	return i4RetValue;
-}
-
-
-static long AF_ControlParam(unsigned long a_u4Param)
-{
-	long i4RetValue = -1;
-	__user struct stAF_CtrlCmd *pCtrlCmd =
-			(__user struct stAF_CtrlCmd *)a_u4Param;
-	struct stAF_CtrlCmd CtrlCmd;
-
-	if (copy_from_user(&CtrlCmd, pCtrlCmd, sizeof(struct stAF_CtrlCmd)))
-		LOG_INF("copy to user failed\n");
-
-	switch (CtrlCmd.i8CmdID) {
-	case CONVERT_CCU_TIMESTAMP:
-		{
-		long long monotonicTime = 0;
-		long long hwTickCnt     = 0;
-
-		hwTickCnt     = CtrlCmd.i8Param[0];
-		monotonicTime = archcounter_timesync_to_monotonic(hwTickCnt);
-		/* ns */
-		CtrlCmd.i8Param[0] = monotonicTime;
-
-		hwTickCnt     = CtrlCmd.i8Param[1];
-		monotonicTime = archcounter_timesync_to_monotonic(hwTickCnt);
-		/* ns */
-		CtrlCmd.i8Param[1] = monotonicTime;
-
-		#if 0
-		hwTickCnt     = arch_counter_get_cntvct(); /* Global timer */
-		monotonicTime = archcounter_timesync_to_monotonic(hwTickCnt);
-		do_div(monotonicTime, 1000); /* ns to us */
-		CtrlCmd.i8Param[1] = monotonicTime;
-		#endif
-		}
-		i4RetValue = 1;
-		break;
-	default:
-		i4RetValue = -1;
-		break;
-	}
-
-	if (i4RetValue > 0) {
-		if (copy_to_user(pCtrlCmd, &CtrlCmd,
-			sizeof(struct stAF_CtrlCmd)))
-			LOG_INF("copy to user failed\n");
-	}
-
 	return i4RetValue;
 }
 
@@ -269,7 +217,7 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 			   sizeof(struct stAF_MotorName)))
 		LOG_INF("copy to user failed when getting motor information\n");
 
-	/* LOG_INF("GETDRVNAME : driver name(%s)\n", stMotorName.uMotorName); */
+	/* LOG_INF("set driver name(%s)\n", stMotorName.uMotorName); */
 
 	for (i = 0; i < MAX_NUM_OF_LENS; i++) {
 		if (g_stAF_DrvList[i].uEnable != 1)
@@ -278,7 +226,7 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 		LOG_INF("Search Motor Name : %s\n", g_stAF_DrvList[i].uDrvName);
 		if (strcmp(stMotorName.uMotorName,
 			   g_stAF_DrvList[i].uDrvName) == 0) {
-			LOG_INF("Motor Name : %s\n", stMotorName.uMotorName);
+			/* LOG_INF("Name : %s\n", stMotorName.uMotorName); */
 			pstAF_CurDrv = &g_stAF_DrvList[i];
 			break;
 		}
@@ -294,8 +242,7 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 			pstAF_CurDrv->pAF_GetFileName(
 					MotorFileName.uMotorName);
 			i4RetValue = 1;
-			LOG_INF("GETDRVNAME : get file name(%s)\n",
-				MotorFileName.uMotorName);
+
 			if (copy_to_user(
 				    pstMotorName, &MotorFileName,
 				    sizeof(struct stAF_MotorName)))
@@ -350,18 +297,12 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 		}
 		break;
 
-	case AFIOC_X_CTRLPARA:
-		if (AF_ControlParam(a_u4Param) <= 0) {
-			if (g_pstAF_CurDrv)
+	default:
+		if (g_pstAF_CurDrv) {
+			if (g_pstAF_CurDrv->pAF_Ioctl)
 				i4RetValue = g_pstAF_CurDrv->pAF_Ioctl(
 					a_pstFile, a_u4Command, a_u4Param);
 		}
-		break;
-
-	default:
-		if (g_pstAF_CurDrv)
-			i4RetValue = g_pstAF_CurDrv->pAF_Ioctl(
-				a_pstFile, a_u4Command, a_u4Param);
 		break;
 	}
 
@@ -391,12 +332,12 @@ static int AF_Open(struct inode *a_pstInode, struct file *a_pstFile)
 {
 	LOG_INF("Start\n");
 
-	spin_lock(&g_AF_SpinLock);
 	if (g_s4AF_Opened) {
-		spin_unlock(&g_AF_SpinLock);
 		LOG_INF("The device is opened\n");
 		return -EBUSY;
 	}
+
+	spin_lock(&g_AF_SpinLock);
 	g_s4AF_Opened = 1;
 	spin_unlock(&g_AF_SpinLock);
 

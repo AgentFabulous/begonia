@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -129,29 +129,29 @@ extern int DW9814AF_GetFileName(unsigned char *pFileName);
 
 #define DW9800VAF_SetI2Cclient DW9800VAF_SetI2Cclient_Main
 #define DW9800VAF_Ioctl DW9800VAF_Ioctl_Main
-
+//#define DW9800VAF_PowerDown DW9800VAF_PowerDown_Main
 #define DW9800VAF_Release DW9800VAF_Release_Main
 #define DW9800VAF_GetFileName DW9800VAF_GetFileName_Main
 extern int DW9800VAF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
 				 spinlock_t *pAF_SpinLock, int *pAF_Opened);
 extern long DW9800VAF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 			   unsigned long a_u4Param);
-
-
+//extern int DW9800VAF_PowerDown(struct i2c_client *pstAF_I2Cclient,
+//                                int *pAF_Opened);
 extern int DW9800VAF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 extern int DW9800VAF_GetFileName(unsigned char *pFileName);
 
 #define FP5516AF_SetI2Cclient FP5516AF_SetI2Cclient_Main
 #define FP5516AF_Ioctl FP5516AF_Ioctl_Main
-
+//#define FP5516AF_PowerDown FP5516AF_PowerDown_Main
 #define FP5516AF_Release FP5516AF_Release_Main
 #define FP5516AF_GetFileName FP5516AF_GetFileName_Main
 extern int FP5516AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
 				 spinlock_t *pAF_SpinLock, int *pAF_Opened);
 extern long FP5516AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 			   unsigned long a_u4Param);
-
-
+//extern int FP5516AF_PowerDown(struct i2c_client *pstAF_I2Cclient,
+//                                int *pAF_Opened);
 extern int FP5516AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 extern int FP5516AF_GetFileName(unsigned char *pFileName);
 
@@ -323,20 +323,6 @@ extern int LC898217AFC_Release(struct inode *a_pstInode,
 extern int LC898217AFC_PowerDown(struct i2c_client *pstAF_I2Cclient,
 				int *pAF_Opened);
 extern int LC898217AFC_GetFileName(unsigned char *pFileName);
-
-#define LC898229AF_SetI2Cclient LC898229AF_SetI2Cclient_Main
-#define LC898229AF_Ioctl LC898229AF_Ioctl_Main
-#define LC898229AF_Release LC898229AF_Release_Main
-#define LC898229AF_PowerDown LC898229AF_PowerDown_Main
-#define LC898229AF_GetFileName LC898229AF_GetFileName_Main
-extern int LC898229AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
-				   spinlock_t *pAF_SpinLock, int *pAF_Opened);
-extern long LC898229AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
-			     unsigned long a_u4Param);
-extern int LC898229AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
-extern int LC898229AF_PowerDown(struct i2c_client *pstAF_I2Cclient,
-				int *pAF_Opened);
-extern int LC898229AF_GetFileName(unsigned char *pFileName);
 
 #if 0
 #define AD5820AF_SetI2Cclient AD5820AF_SetI2Cclient_Main

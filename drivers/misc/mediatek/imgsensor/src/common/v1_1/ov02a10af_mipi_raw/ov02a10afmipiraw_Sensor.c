@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018-2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -124,7 +123,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 	.custom1 = {
 		.pclk = 69000000,
 		.linelength  = 934,
-		.framelength = 1392,
+		.framelength = 1392,//1432,
 		.startx = 0,
 		.starty = 0,
 		.grabwindow_width  = 1600,
@@ -190,7 +189,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 };
 
 static struct imgsensor_struct imgsensor = {
-	.mirror = IMAGE_NORMAL,
+	.mirror = IMAGE_NORMAL,//IMAGE_NORMAL,		/*mirrorflip information*/
 	.sensor_mode = IMGSENSOR_MODE_INIT,
 	.shutter = 0x4C00,			/*current shutter*/
 	.gain = 0x200,				/*current gain*/
@@ -210,11 +209,11 @@ static struct imgsensor_struct imgsensor = {
 
 /* Sensor output window information*/
 static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[7] = {
-	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},
-	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},
-	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},
-	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},
-	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},
+	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200}, // Preview
+	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200}, // capture
+	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200}, // video
+	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},// hight video 120
+	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},// slim video
 	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},
 	{ 1600, 1200,	 0,  0, 1600, 1200, 1600,  1200, 0000, 0000, 1600, 1200, 0,    0, 1600,  1200},
 };
@@ -259,7 +258,7 @@ static kal_uint16 read_eeprom_module_id(kal_uint32 addr)
 
 	char pu_send_cmd[2] = {(char)(addr >> 8), (char)(addr & 0xFF) };
 
-	iReadRegI2C(pu_send_cmd, 2, (u8 *) &get_byte, 1, 0xA8);
+	iReadRegI2C(pu_send_cmd, 2, (u8 *) &get_byte, 1, 0xA8);//Ofilm
 
 	return get_byte;
 }

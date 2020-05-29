@@ -1613,7 +1613,6 @@ static inline void OWE_Prepare_Enable_ccf_clock(void)
 	 * CG_SCP_SYS_DIS-> CG_MM_SMI_COMMON -> CG_SCP_SYS_ISP -> OWE clk
 	 */
 	smi_bus_prepare_enable(SMI_LARB5, OWE_DEV_NAME);
-
 	ret = clk_prepare_enable(owe_clk.CG_IMGSYS_OWE);
 	if (ret)
 		LOG_ERR("cannot prepare and enable CG_IMGSYS_OWE clock\n");
@@ -3079,7 +3078,7 @@ EXIT:
  ******************************************************************************/
 static signed int OWE_mmap(struct file *pFile, struct vm_area_struct *pVma)
 {
-	long length = 0;
+	unsigned long length = 0;
 	unsigned int pfn = 0x0;
 
 	length = pVma->vm_end - pVma->vm_start;
@@ -3374,6 +3373,8 @@ static signed int OWE_probe(struct platform_device *pDev)
 		/*  */
 		OWEInfo.IrqInfo.Mask[OWE_IRQ_TYPE_INT_OWE_ST] = INT_ST_MASK_OWE;
 
+		seqlock_init(&(wmfe_reqs.seqlock));
+		seqlock_init(&(occ_reqs.seqlock));
 	}
 
 EXIT:

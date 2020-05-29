@@ -2624,6 +2624,7 @@ static signed int FDVT_WaitIrq(FDVT_WAIT_IRQ_STRUCT *WaitIrq)
 		log_err("interrupted by system, timeout(%d),irq Type/User/Sts/whichReq/Pid(0x%x/%d/0x%x/%d/%d)\n",
 		Timeout, WaitIrq->Type, WaitIrq->UserKey,
 		WaitIrq->Status, whichReq, WaitIrq->ProcessID);
+		mt_irq_dump_status(FDVTInfo.IrqNum);
 		/* actually it should be -ERESTARTSYS */
 		Ret = -ERESTARTSYS;
 		goto EXIT;
@@ -2657,6 +2658,8 @@ static signed int FDVT_WaitIrq(FDVT_WAIT_IRQ_STRUCT *WaitIrq)
 
 		if (WaitIrq->bDumpReg)
 			FDVT_DumpReg();
+
+		mt_irq_dump_status(FDVTInfo.IrqNum);
 
 		Ret = -EFAULT;
 		goto EXIT;
@@ -3986,6 +3989,8 @@ static signed int FDVT_probe(struct platform_device *pDev)
 	/* get IRQ ID and request IRQ */
 	FDVT_dev->irq = irq_of_parse_and_map(pDev->dev.of_node, 0);
 
+	FDVTInfo.IrqNum = FDVT_dev->irq;
+
 	if (FDVT_dev->irq > 0) {
 		/* Get IRQ Flag from device node */
 		if (of_property_read_u32_array
@@ -4880,7 +4885,6 @@ static irqreturn_t ISP_Irq_FDVT(signed int Irq, void *DeviceId)
 	 *  "FdvtHWSta:0x%x, FdvtHWSta:0x%x,
 	 *  DpeDveSta0:0x%x\n", DveStatus, FdvtStatus, DpeDveSta0);
 	 */
-
 	if (FdvtStatus & FDVT_INT_ST)
 		tasklet_schedule(FDVT_tasklet
 					[FDVT_IRQ_TYPE_INT_FDVT_ST].pFDVT_tkt);

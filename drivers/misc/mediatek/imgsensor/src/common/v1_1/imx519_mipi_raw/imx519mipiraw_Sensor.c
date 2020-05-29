@@ -82,16 +82,16 @@ static struct imgsensor_info_struct imgsensor_info = {
 
 	.checksum_value = 0x8ac2d94a,
 	.pre = {
-		.pclk = 1224000000,
+		.pclk = 500000000,
 		.linelength = 5920,
-		.framelength = 6891,
+		.framelength = 2815,
 		.startx = 0,
 		.starty = 0,
 		.grabwindow_width = 2328,
 		.grabwindow_height = 1728, /*1746*/
 		.mipi_data_lp2hs_settle_dc = 85,
 		/* following for GetDefaultFramerateByScenario() */
-		.mipi_pixel_rate = 576000000,
+		.mipi_pixel_rate = 226290000,
 		.max_framerate = 300, /* 30fps */
 	},
 #if IMX519_CAP_2TRIO
@@ -266,7 +266,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 	},
 #endif
 
-	.margin = 4,		/* sensor framelength & shutter margin */
+	.margin = 32,		/* sensor framelength & shutter margin */
 	.min_shutter = 1,	/* min shutter */
 	.max_frame_length = 0xffff,
 	.ae_shut_delay_frame = 0,
@@ -612,28 +612,12 @@ static void write_shutter(kal_uint32 shutter)
 	if (imgsensor.autoflicker_en) {
 		realtime_fps = imgsensor.pclk / imgsensor.line_length * 10
 				/ imgsensor.frame_length;
+		LOG_INF("autoflicker enable, realtime_fps = %d\n",
+			realtime_fps);
 		if (realtime_fps >= 297 && realtime_fps <= 305)
 			set_max_framerate(296, 0);
 		else if (realtime_fps >= 147 && realtime_fps <= 150)
 			set_max_framerate(146, 0);
-		else {
-			/* Extend frame length*/
-			write_cmos_sensor_8(0x0104, 0x01);
-			write_cmos_sensor_8(0x0340,
-				 imgsensor.frame_length >> 8);
-			write_cmos_sensor_8(0x0341,
-				 imgsensor.frame_length & 0xFF);
-			write_cmos_sensor_8(0x0104, 0x00);
-		}
-	} else {
-		/* Extend frame length*/
-		write_cmos_sensor_8(0x0104, 0x01);
-		write_cmos_sensor_8(0x0340, imgsensor.frame_length >> 8);
-		write_cmos_sensor_8(0x0341, imgsensor.frame_length & 0xFF);
-		write_cmos_sensor_8(0x0104, 0x00);
-
-		LOG_INF("(else)imgsensor.frame_length = %d\n",
-			imgsensor.frame_length);
 	}
 
 	/* long expsoure */
@@ -655,21 +639,9 @@ static void write_shutter(kal_uint32 shutter)
 		}
 		shutter = shutter >> l_shift;
 		imgsensor.frame_length = shutter + imgsensor_info.margin;
-		/* LOG_INF(
-		 *  "0x3100 0x%x l_shift %d l_shift&0x3 %d\n",
-		 *  read_cmos_sensor(0x3100),
-		 *  l_shift,
-		 *  l_shift&0x7);
-		 */
 		LOG_INF("enter long exposure mode, time is %d", l_shift);
-
-		write_cmos_sensor_8(0x0104, 0x01);
 		write_cmos_sensor_8(0x3100,
-				read_cmos_sensor(0x3100) | (l_shift & 0x7));
-		write_cmos_sensor_8(0x0340, imgsensor.frame_length >> 8);
-		write_cmos_sensor_8(0x0341, imgsensor.frame_length & 0xFF);
-		write_cmos_sensor_8(0x0104, 0x00);
-
+			read_cmos_sensor(0x3100) | (l_shift & 0x7));
 		/* Frame exposure mode customization for LE*/
 		imgsensor.ae_frm_mode.frame_mode_1 = IMGSENSOR_AE_MODE_SE;
 		imgsensor.ae_frm_mode.frame_mode_2 = IMGSENSOR_AE_MODE_SE;
@@ -681,18 +653,27 @@ static void write_shutter(kal_uint32 shutter)
 		write_cmos_sensor_8(0x0341, imgsensor.frame_length & 0xFF);
 		write_cmos_sensor_8(0x0104, 0x00);
 		imgsensor.current_ae_effective_frame = 2;
-		LOG_INF("exit long exposure mode");
+		LOG_INF("set frame_length\n");
 	}
 
 	/* Update Shutter */
 	write_cmos_sensor_8(0x0104, 0x01);
+	write_cmos_sensor_8(0x0350, 0x01); /* Enable auto extend */
 	write_cmos_sensor_8(0x0202, (shutter >> 8) & 0xFF);
 	write_cmos_sensor_8(0x0203, shutter  & 0xFF);
 	write_cmos_sensor_8(0x0104, 0x00);
 
 	LOG_INF("shutter =%d, framelength =%d\n",
 		shutter, imgsensor.frame_length);
-
+#if 0
+	LOG_INF(
+		"shift 0x3100=0x%x, Shutter 0x0340=0x%x, 0x0341=0x%x, FL 0x0340=0x%x, 0x0341=0x%x\n",
+		read_cmos_sensor_8(0x3100),
+		read_cmos_sensor_8(0x0202),
+		read_cmos_sensor_8(0x0203),
+		read_cmos_sensor_8(0x0340),
+		read_cmos_sensor_8(0x0341));
+#endif
 }	/*	write_shutter  */
 
 /*************************************************************************
@@ -1811,24 +1792,43 @@ static kal_uint16 imx519_preview_setting[] = {
 	0x0114, 0x02,
 	0x0342, 0x17,
 	0x0343, 0x20,
-	0x0340, 0x1A,
-	0x0341, 0xEB,
+	0x0340, 0x0A,
+	0x0341, 0xFF,
 	0x0344, 0x00,
 	0x0345, 0x00,
 	0x0346, 0x00,
-	0x0347, 0x02,
+	0x0347, 0x12,
 	0x0348, 0x12,
 	0x0349, 0x2F,
 	0x034A, 0x0D,
-	0x034B, 0xA5,
+	0x034B, 0x95,
 	0x0220, 0x00,
 	0x0221, 0x11,
 	0x0222, 0x01,
 	0x0900, 0x01,
 	0x0901, 0x22,
-	0x0902, 0x0A,
+	0x0902, 0x08, //0x84,
 	0x3F4C, 0x05,
 	0x3F4D, 0x03,
+	/*PDAF Area Config Begin*/
+	0x38A3, 0x02,/*0:Fixed (16x12), 1:Fixed (8x6), 2:Flexible*/
+	0x38B4, 0x02,
+	0x38B5, 0xE2,/*738*/
+	0x38B6, 0x02,
+	0x38B7, 0x10,/*528*/
+	0x38B8, 0x06,
+	0x38B9, 0x36,/*1590*/
+	0x38BA, 0x04,
+	0x38BB, 0xB0,/*1200*/
+	0x38AC, 0x01,/* enable and disable Flexible window,total 8*/
+	0x38AD, 0x00,
+	0x38AE, 0x00,
+	0x38AF, 0x00,
+	0x38B0, 0x00,
+	0x38B1, 0x00,
+	0x38B2, 0x00,
+	0x38B3, 0x00,
+	/*PDAF Area Config End*/
 	0x4254, 0x7F,
 	0x0401, 0x00,
 	0x0404, 0x00,
@@ -1840,32 +1840,36 @@ static kal_uint16 imx519_preview_setting[] = {
 	0x040C, 0x09,
 	0x040D, 0x18,
 	0x040E, 0x06,
-	0x040F, 0xD2,
+	0x040F, 0xC0,
 	0x034C, 0x09,
 	0x034D, 0x18,
 	0x034E, 0x06,
-	0x034F, 0xD2,
+	0x034F, 0xC0,
 	0x0301, 0x06,
-	0x0303, 0x02,
+	0x0303, 0x04,
 	0x0305, 0x04,
-	0x0306, 0x01,
-	0x0307, 0x32,
+	0x0306, 0x00,
+	0x0307, 0xFA,
 	0x0309, 0x0A,
-	0x030B, 0x02,
+	0x030B, 0x04,
 	0x030D, 0x04,
-	0x030E, 0x01,
-	0x030F, 0x18,
+	0x030E, 0x00,
+	0x030F, 0xE6,
 	0x0310, 0x01,
-	0x0820, 0x09,
-	0x0821, 0xD8,
+	0x0820, 0x04,
+	0x0821, 0x0B,
 	0x0822, 0x00,
 	0x0823, 0x00,
+	0x3E20, 0x01,
+	0x3E37, 0x01,
+	0x3E3B, 0x00,
 	0x0106, 0x00,
 	0x0B00, 0x00,
 	0x3230, 0x00,
 	0x3F14, 0x00,
 	0x3F3C, 0x03,
 	0x3F0D, 0x0A,
+	0x3FBC, 0x00,
 	0x3C06, 0x00,
 	0x3C07, 0x00,
 	0x3C0A, 0x00,
@@ -1886,8 +1890,6 @@ static kal_uint16 imx519_preview_setting[] = {
 	0x020F, 0x00,
 	0x0218, 0x01,
 	0x0219, 0x00,
-	0x3E20, 0x01,
-	0x3E37, 0x01,
 };
 
 #if READOUT_TIME_DECREASE
@@ -3526,67 +3528,31 @@ static kal_uint32 set_max_framerate_by_scenario(
 			set_dummy();
 		break;
 	case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
-#if 0
-	if (imgsensor.current_fps == imgsensor_info.cap1.max_framerate) {
-		frame_length = imgsensor_info.cap1.pclk / framerate * 10
-				/ imgsensor_info.cap1.linelength;
-		spin_lock(&imgsensor_drv_lock);
-			imgsensor.dummy_line =
-			(frame_length > imgsensor_info.cap1.framelength)
-			? (frame_length - imgsensor_info.cap1.framelength) : 0;
-			imgsensor.frame_length =
-				imgsensor_info.cap1.framelength
-				+ imgsensor.dummy_line;
-			imgsensor.min_frame_length = imgsensor.frame_length;
-			spin_unlock(&imgsensor_drv_lock);
-	} else if (imgsensor.current_fps == imgsensor_info.cap2.max_framerate) {
-		frame_length = imgsensor_info.cap2.pclk / framerate * 10
-					/ imgsensor_info.cap2.linelength;
-		spin_lock(&imgsensor_drv_lock);
-			imgsensor.dummy_line =
-			  (frame_length > imgsensor_info.cap2.framelength)
-			  ? (frame_length - imgsensor_info.cap2.framelength)
-			  : 0;
-			imgsensor.frame_length =
-				imgsensor_info.cap2.framelength
-				+ imgsensor.dummy_line;
-			imgsensor.min_frame_length = imgsensor.frame_length;
-			spin_unlock(&imgsensor_drv_lock);
-	} else {
-		if (imgsensor.current_fps
-				!= imgsensor_info.cap.max_framerate)
+		if (imgsensor.current_fps != imgsensor_info.cap.max_framerate)
 			LOG_INF(
-			"Warning: current_fps %d fps is not support, so use cap's setting: %d fps!\n"
-			, framerate, imgsensor_info.cap.max_framerate/10);
-		frame_length = imgsensor_info.cap.pclk / framerate * 10
+				"Warning: current_fps %d fps is not support, so use cap's setting: %d fps!\n"
+				, framerate
+				, imgsensor_info.cap.max_framerate/10);
+			frame_length = imgsensor_info.cap.pclk / framerate * 10
 					/ imgsensor_info.cap.linelength;
+
+		if (frame_length > imgsensor_info.max_frame_length) {
+			LOG_INF(
+				"Warning: frame_length %d > max_frame_length %d!\n"
+				, frame_length
+				, imgsensor_info.max_frame_length);
+			break;
+		}
+
 		spin_lock(&imgsensor_drv_lock);
 		imgsensor.dummy_line =
 			(frame_length > imgsensor_info.cap.framelength)
-			  ? (frame_length - imgsensor_info.cap.framelength) : 0;
+			? (frame_length - imgsensor_info.cap.framelength) : 0;
 		imgsensor.frame_length =
 			imgsensor_info.cap.framelength
 			+ imgsensor.dummy_line;
 		imgsensor.min_frame_length = imgsensor.frame_length;
 		spin_unlock(&imgsensor_drv_lock);
-	}
-#else
-	if (imgsensor.current_fps != imgsensor_info.cap.max_framerate)
-		LOG_INF(
-			"Warning: current_fps %d fps is not support, so use cap's setting: %d fps!\n"
-			, framerate, imgsensor_info.cap.max_framerate/10);
-		frame_length = imgsensor_info.cap.pclk / framerate * 10
-				/ imgsensor_info.cap.linelength;
-		spin_lock(&imgsensor_drv_lock);
-			imgsensor.dummy_line =
-			(frame_length > imgsensor_info.cap.framelength)
-			  ? (frame_length - imgsensor_info.cap.framelength) : 0;
-			imgsensor.frame_length =
-				imgsensor_info.cap.framelength
-				+ imgsensor.dummy_line;
-			imgsensor.min_frame_length = imgsensor.frame_length;
-			spin_unlock(&imgsensor_drv_lock);
-#endif
 		if (imgsensor.frame_length > imgsensor.shutter)
 			set_dummy();
 		break;

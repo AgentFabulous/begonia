@@ -1,6 +1,6 @@
 #
 # Copyright (C) 2015 MediaTek Inc.
-# Copyright (C) 2019 XiaoMi, Inc.
+# Copyright (C) 2020 XiaoMi, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -23,8 +23,6 @@ MTK_CUSTOM_PATH  := $(srctree)/drivers/misc/mediatek
 
 
 subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/sub2/inc
-
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync/
 
 ifeq ($(CONFIG_MTK_LENS_USE_MODULE), y)
 

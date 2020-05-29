@@ -307,9 +307,6 @@ void apu_get_power_info(void)
 	int temp_freq = 0;
 	mutex_lock(&power_check_lock);
 
-	// prevent to get abnormal clock value in the API call first time
-	temp_freq = mt_get_ckgen_freq(1);
-
 	dsp_freq = mt_get_ckgen_freq(10);
 	if (dsp_freq == 0)
 		temp_freq = mt_get_ckgen_freq(1);

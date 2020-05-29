@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -51,6 +52,10 @@
 #include "imgsensor_oc.h"
 #endif
 #include "imgsensor.h"
+
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+#include "imgsensor_ca.h"
+#endif
 
 static DEFINE_MUTEX(gimgsensor_mutex);
 static DEFINE_MUTEX(gimgsensor_open_mutex);
@@ -139,6 +144,10 @@ static void imgsensor_mutex_unlock(struct IMGSENSOR_SENSOR_INST *psensor_inst)
 MINT32 imgsensor_sensor_open(struct IMGSENSOR_SENSOR *psensor)
 {
 	MINT32 ret = ERROR_NONE;
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	MINT32 ret_sec = ERROR_NONE;
+	struct command_params c_params = {0};
+#endif
 	struct IMGSENSOR             *pimgsensor   = &gimgsensor;
 	struct IMGSENSOR_SENSOR_INST *psensor_inst = &psensor->inst;
 	struct SENSOR_FUNCTION_STRUCT *psensor_func =  psensor->pfunc;
@@ -171,7 +180,20 @@ MINT32 imgsensor_sensor_open(struct IMGSENSOR_SENSOR *psensor)
 
 		psensor_func->psensor_inst = psensor_inst;
 
-		ret = psensor_func->SensorOpen();
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	PK_INFO("%s secure state %d", __func__,
+		(int)(&gimgsensor)->imgsensor_sec_flag);
+		if ((&gimgsensor)->imgsensor_sec_flag) {
+			ret = imgsensor_ca_invoke_command(
+				IMGSENSOR_TEE_CMD_OPEN, c_params, &ret_sec);
+
+		} else {
+#endif
+			ret = psensor_func->SensorOpen();
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+		}
+#endif
+
 		if (ret != ERROR_NONE) {
 			imgsensor_hw_power(&pimgsensor->hw,
 				psensor,
@@ -282,6 +304,10 @@ imgsensor_sensor_feature_control(
 		MUINT32 *pFeatureParaLen)
 {
 	MUINT32 ret = ERROR_NONE;
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	MINT32 ret_sec = ERROR_NONE;
+	struct command_params c_params;
+#endif
 	struct IMGSENSOR_SENSOR_INST  *psensor_inst = &psensor->inst;
 	struct SENSOR_FUNCTION_STRUCT *psensor_func =  psensor->pfunc;
 
@@ -294,11 +320,24 @@ imgsensor_sensor_feature_control(
 		imgsensor_mutex_lock(psensor_inst);
 
 		psensor_func->psensor_inst = psensor_inst;
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	PK_INFO("%s secure state %d", __func__,
+		(int)(&gimgsensor)->imgsensor_sec_flag);
+	if ((&gimgsensor)->imgsensor_sec_flag) {
 
+		c_params.param0 = (void *)FeatureId;
+		c_params.param1 = (void *)pFeaturePara;
+		c_params.param2 = (void *)pFeatureParaLen;
+		ret = imgsensor_ca_invoke_command(
+			IMGSENSOR_TEE_CMD_FEATURE_CONTROL, c_params, &ret_sec);
+
+	} else {
+#endif
 		ret = psensor_func->SensorFeatureControl(
-		    FeatureId,
-		    pFeaturePara,
-		    pFeatureParaLen);
+			FeatureId, pFeaturePara, pFeatureParaLen);
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	}
+#endif
 		if (ret != ERROR_NONE)
 			PK_PR_ERR("[%s]\n", __func__);
 
@@ -316,6 +355,10 @@ imgsensor_sensor_control(
 	enum MSDK_SCENARIO_ID_ENUM ScenarioId)
 {
 	MUINT32 ret = ERROR_NONE;
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	MINT32 ret_sec = ERROR_NONE;
+	struct command_params c_params;
+#endif
 	struct IMGSENSOR_SENSOR_INST *psensor_inst = &psensor->inst;
 	struct SENSOR_FUNCTION_STRUCT *psensor_func =  psensor->pfunc;
 
@@ -335,9 +378,23 @@ imgsensor_sensor_control(
 		psensor_func->psensor_inst = psensor_inst;
 		psensor_func->ScenarioId = ScenarioId;
 
-		ret = psensor_func->SensorControl(ScenarioId,
-		    &image_window,
-		    &sensor_config_data);
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	PK_INFO("%s secure state %d", __func__,
+		(int)(&gimgsensor)->imgsensor_sec_flag);
+	if ((&gimgsensor)->imgsensor_sec_flag) {
+		c_params.param0 = (void *)ScenarioId;
+		c_params.param1 = (void *)&image_window;
+		c_params.param2 = (void *)&sensor_config_data;
+		ret = imgsensor_ca_invoke_command(
+			IMGSENSOR_TEE_CMD_CONTROL, c_params, &ret_sec);
+
+	} else {
+#endif
+		ret = psensor_func->SensorControl(
+			ScenarioId, &image_window, &sensor_config_data);
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	}
+#endif
 		if (ret != ERROR_NONE)
 			PK_PR_ERR("[%s]\n", __func__);
 
@@ -356,6 +413,10 @@ imgsensor_sensor_control(
 MINT32 imgsensor_sensor_close(struct IMGSENSOR_SENSOR *psensor)
 {
 	MINT32 ret = ERROR_NONE;
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+	MINT32 ret_sec = ERROR_NONE;
+	struct command_params c_params = {0};
+#endif
 	struct IMGSENSOR *pimgsensor = &gimgsensor;
 	struct IMGSENSOR_SENSOR_INST  *psensor_inst = &psensor->inst;
 	struct SENSOR_FUNCTION_STRUCT *psensor_func =  psensor->pfunc;
@@ -373,8 +434,18 @@ MINT32 imgsensor_sensor_close(struct IMGSENSOR_SENSOR *psensor)
 #endif
 
 		psensor_func->psensor_inst = psensor_inst;
-
-		ret = psensor_func->SensorClose();
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+		PK_INFO("%s secure state %d", __func__,
+			(int)(&gimgsensor)->imgsensor_sec_flag);
+		if ((&gimgsensor)->imgsensor_sec_flag) {
+			ret = imgsensor_ca_invoke_command(
+				IMGSENSOR_TEE_CMD_CLOSE, c_params, &ret_sec);
+		} else {
+#endif
+			ret = psensor_func->SensorClose();
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+		}
+#endif
 		if (ret != ERROR_NONE) {
 			PK_PR_ERR("[%s]", __func__);
 		} else {
@@ -645,7 +716,7 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 			"\nCAM[%d]:%s;",
 			psensor->inst.sensor_idx,
 			psensor->inst.psensor_list->name);
-
+#if 0 // XIAOMI: libin16 comment --start
 	pmtk_ccm_name = strchr(mtk_ccm_name, '\0');
 	snprintf(
 			pmtk_ccm_name,
@@ -738,7 +809,7 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 			camera_info_size - (int)(pmtk_ccm_name - mtk_ccm_name),
 			"\nHDR_Support(0:NO HDR,1: iHDR,2:mvHDR,3:zHDR)=%2d",
 			info.HDR_Support);
-
+#endif // XIAOMI: libin16 comment --end
 	/* Resolution */
 	if (copy_to_user((void __user *)(pSensorGetInfo->pSensorResolution),
 			(void *)&sensor_resolution,
@@ -790,7 +861,13 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	struct ACDK_KD_SENSOR_SYNC_STRUCT *pSensorSyncInfo = NULL;
 	signed int ret = 0;
 
-	pFeatureCtrl = (struct ACDK_SENSOR_FEATURECONTROL_STRUCT *)pBuf;
+#ifdef CONFIG_MTK_CAM_SECURE_I2C
+	struct command_params c_params;
+
+	memset(&c_params, 0, sizeof(struct command_params));
+#endif
+
+	pFeatureCtrl = (struct ACDK_SENSOR_FEATURECONTROL_STRUCT *) pBuf;
 	if (pFeatureCtrl == NULL) {
 		PK_PR_ERR("NULL pFeatureCtrl\n");
 		return -EFAULT;
@@ -856,6 +933,32 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 
 		break;
 	}
+#ifdef CONFIG_MTK_CAM_SECURE_I2C
+	case SENSOR_FEATURE_OPEN_SECURE_SESSION:
+		PK_INFO("SECURE_SENSOR_ID = %x\n",
+			(int)psensor->inst.psensor_list->id);
+
+		/* size : IMGSENSOR_SENSOR */
+		c_params.param0 =
+			(void *)(uintptr_t)(psensor->inst.psensor_list->id);
+
+		imgsensor_ca_open();
+		if ((imgsensor_ca_invoke_command(IMGSENSOR_TEE_CMD_SET_SENSOR,
+		c_params, &ret) != 0) || (ret != 0)) {
+			PK_DBG("Error!! set secure sensor_pfunc failed!");
+			return ret;
+		}
+		break;
+	case SENSOR_FEATURE_CLOSE_SECURE_SESSION:
+		imgsensor_ca_close();
+		break;
+	case SENSOR_FEATURE_SET_AS_SECURE_DRIVER:
+		(&gimgsensor)->imgsensor_sec_flag =
+			(*(unsigned long long *)pFeaturePara);
+		PK_INFO("debug: secure set as %d",
+			(int)((&gimgsensor)->imgsensor_sec_flag));
+		break;
+#endif
 	case SENSOR_FEATURE_SET_I2C_BUF_MODE_EN:
 		ret = imgsensor_i2c_buffer_mode(
 			(*(unsigned long long *)pFeaturePara));
@@ -910,7 +1013,7 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 			(unsigned char *)&pSensorSyncInfo->u2SensorNewGain,
 			(unsigned int *) &FeatureParaLen);
 		break;
-	case SENOSR_FEATURE_GET_OFFSET_TO_START_OF_EXPOSURE:
+	case SENSOR_FEATURE_GET_OFFSET_TO_START_OF_EXPOSURE:
 	case SENSOR_FEATURE_GET_PIXEL_CLOCK_FREQ_BY_SCENARIO:
 	case SENSOR_FEATURE_GET_PERIOD_BY_SCENARIO:
 	case SENSOR_FEATURE_GET_DEFAULT_FRAME_RATE_BY_SCENARIO:
@@ -1832,9 +1935,20 @@ static int imgsensor_open(struct inode *a_pstInode, struct file *a_pstFile)
 	atomic_inc(&pimgsensor->imgsensor_open_cnt);
 	PK_DBG("%s %d\n", __func__,
 		atomic_read(&pimgsensor->imgsensor_open_cnt));
+
 	mutex_unlock(&gimgsensor_open_mutex);
 	return 0;
 }
+
+#if defined(CONFIG_MTK_CAM_SECURE_I2C)
+static void imgsensor_release_secure_flag(void)
+{
+	struct IMGSENSOR *pimgsensor = &gimgsensor;
+
+	pimgsensor->imgsensor_sec_flag = 0;
+	PK_DBG("release secure flag! %d", (int)pimgsensor->imgsensor_sec_flag);
+}
+#endif
 
 static int imgsensor_release(struct inode *a_pstInode, struct file *a_pstFile)
 {
@@ -1843,12 +1957,19 @@ static int imgsensor_release(struct inode *a_pstInode, struct file *a_pstFile)
 	mutex_lock(&gimgsensor_open_mutex);
 
 	atomic_dec(&pimgsensor->imgsensor_open_cnt);
-	if (atomic_read(&pimgsensor->imgsensor_open_cnt) == 0)
+	if (atomic_read(&pimgsensor->imgsensor_open_cnt) == 0) {
 		imgsensor_hw_release_all(&pimgsensor->hw);
 
+#ifdef CONFIG_MTK_CAM_SECURE_I2C
+		imgsensor_release_secure_flag();/* to reset sensor status */
+		imgsensor_ca_release();
+#endif
+
+	}
 
 	PK_DBG("%s %d\n", __func__,
 		atomic_read(&pimgsensor->imgsensor_open_cnt));
+
 	mutex_unlock(&gimgsensor_open_mutex);
 	return 0;
 }

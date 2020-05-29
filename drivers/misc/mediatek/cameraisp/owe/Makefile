@@ -36,3 +36,4 @@ endif
 ifeq ($(CONFIG_MACH_MT6785),y)
   obj-$(CONFIG_MTK_CAMERA_ISP_OWE_SUPPORT) += mt6785/camera_owe.o
 endif
+

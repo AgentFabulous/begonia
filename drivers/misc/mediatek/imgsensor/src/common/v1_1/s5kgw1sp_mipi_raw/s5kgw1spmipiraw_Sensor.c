@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -32,7 +31,7 @@
  *============================================================================
  ****************************************************************************/
 #define PFX "S5KGW1SP_camera_sensor"
-
+//#define pr_fmt(fmt) PFX "[%s] " fmt, __func__
 
 #include <linux/videodev2.h>
 #include <linux/i2c.h>
@@ -76,7 +75,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 4640, /*//0x1220*/
 		.grabwindow_height = 3472, /*//0x0D90*/
-
+		//grabwindow_height should be 16's N times
 		.mipi_data_lp2hs_settle_dc = 0x22,/*// cphy  need to confirm from HQ*/
 		.max_framerate = 300,
 		.mipi_pixel_rate = 770000000,
@@ -89,7 +88,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 9280, /*//0x2440*/
 		.grabwindow_height = 6944, /*//0x1B20*/
-
+		//grabwindow_height should be 16's N times*/
 		.mipi_data_lp2hs_settle_dc = 0x22,/*// cphy  need to confirm from HQ*/
 		.max_framerate = 150,
 		.mipi_pixel_rate = 1580000000,
@@ -102,7 +101,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 2320, /*//0x0910*/
 		.grabwindow_height = 1736, /*//0x06C8*/
-
+		//grabwindow_height should be 16's N times*/
 		.mipi_data_lp2hs_settle_dc = 85,
 		.max_framerate = 1200,
 	},
@@ -114,7 +113,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 2320, /*//0x0910*/
 		.grabwindow_height = 1736, /*//0x06C8*/
-
+		//grabwindow_height should be 16's N times*/
 		.mipi_data_lp2hs_settle_dc = 85,
 		.max_framerate = 1200,
 	},
@@ -126,7 +125,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 4640, /*//0x1220*/
 		.grabwindow_height = 3472, /*//0x0D90*/
-
+		//grabwindow_height should be 16's N times
 		.mipi_data_lp2hs_settle_dc = 0x22,/*// cphy  need to confirm from HQ*/
 		.max_framerate = 300,
 		.mipi_pixel_rate = 770000000,
@@ -139,13 +138,13 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 1920, /*//0x0910*/
 		.grabwindow_height = 1080, /*//0x06C8*/
-
+		//grabwindow_height should be 16's N times*/
 		.mipi_data_lp2hs_settle_dc = 0x22,/*// cphy  need to confirm from HQ*/
 		.max_framerate = 2400,
 		.mipi_pixel_rate = 1518000000,
 	},
 
-	.custom1 = {
+	.custom1 = {//slow motion 1080p 120fps
 		.pclk = 1920000000,
 		.linelength = 7808,
 		.framelength = 2042,
@@ -167,7 +166,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.starty = 0,
 		.grabwindow_width = 2320, /*//0x0910*/
 		.grabwindow_height = 1736, /*//0x06C8*/
-
+		//grabwindow_height should be 16's N times*/
 		.mipi_data_lp2hs_settle_dc = 85,
 		.max_framerate = 1200,
 		.mipi_pixel_rate = 560000000,
@@ -214,14 +213,14 @@ static struct imgsensor_info_struct imgsensor_info = {
 	/* 0,MIPI_SETTLEDELAY_AUTO; 1,MIPI_SETTLEDELAY_MANNUAL */
 	.mipi_settle_delay_mode = 1,
 	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_4CELL_HW_BAYER_Gr,
-
+	//.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_Gr,
 	.mclk = 24,	/* mclk value, suggest 24 or 26 for 24Mhz or 26Mhz */
 	.mipi_lane_num = SENSOR_MIPI_3_LANE,
-
+	//.i2c_speed = 1000, /*support 1MHz write*/
 	/* record sensor support all write id addr,
 	 * only supprt 4 must end with 0xff
 	 */
-
+	//.i2c_addr_table = { 0x20, 0x5a, 0xff},
 	.i2c_addr_table = { 0x5a, 0xff},
 };
 
@@ -264,7 +263,7 @@ static struct imgsensor_struct imgsensor = {
 
 };
 
-
+//int chip_id;
 /* VC_Num, VC_PixelNum, ModeSelect, EXPO_Ratio, ODValue, RG_STATSMODE */
 /* VC0_ID, VC0_DataType, VC0_SIZEH, VC0_SIZE,
  * VC1_ID, VC1_DataType, VC1_SIZEH, VC1_SIZEV
@@ -524,7 +523,7 @@ static void set_shutter_frame_length(kal_uint16 shutter,
 	dummy_line = frame_length - imgsensor.frame_length;
 	imgsensor.frame_length = imgsensor.frame_length + dummy_line;
 	imgsensor.min_frame_length = imgsensor.frame_length;
-
+	//
 	if (shutter > imgsensor.min_frame_length - imgsensor_info.margin)
 		imgsensor.frame_length = shutter + imgsensor_info.margin;
 	else
@@ -546,22 +545,22 @@ static void set_shutter_frame_length(kal_uint16 shutter,
 		else if (realtime_fps >= 147 && realtime_fps <= 150)
 			set_max_framerate(146, 0);
 		else {
-
-
+			// Extend frame length
+			//write_cmos_sensor(0x0104, 0x01);
 			write_cmos_sensor(0x0340, imgsensor.frame_length);
-
+			//write_cmos_sensor(0x0104, 0x00);
 		}
 	} else {
-
-
+		// Extend frame length
+		//write_cmos_sensor(0x0104, 0x01);
 		write_cmos_sensor(0x0340,  imgsensor.frame_length);
-
+		//write_cmos_sensor(0x0104, 0x00);
 	}
 
-
-
+	// Update Shutter
+	//write_cmos_sensor(0x0104, 0x01);
 	write_cmos_sensor(0x0202, shutter);
-
+	//write_cmos_sensor(0x0104, 0x00);
 	printk("Add for N3D! shutter =%d, framelength =%d\n",
 		shutter, imgsensor.frame_length);
 
@@ -3968,7 +3967,7 @@ static void sensor_init(void)
 {
 	pr_debug("%s E\n", __func__);
 	/* initial sequence */
-
+	// Convert from : "InitGlobal.sset"
 	pr_debug("[%s] +", __func__);
 
 	write_cmos_sensor(0x6010, 0x0001);
@@ -4091,16 +4090,16 @@ static kal_uint16 addr_data_pair_pre_gw1[] = {
 	0x034C, 0x1220,
 	0x034E, 0x0D90,
 
-
-
+	//0x0380, 0x0002,
+	//0x0382, 0x0002,
 
 	0x0380, 0x0001,
 	0x0382, 0x0001,
 
 	0x0384, 0x0002,
 	0x0386, 0x0002,
-
-
+	//0x0900, 0x2222,
+	//0x040C, 0x0000,
 
 	0x0900, 0x0212,
 	0x040C, 0x1000,
@@ -4108,7 +4107,7 @@ static kal_uint16 addr_data_pair_pre_gw1[] = {
 	0x0404, 0x1000,
 	0x0408, 0x0100,
 	0x040A, 0x0100,
-
+	//0x0400, 0x1010,
 
 	0x0400, 0x2010,
 
@@ -4119,7 +4118,7 @@ static kal_uint16 addr_data_pair_pre_gw1[] = {
 	0x0300, 0x0004,
 	0x030E, 0x0004,
 	0x0312, 0x0001,
-	0x0310, 0x0100,
+	0x0310, 0x0100,//0x0100
 	0x030A, 0x0001,
 	0x0308, 0x0008,
 	0x0342, 0x3010,
@@ -4133,17 +4132,17 @@ static kal_uint16 addr_data_pair_pre_gw1[] = {
 	0x0D02, 0x0001,
 	0x0114, 0x0200,
 
-
+	//0x0114, 0x0201,
 	0x0B06, 0x0101,
 	0x0FEA, 0x2980,
 	0x602A, 0x20FC,
-
+	//0x6F12, 0x0000,
 	0x6F12, 0x0001,
 
 	0x6F12, 0x0001,
 	0x6028, 0x2001,
 	0x602A, 0xD20C,
-
+	//0x6F12, 0x0104,
 	0x6F12, 0x0108,
 
 	0x6F12, 0x0800,
@@ -4185,7 +4184,7 @@ static kal_uint16 addr_data_pair_pre_gw1[] = {
 	0x0D06, 0x0910,
 	0x0D08, 0x0364,
 	0x602A, 0x57FE,
-
+	//0x6F12, 0x010F,
 	0x6F12, 0x010C,
 
 	0x6028, 0x2001,
@@ -4304,7 +4303,7 @@ static kal_uint16 addr_data_pair_pre_gw1[] = {
 
 	0x6214, 0xF9F0,
 	0x6218, 0xF9F0,
-
+	//0x0100, 0x0100
 };
 
 static void preview_setting(void)
@@ -4614,7 +4613,7 @@ static kal_uint16 addr_data_pair_cap_gw1[] = {
 	0x6F12, 0x0000,
 	0x6214, 0xF9F0,
 	0x6218, 0xF9F0,
-
+	//0x0100, 0x0100
 };
 
 static void capture_setting(kal_uint16 currefps)
@@ -4713,16 +4712,16 @@ static kal_uint16 addr_data_pair_video_gw1[] = {
 	0x034C, 0x1220,
 	0x034E, 0x0D90,
 
-
-
+	//0x0380, 0x0002,
+	//0x0382, 0x0002,
 
 	0x0380, 0x0001,
 	0x0382, 0x0001,
 
 	0x0384, 0x0002,
 	0x0386, 0x0002,
-
-
+	//0x0900, 0x2222,
+	//0x040C, 0x0000,
 
 	0x0900, 0x0212,
 	0x040C, 0x1000,
@@ -4730,7 +4729,7 @@ static kal_uint16 addr_data_pair_video_gw1[] = {
 	0x0404, 0x1000,
 	0x0408, 0x0100,
 	0x040A, 0x0100,
-
+	//0x0400, 0x1010,
 
 	0x0400, 0x2010,
 
@@ -4741,7 +4740,7 @@ static kal_uint16 addr_data_pair_video_gw1[] = {
 	0x0300, 0x0004,
 	0x030E, 0x0004,
 	0x0312, 0x0001,
-	0x0310, 0x0100,
+	0x0310, 0x0100,//0x0100
 	0x030A, 0x0001,
 	0x0308, 0x0008,
 	0x0342, 0x3010,
@@ -4755,17 +4754,17 @@ static kal_uint16 addr_data_pair_video_gw1[] = {
 	0x0D02, 0x0001,
 	0x0114, 0x0200,
 
-
+	//0x0114, 0x0201,
 	0x0B06, 0x0101,
 	0x0FEA, 0x2980,
 	0x602A, 0x20FC,
-
+	//0x6F12, 0x0000,
 	0x6F12, 0x0001,
 
 	0x6F12, 0x0001,
 	0x6028, 0x2001,
 	0x602A, 0xD20C,
-
+	//0x6F12, 0x0104,
 	0x6F12, 0x0108,
 
 	0x6F12, 0x0800,
@@ -4806,7 +4805,7 @@ static kal_uint16 addr_data_pair_video_gw1[] = {
 	0x0D06, 0x0910,
 	0x0D08, 0x0364,
 	0x602A, 0x57FE,
-
+	//0x6F12, 0x010F,
 	0x6F12, 0x010C,
 
 	0x6028, 0x2001,
@@ -4926,7 +4925,7 @@ static kal_uint16 addr_data_pair_video_gw1[] = {
 
 	0x6214, 0xF9F0,
 	0x6218, 0xF9F0,
-
+	//0x0100, 0x0100
 };
 
 static void normal_video_setting(kal_uint16 currefps)
@@ -4959,8 +4958,8 @@ static void normal_video_setting(kal_uint16 currefps)
 	table_write_cmos_sensor(addr_data_pair_video_gw1,
 		sizeof(addr_data_pair_video_gw1) / sizeof(kal_uint16));
 
-
-
+	//	table_write_cmos_sensor(addr_data_pair_pre_gw1,
+	//		sizeof(addr_data_pair_pre_gw1) / sizeof(kal_uint16));
 
 
 	pr_debug("[%s] -", __func__);
@@ -5490,7 +5489,7 @@ static void custom1_setting(void)
 {
 	pr_debug("%s E\n", __func__);
 
-
+  // sensor_init();
 	table_write_cmos_sensor(addr_data_pair_custom1_gw1,
 		sizeof(addr_data_pair_custom1_gw1) / sizeof(kal_uint16));
 
@@ -5516,7 +5515,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
 	kal_uint8 i = 0;
 	kal_uint8 retry = 2;
-
+	//	kal_uint16 sp8spFlag = 0;
 
 	/* sensor have two i2c address 0x6c 0x6d & 0x21 0x20,
 	 *we should detect the module used i2c address
@@ -6372,7 +6371,7 @@ static kal_uint32 get_sensor_temperature(void)
 	return temperature_convert;
 }
 #if 1
-#define FOUR_CELL_SIZE 3072
+#define FOUR_CELL_SIZE 3072//size = 3072 = 0xc00
 static int Is_Read_4Cell;
 static char Four_Cell_Array[FOUR_CELL_SIZE + 2];
 
@@ -6636,8 +6635,8 @@ UINT8 *feature_para, UINT32 *feature_para_len)
 		pr_debug("ihdr enable :%d\n", *feature_data_32);
 		spin_lock(&imgsensor_drv_lock);
 		imgsensor.hdr_mode = (UINT8)*feature_data_32;
-
-
+		// imgsensor.hdr_mode = 9;
+		// force set hdr_mode to zHDR
 		spin_unlock(&imgsensor_drv_lock);
 		break;
 

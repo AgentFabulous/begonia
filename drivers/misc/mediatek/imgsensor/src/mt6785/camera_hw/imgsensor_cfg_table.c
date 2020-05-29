@@ -1,6 +1,6 @@
-	/*
+/*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -102,7 +102,7 @@ struct IMGSENSOR_HW_CFG imgsensor_custom_config[] = {
 struct IMGSENSOR_HW_POWER_SEQ platform_power_sequence[] = {
 #ifdef MIPI_SWITCH
 	{
-		IMGSENSOR_SENSOR_IDX_NAME_SUB,
+		PLATFORM_POWER_SEQ_NAME,
 		{
 			{
 				IMGSENSOR_HW_PIN_MIPI_SWITCH_EN,
@@ -118,10 +118,11 @@ struct IMGSENSOR_HW_POWER_SEQ platform_power_sequence[] = {
 				IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH,
 				0
 			},
-		}
+		},
+		IMGSENSOR_SENSOR_IDX_SUB,
 	},
 	{
-		IMGSENSOR_SENSOR_IDX_NAME_MAIN3,
+		PLATFORM_POWER_SEQ_NAME,
 		{
 			{
 				IMGSENSOR_HW_PIN_MIPI_SWITCH_EN,
@@ -137,7 +138,8 @@ struct IMGSENSOR_HW_POWER_SEQ platform_power_sequence[] = {
 				IMGSENSOR_HW_PIN_STATE_LEVEL_0,
 				0
 			},
-		}
+		},
+		IMGSENSOR_SENSOR_IDX_MAIN3,
 	},
 #endif
 
@@ -221,7 +223,7 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 			{RST, Vol_High, 1},
 			{DOVDD, Vol_1800, 1},
 			{AVDD, Vol_2800, 1},
-
+			//{DVDD, Vol_1200, 0},
 			{AFVDD, Vol_2800, 1},
 			{SensorMCLK, Vol_High, 5},
 			{RST, Vol_Low, 10}
@@ -235,10 +237,23 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 			{RST, Vol_High, 1},
 			{DOVDD, Vol_1800, 1},
 			{AVDD, Vol_2800, 1},
-
+			//{DVDD, Vol_1200, 0},
 			{AFVDD, Vol_2800, 1},
 			{SensorMCLK, Vol_High, 5},
 			{RST, Vol_Low, 10}
+		},
+	},
+#endif
+#if defined(GC5035_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_GC5035_MIPI_RAW,
+		{
+			{RST, Vol_Low, 1},
+			{DOVDD, Vol_1800, 1},
+			{AVDD, Vol_2800, 1},
+			//{DVDD, Vol_1200, 0},
+			{SensorMCLK, Vol_High, 5},
+			{RST, Vol_High, 10}
 		},
 	},
 #endif
@@ -249,7 +264,7 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 			{RST, Vol_High, 1},
 			{DOVDD, Vol_1800, 1},
 			{AVDD, Vol_2800, 1},
-
+			//{DVDD, Vol_1200, 0},
 			{SensorMCLK, Vol_High, 5},
 			{RST, Vol_Low, 10}
 		},
@@ -262,7 +277,7 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 			{RST, Vol_High, 1},
 			{DOVDD, Vol_1800, 1},
 			{AVDD, Vol_2800, 1},
-
+			//{DVDD, Vol_1200, 0},
 			{SensorMCLK, Vol_High, 5},
 			{RST, Vol_Low, 10}
 		},
@@ -272,11 +287,10 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 	{
 		SENSOR_DRVNAME_OV02A10BETA_MIPI_RAW,
 		{
-			{AFVDD, Vol_2800, 1},
 			{RST, Vol_High, 1},
 			{DOVDD, Vol_1800, 1},
 			{AVDD, Vol_2800, 1},
-
+			//{DVDD, Vol_1200, 0},
 			{SensorMCLK, Vol_High, 5},
 			{RST, Vol_Low, 10}
 		},
@@ -286,11 +300,10 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 	{
 		SENSOR_DRVNAME_OV02A10ALPHA_MIPI_RAW,
 		{
-			{AFVDD, Vol_2800, 1},
 			{RST, Vol_High, 1},
 			{DOVDD, Vol_1800, 1},
 			{AVDD, Vol_2800, 1},
-
+			//{DVDD, Vol_1200, 0},
 			{SensorMCLK, Vol_High, 5},
 			{RST, Vol_Low, 10}
 		},

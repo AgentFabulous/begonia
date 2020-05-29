@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018-2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -117,9 +116,9 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.mipi_pixel_rate = 62400000,
 		.max_framerate = 300,
 		},
-	.margin = 0,		/* sensor framelength & shutter margin */
+	.margin = 16,		/* sensor framelength & shutter margin */
 	.min_shutter = 1,	/* min shutter */
-	.max_frame_length = 0x3fff,
+	.max_frame_length = 0x24c7,
 	.ae_shut_delay_frame = 0,
 	.ae_sensor_gain_delay_frame = 0,
 	.ae_ispGain_delay_frame = 2,	/* isp gain delay frame for AE cycle */
@@ -205,7 +204,7 @@ static kal_uint16 read_eeprom_module_id(kal_uint32 addr)
 
 	char pu_send_cmd[2] = {(char)(addr >> 8), (char)(addr & 0xFF) };
 
-	iReadRegI2C(pu_send_cmd, 2, (u8 *) &get_byte, 1, 0xA2);
+	iReadRegI2C(pu_send_cmd, 2, (u8 *) &get_byte, 1, 0xA2);//Sunny
 
 	return get_byte;
 }
@@ -220,6 +219,7 @@ static void set_dummy(void)
 	vb = imgsensor.frame_length - basic_line;
 	vb = (vb < 16) ? 16 : vb;
 	vb = (vb > 8191) ? 8191 : vb;
+    cam_pr_debug("vb = %d.\n", vb);
 
 	write_cmos_sensor(0x07, (vb >> 8) & 0x1F);
 	write_cmos_sensor(0x08, vb & 0xFF);
@@ -314,6 +314,10 @@ static void set_shutter(kal_uint16 shutter)
 		imgsensor_info.margin)
 		: shutter;
 
+    cam_pr_debug("current_f1 = %d. ", (imgsensor.dummy_line+imgsensor_info.pre.framelength));
+
+    shutter = (shutter == imgsensor.dummy_line+imgsensor_info.pre.framelength-1) ? shutter + 1 : shutter;
+
 	/* Update Shutter */
 	write_cmos_sensor(0xfe, 0x00);
 	write_cmos_sensor(0x03, (shutter >> 8) & 0x3F);
@@ -342,7 +346,7 @@ static void set_shutter_frame_length(kal_uint16 shutter,
 	dummy_line = frame_length - imgsensor.frame_length;
 	imgsensor.frame_length = imgsensor.frame_length + dummy_line;
 	imgsensor.min_frame_length = imgsensor.frame_length;
-
+	//
 	if (shutter > imgsensor.min_frame_length - imgsensor_info.margin)
 		imgsensor.frame_length = shutter + imgsensor_info.margin;
 	else
@@ -364,22 +368,22 @@ static void set_shutter_frame_length(kal_uint16 shutter,
 		else if (realtime_fps >= 147 && realtime_fps <= 150)
 			set_max_framerate(146, 0);
 		else {
+			// Extend frame length
 
-
-
+			//write_cmos_sensor(0x0340, imgsensor.frame_length);
       vb = imgsensor.frame_length - basic_line;
 	    write_cmos_sensor(0x07, (vb >> 8) & 0x1F);
 	    write_cmos_sensor(0x08, vb & 0xFF);
 
 		}
 	} else {
-
+		// Extend frame length
       vb = imgsensor.frame_length - basic_line;
 	    write_cmos_sensor(0x07, (vb >> 8) & 0x1F);
 	    write_cmos_sensor(0x08, vb & 0xFF);
 	}
 
-
+	// Update Shutter
 	write_cmos_sensor(0xfe, 0x00);
 	write_cmos_sensor(0x03, (shutter >> 8) & 0x3F);
 	write_cmos_sensor(0x04, shutter & 0xFF);
@@ -664,6 +668,7 @@ static void sensor_init(void)
 	write_cmos_sensor(0xeb, 0x01);
 
 	/* out crop */
+	//write_cmos_sensor(0x86, 0x54);
 	write_cmos_sensor(0x90, 0x01);
 	write_cmos_sensor(0x92, STARTY);
 	write_cmos_sensor(0x94, STARTX);
@@ -696,7 +701,7 @@ static void sensor_init(void)
 	write_cmos_sensor(0xb6, 0x00);
 
 	/* MIPI */
-	write_cmos_sensor(0xef, 0x90);
+	//write_cmos_sensor(0xef, 0x90);
 	write_cmos_sensor(0xfe, 0x03);
 	write_cmos_sensor(0x01, 0x03);
 	write_cmos_sensor(0x02, 0x33);
@@ -1464,7 +1469,7 @@ static kal_uint32 streaming_control(kal_bool enable)
 		write_cmos_sensor(0xef, 0x00);	/*Stream off */
 	}
 
-	mdelay(10);
+	mdelay(25);
 	return ERROR_NONE;
 }
 

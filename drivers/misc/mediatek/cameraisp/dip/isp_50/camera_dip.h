@@ -22,9 +22,6 @@ extern void mt_irq_set_polarity
 	(unsigned int irq, unsigned int polarity);
 #endif
 
-enum m4u_callback_ret_t DIP_M4U_TranslationFault_callback
-(int port, unsigned int mva, void *data);
-
 
 /**
  * enforce kernel log enable
@@ -218,7 +215,6 @@ enum DIP_GCE_EVENT_ENUM {
 	DIP_GCE_EVENT_CMDQ,
 	DIP_GCE_EVENT_THEOTHERS
 };
-
 enum DIP_P2_BUFQUE_PROPERTY {
 	DIP_P2_BUFQUE_PROPERTY_DIP = 0,
 	DIP_P2_BUFQUE_PROPERTY_NUM = 1,

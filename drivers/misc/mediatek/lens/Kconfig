@@ -154,24 +154,6 @@ config MTK_LENS_DW9714AF_SUPPORT
 	  lens driver for the camera sensor module
 	  Set as y if the driver is used in this project
 
-config MTK_LENS_DW9800VAF_SUPPORT
-        bool "DW9800VAF Lens Driver"
-        default n
-        help
-          DW9800VAF Lens Driver
-          This config is used to enable the corresponding
-          lens driver for the camera sensor module
-          Set as y if the driver is used in this project
-
-config MTK_LENS_VAF_SUPPORT
-        bool "DW9800VAF Lens Driver"
-        default n
-        help
-          DW9800VAF Lens Driver
-          This config is used to enable the corresponding
-          lens driver for the camera sensor module
-          Set as y if the driver is used in this project
-
 config MTK_LENS_DW9714A_SUPPORT
 	bool "DW9714A Lens Driver"
 	default n

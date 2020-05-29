@@ -19,6 +19,7 @@ obj-$(CONFIG_MACH_MT6785) += 3.0/
 MTK_VPU_CORE := 2
 #subdir-ccflags-y += -DMTK_VPU_SMI_DEBUG_ON
 subdir-ccflags-y += -DMTK_VPU_CORE=$(MTK_VPU_CORE)
+subdir-ccflags-y += -DMTK_VPU_DVT
 
 ifeq ($(CONFIG_MTK_QOS_V2),y)
 subdir-ccflags-y += -DENABLE_EARA_QOS
