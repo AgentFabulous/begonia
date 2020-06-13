@@ -555,13 +555,9 @@ int tipc_chan_queue_msg(struct tipc_chan *chan, struct tipc_msg_buf *mb)
 	case TIPC_DISCONNECTED:
 	case TIPC_CONNECTING:
 		err = -ENOTCONN;
-		pr_err("%s: unexpected channel state %d\n",
-		       __func__, chan->state);
 		break;
 	case TIPC_STALE:
 		err = -ESHUTDOWN;
-		pr_err("%s: unexpected channel state %d\n",
-		       __func__, chan->state);
 		break;
 	default:
 		err = -EBADFD;
@@ -707,7 +703,6 @@ static int dn_wait_for_reply(struct tipc_dn_chan *dn, int timeout)
 	if (!ret) {
 		/* no reply from remote */
 		dn->state = TIPC_STALE;
-		dn->state_bak = TIPC_STALE;
 		ret = -ETIMEDOUT;
 	} else {
 		/* got reply */
@@ -723,9 +718,6 @@ static int dn_wait_for_reply(struct tipc_dn_chan *dn, int timeout)
 	}
 	mutex_unlock(&dn->lock);
 
-	if (ret < 0)
-		pr_err("%s: wait reply error (%d), dn=%p, state=%d!\n",
-			__func__, ret, dn, dn->state);
 	return ret;
 }
 
@@ -760,7 +752,6 @@ static void dn_connected(struct tipc_dn_chan *dn)
 {
 	mutex_lock(&dn->lock);
 	dn->state = TIPC_CONNECTED;
-	dn->state_bak = TIPC_CONNECTED;
 
 	/* complete all pending  */
 	complete(&dn->reply_comp);
@@ -772,7 +763,6 @@ static void dn_disconnected(struct tipc_dn_chan *dn)
 {
 	mutex_lock(&dn->lock);
 	dn->state = TIPC_DISCONNECTED;
-	dn->state_bak = TIPC_DISCONNECTED;
 
 	/* complete all pending  */
 	complete(&dn->reply_comp);
@@ -789,7 +779,6 @@ static void dn_shutdown(struct tipc_dn_chan *dn)
 
 	/* set state to STALE */
 	dn->state = TIPC_STALE;
-	dn->state_bak = TIPC_STALE;
 
 	/* complete all pending  */
 	complete(&dn->reply_comp);
@@ -877,7 +866,6 @@ static int tipc_open(struct inode *inode, struct file *filp)
 	INIT_LIST_HEAD(&dn->rx_msg_queue);
 
 	dn->state = TIPC_DISCONNECTED;
-	dn->state_bak = TIPC_DISCONNECTED;
 
 	dn->chan = vds_create_channel(vds, &_dn_ops, dn);
 	if (IS_ERR(dn->chan)) {
@@ -935,6 +923,12 @@ static long tipc_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (ret) {
 			pr_err("%s: TIPC_IOC_CONNECT error (%d)!\n",
 				__func__, ret);
+			trusty_fast_call32(
+				dn->chan->vds->vdev->dev.parent->parent,
+				MT_SMC_FC_THREADS, 0, 0, 0);
+			trusty_std_call32(
+				dn->chan->vds->vdev->dev.parent->parent,
+				SMC_SC_NOP, 0, 0, 0);
 		}
 		break;
 	default:
@@ -1032,14 +1026,6 @@ static ssize_t tipc_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	tipc_chan_put_rxbuf(dn->chan, mb);
 
 out:
-	if (ret < 0) {
-		pr_err("%s: TIPC read error (%d), dn=%p, state=%d, s_bak=%d!\n",
-			__func__, ret, dn, dn->state, dn->state_bak);
-		/* Trigger KE if state is changed unexpectedly! */
-		if (dn->state != dn->state_bak)
-			BUG();
-	}
-
 	mutex_unlock(&dn->lock);
 	return ret;
 }
@@ -1186,7 +1172,6 @@ static int tipc_open_channel(struct tipc_cdev_node *cdn,
 	INIT_LIST_HEAD(&dn->rx_msg_queue);
 
 	dn->state = TIPC_DISCONNECTED;
-	dn->state_bak = TIPC_DISCONNECTED;
 
 	dn->chan = vds_create_channel(vds, &_dn_ops, dn);
 	if (IS_ERR(dn->chan)) {
@@ -1300,14 +1285,6 @@ ssize_t tipc_k_read(struct tipc_k_handle *h, void *buf, size_t buf_len,
 	tipc_chan_put_rxbuf(dn->chan, mb);
 
 out:
-	if (ret < 0) {
-		pr_err("%s: TIPC read error (%d), dn=%p, state=%d, s_bak=%d!\n",
-			__func__, ret, dn, dn->state, dn->state_bak);
-		/* Trigger KE if state is changed unexpectedly! */
-		if (dn->state != dn->state_bak)
-			BUG();
-	}
-
 	mutex_unlock(&dn->lock);
 	return ret;
 }

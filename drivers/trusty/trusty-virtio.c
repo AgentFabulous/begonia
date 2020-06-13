@@ -159,11 +159,7 @@ static bool trusty_virtio_notify(struct virtqueue *vq)
 		atomic_set(&tvr->needs_kick, 1);
 		queue_work(tctx->kick_wq, &tctx->kick_vqs);
 	} else {
-#if defined(CONFIG_MTK_NEBULA_VM_SUPPORT) && defined(CONFIG_GZ_SMC_CALL_REMAP)
-		trusty_enqueue_nop(tctx->dev->parent, &tvr->kick_nop, true);
-#else
 		trusty_enqueue_nop(tctx->dev->parent, &tvr->kick_nop);
-#endif
 	}
 
 	return true;
@@ -640,57 +636,6 @@ err_load_descr:
 	return ret;
 }
 
-#ifdef CONFIG_MTK_ENABLE_GENIEZONE
-
-static struct workqueue_attrs *attrs;
-
-/* parse dtsi to find big core and set to mask */
-static int bind_big_core(struct cpumask *mask)
-{
-	struct device_node *cpus = NULL, *cpu = NULL;
-	struct property *cpu_pp = NULL;
-
-	int cpu_num = 0, big_start_num = 0, big_type = 0, cpu_type = 0;
-	char *compat_val;
-	int compat_len, i;
-
-	cpus = of_find_node_by_path("/cpus");
-	if (cpus == NULL)
-		return -1;
-
-	for_each_child_of_node(cpus, cpu) {
-		if (of_node_cmp(cpu->type, "cpu"))
-			continue;
-
-		cpu_num++;
-
-		for_each_property_of_node(cpu, cpu_pp) {
-			if (strcmp(cpu_pp->name, "compatible") == 0) {
-				compat_val = (char *)cpu_pp->value;
-				compat_len = strlen(compat_val);
-				i = kstrtoint(compat_val+(compat_len-2), 10,
-								&cpu_type);
-				if (big_type < cpu_type) {
-					big_type = cpu_type;
-					big_start_num = cpu_num - 1;
-				}
-			}
-		}
-	}
-
-	cpumask_clear(mask);
-	// final CPU is for TEE
-	for (i = big_start_num ; i < cpu_num-1 ; i++) {
-		/* dev_info(&pdev->dev, "%s bind cpu%d\n", __func__, i); */
-		cpumask_set_cpu(i, mask);
-	}
-
-	return 0;
-}
-
-#endif
-
-
 static int trusty_virtio_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -727,18 +672,6 @@ static int trusty_virtio_probe(struct platform_device *pdev)
 		goto err_create_kick_wq;
 	}
 
-#ifdef CONFIG_MTK_ENABLE_GENIEZONE
-	attrs = alloc_workqueue_attrs(GFP_KERNEL);
-	if (!attrs) {
-		ret = -ENOMEM;
-		goto err_free_workqueue;
-	}
-	ret = bind_big_core(attrs->cpumask);
-	if (ret)
-		dev_info(&pdev->dev, "Failed to bind big cores\n");
-	apply_workqueue_attrs(tctx->kick_wq, attrs);
-#endif
-
 	ret = trusty_virtio_add_devices(tctx);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to add virtio devices\n");
@@ -750,8 +683,6 @@ static int trusty_virtio_probe(struct platform_device *pdev)
 
 err_add_devices:
 	destroy_workqueue(tctx->kick_wq);
-err_free_workqueue:
-	free_workqueue_attrs(attrs);
 err_create_kick_wq:
 	destroy_workqueue(tctx->check_wq);
 err_create_check_wq:
@@ -783,11 +714,6 @@ static int trusty_virtio_remove(struct platform_device *pdev)
 
 	/* free shared area */
 	free_pages_exact(tctx->shared_va, tctx->shared_sz);
-
-#ifdef CONFIG_MTK_ENABLE_GENIEZONE
-	/* free workqueue attrs */
-	free_workqueue_attrs(attrs);
-#endif
 
 	/* free context */
 	kfree(tctx);
