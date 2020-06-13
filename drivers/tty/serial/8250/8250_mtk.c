@@ -876,7 +876,7 @@ void mtk8250_restore_dev(void)
 			continue;
 
 		mtk8250_runtime_resume(up->port.dev);
-		//pr_info("restore UART register start!\n");
+		pr_info("restore UART register start!\n");
 
 		spin_lock_irqsave(&up->port.lock, flags);
 
@@ -984,7 +984,7 @@ static int __init early_mtk8250_setup(struct earlycon_device *device,
 	return early_serial8250_setup(device, NULL);
 }
 #ifdef CONFIG_FPGA_EARLY_PORTING
-EARLYCON_DECLARE(uart8250, early_mtk8250_setup);
+EARLYCON_DECLARE(mtk8250, early_mtk8250_setup);
 #endif
 OF_EARLYCON_DECLARE(mtk8250, "mediatek,mt6577-uart", early_mtk8250_setup);
 #endif
