@@ -2,7 +2,7 @@
  *  linux/drivers/video/fbmem.c
  *
  *  Copyright (C) 1994 Martin Schaller
- *  Copyright (C) 2019 XiaoMi, Inc.
+ *  Copyright (C) 2020 XiaoMi, Inc.
  *
  *	2001 - Documented with DocBook
  *	- Brad Douglas <brad@neruo.com>
@@ -1070,8 +1070,6 @@ fb_blank(struct fb_info *info, int blank)
 
  	if (blank > FB_BLANK_POWERDOWN)
  		blank = FB_BLANK_POWERDOWN;
-
-	pr_debug("%s blank = %d\n", __func__, blank);
 
 	if (info->blank == blank) {
 		if (info->fbops->fb_blank)
