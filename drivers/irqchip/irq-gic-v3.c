@@ -568,8 +568,6 @@ static void gic_cpu_sys_reg_init(void)
 	gic_write_grpen1(1);
 }
 
-__weak int __init mt_gic_ext_init(void) { return 0; }
-
 static int gic_dist_supports_lpis(void)
 {
 	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
@@ -1237,6 +1235,8 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
 	gic_v3_kvm_info.has_v4 = gic_data.rdists.has_vlpis;
 	gic_set_kvm_info(&gic_v3_kvm_info);
 }
+
+__weak int __init mt_gic_ext_init(void) { return 0; }
 
 static int __init gic_of_init(struct device_node *node, struct device_node *parent)
 {
