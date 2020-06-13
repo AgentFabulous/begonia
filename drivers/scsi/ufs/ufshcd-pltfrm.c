@@ -3,6 +3,7 @@
  *
  * This code is based on drivers/scsi/ufs/ufshcd-pltfrm.c
  * Copyright (C) 2011-2013 Samsung India Software Operations
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Authors:
  *	Santosh Yaraganavi <santosh.sy@samsung.com>
@@ -107,6 +108,13 @@ static int ufshcd_parse_clock_info(struct ufs_hba *hba)
 		if (ret)
 			goto out;
 
+		/* skip vendor clk, vendor clk shall be handled by vops */
+		if (strstr(name, "vendor")) {
+			dev_info(dev, "%s: vendor clk %s is found and skipped\n",
+				 __func__, name);
+			continue;
+		}
+
 		clki = devm_kzalloc(dev, sizeof(*clki), GFP_KERNEL);
 		if (!clki) {
 			ret = -ENOMEM;
@@ -153,8 +161,24 @@ static int ufshcd_populate_vreg(struct device *dev, const char *name,
 
 	/* if fixed regulator no need further initialization */
 	snprintf(prop_name, MAX_PROP_SIZE, "%s-fixed-regulator", name);
-	if (of_property_read_bool(np, prop_name))
+	if (of_property_read_bool(np, prop_name)) {
+		ret = of_property_read_u32(np, "vcc-voltage",
+			&vreg->fixed_uV);
+		if (ret) {
+			dev_err(dev, "%s: Read vcc-voltage, err %d\n",
+					__func__, ret);
+			goto out;
+		}
+
+		ret = of_property_read_u32(np, "vcc-voltage-plus",
+			&vreg->plus_uV);
+		if (ret) {
+			dev_err(dev, "%s: Read vcc-voltage-plus, err %d\n",
+					__func__, ret);
+			goto out;
+		}
 		goto out;
+	}
 
 	snprintf(prop_name, MAX_PROP_SIZE, "%s-max-microamp", name);
 	ret = of_property_read_u32(np, prop_name, &vreg->max_uA);

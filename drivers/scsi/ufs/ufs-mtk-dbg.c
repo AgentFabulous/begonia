@@ -17,6 +17,7 @@
 
 #define pr_fmt(fmt) "["KBUILD_MODNAME"]" fmt
 
+#include <linux/atomic.h>
 #include <linux/sched.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
@@ -49,6 +50,7 @@ int ufs_cmd_ptr = MAX_UFS_CMD_HLIST_ENTRY_CNT - 1;
 int ufs_cmd_cnt;
 static spinlock_t ufs_mtk_cmd_dump_lock;
 static int ufs_mtk_is_cmd_dump_lock_init;
+static atomic_t cmd_hist_enabled;
 char ufs_aee_buffer[UFS_AEE_BUFFER_SIZE];
 
 static void ufs_mtk_dbg_dump_feature(struct ufs_hba *hba, struct seq_file *m)
@@ -80,7 +82,12 @@ void ufs_mtk_dbg_add_trace(struct ufs_hba *hba,
 	if (!ufs_mtk_is_cmd_dump_lock_init) {
 		spin_lock_init(&ufs_mtk_cmd_dump_lock);
 		ufs_mtk_is_cmd_dump_lock_init = 1;
+
+		atomic_set(&cmd_hist_enabled, 1);
 	}
+
+	if (!atomic_read(&cmd_hist_enabled))
+		return;
 
 	spin_lock_irqsave(&ufs_mtk_cmd_dump_lock, flags);
 
@@ -113,6 +120,11 @@ void ufs_mtk_dbg_add_trace(struct ufs_hba *hba,
 		if (hba->lrb[tag].cmd && hba->lrb[tag].cmd->request) {
 			ufs_cmd_hlist[ptr].rq =
 				hba->lrb[tag].cmd->request;
+			ufs_cmd_hlist[ptr].crypted =
+				hba->lrb[tag].crypto_en;
+			ufs_cmd_hlist[ptr].keyslot =
+				ufs_cmd_hlist[ptr].crypted ?
+				hba->lrb[tag].crypto_cfgid : 0;
 		}
 	}
 
@@ -242,13 +254,15 @@ void ufs_mtk_dbg_dump_trace(char **buff, unsigned long *size,
 
 		} else {
 			SPREAD_PRINTF(buff, size, m,
-				"%3d-r,%5d,%2d,0x%2x,t=%2d,lun=0x%x,lba=0x%llx,len=%6d,%llu,\t%llu",
+				"%3d-r,%5d,%2d,0x%2x,t=%2d,lun=0x%x,crypt:%d,%d,lba=0x%llx,len=%6d,%llu,\t%llu",
 				ptr,
 				ufs_cmd_hlist[ptr].pid,
 				ufs_cmd_hlist[ptr].event,
 				ufs_cmd_hlist[ptr].opcode,
 				ufs_cmd_hlist[ptr].tag,
 				ufs_cmd_hlist[ptr].lun,
+				ufs_cmd_hlist[ptr].crypted,
+				ufs_cmd_hlist[ptr].keyslot,
 				(long long int)ufs_cmd_hlist[ptr].lba,
 				ufs_cmd_hlist[ptr].transfer_len,
 				(u64)ufs_cmd_hlist[ptr].time,
@@ -297,7 +311,7 @@ void ufs_mtk_dbg_hang_detect_dump(void)
 	ufs_mtk_dbg_dump_trace(NULL, NULL,
 		ufs_mtk_hba->nutrs + ufs_mtk_hba->nutrs / 2, NULL);
 
-	ufshcd_print_all_uic_err_hist(ufs_mtk_hba, NULL, NULL, NULL);
+	ufshcd_print_all_err_hist(ufs_mtk_hba, NULL, NULL, NULL);
 #endif
 }
 
@@ -318,7 +332,7 @@ void ufs_mtk_dbg_proc_dump(struct seq_file *m)
 	ufs_mtk_dbg_dump_trace(NULL, NULL,
 		MAX_UFS_CMD_HLIST_ENTRY_CNT, m);
 
-	ufshcd_print_all_uic_err_hist(ufs_mtk_hba, m, NULL, NULL);
+	ufshcd_print_all_err_hist(ufs_mtk_hba, m, NULL, NULL);
 #endif
 }
 
@@ -338,7 +352,7 @@ void get_ufs_aee_buffer(unsigned long *vaddr, unsigned long *size)
 	ufs_mtk_dbg_dump_trace(&buff, &free_size,
 		MAX_UFS_CMD_HLIST_ENTRY_CNT, NULL);
 
-	ufshcd_print_all_uic_err_hist(ufs_mtk_hba,
+	ufshcd_print_all_err_hist(ufs_mtk_hba,
 		NULL, &buff, &free_size);
 
 	/* retrun start location */
@@ -418,26 +432,24 @@ static int ufs_help_proc_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-int ufs_g_count;
 /* ========== driver proc interface =========== */
 static int ufs_debug_proc_show(struct seq_file *m, void *v)
 {
-	int cmd = -1;
-	int sscanf_num;
-	int p1, p2, p3, p4, p5, p6, p7, p8;
+	unsigned long cmd;
 
-	p1 = p2 = p3 = p4 = p5 = p6 = p7 = p8 = -1;
+	seq_printf(m, "ufsdbg: debug command: %s\n", cmd_buf);
 
-	cmd_buf[ufs_g_count] = '\0';
-	seq_printf(m, "Debug Command:  %s\n", cmd_buf);
+	if (kstrtoul(cmd_buf, 10, &cmd))
+		cmd = UFS_CMDS_DUMP;
 
-	sscanf_num = sscanf(cmd_buf, "%x %x %x %x %x %x %x %x %x", &cmd,
-		&p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8);
-
-	ufs_g_count = 0;
-	cmd_buf[ufs_g_count] = '\0';
+	cmd_buf[0] = '\0';
 
 	if (cmd == UFS_CMDS_DUMP) {
+		/*
+		 * Default print cmd history for aee:
+		 * JE/NE/ANR/EE/SWT/system api dump
+		 */
+		seq_puts(m, "==== UFS Debug Info ====\n");
 		ufs_mtk_dbg_proc_dump(m);
 	} else if (cmd == UFS_GET_PWR_MODE) {
 		seq_puts(m, "(1:FAST 2:SLOW 4:FAST_AUTO 5:SLOW_AUTO 7:UNCHANGE)\n");
@@ -454,14 +466,6 @@ static int ufs_debug_proc_show(struct seq_file *m, void *v)
 			ufs_mtk_hba->pwr_info.lane_rx);
 	} else if (cmd == UFS_DUMP_HEALTH_DESCRIPTOR) {
 		ufsdbg_dump_health_desc(m);
-
-	} else {
-		/*
-		 * Default print cmd history for aee:
-		 * JE/NE/ANR/EE/SWT/system api dump
-		 */
-		seq_puts(m, "==== ufs debug info for aee ====\n");
-		ufs_mtk_dbg_proc_dump(m);
 	}
 
 	return 0;
@@ -470,18 +474,87 @@ static int ufs_debug_proc_show(struct seq_file *m, void *v)
 static ssize_t ufs_debug_proc_write(struct file *file, const char *buf,
 	size_t count, loff_t *data)
 {
-	int ret;
+	unsigned long op = UFS_CMD_UNKNOWN;
+	bool handled = false;
 
-	if (count == 0)
-		return -1;
-	if (count > 255)
-		count = 255;
-	ufs_g_count = count;
-	ret = copy_from_user(cmd_buf, buf, count);
-	if (ret < 0)
-		return -1;
+	if (count == 0 || count > 255)
+		return -EINVAL;
+
+	if (copy_from_user(cmd_buf, buf, count))
+		return -EINVAL;
+
+	/*
+	 * Let's handle simple commands here.
+	 * Simple command can be executed immediately
+	 * after command is written and do not need further
+	 * "read" or "cat" anymore.
+	 */
+	cmd_buf[count] = '\0';
+	if (kstrtoul(cmd_buf, 10, &op))
+		return -EINVAL;
+
+	if (op == UFS_CMD_HIST_BEGIN) {
+		atomic_set(&cmd_hist_enabled, 1);
+		pr_info("ufsdbg: cmd history on\n");
+		handled = true;
+	} else if (op == UFS_CMD_HIST_STOP) {
+		atomic_set(&cmd_hist_enabled, 0);
+		pr_info("ufsdbg: cmd history off\n");
+		handled = true;
+	}
+
+	if (handled)
+		cmd_buf[0] = '\0';
+
 	return count;
 }
+
+static int ufs_perf_proc_show(struct seq_file *m, void *v)
+{
+	struct ufs_mtk_host *host = m->private;
+
+	seq_puts(m, "UFS Performance Mode\n");
+	seq_printf(m, "  - supported: %d\n", ufs_mtk_perf_is_supported(host));
+	seq_printf(m, "  - enabled: %d\n", host->perf_mode);
+	seq_printf(m, "  - crypto_vcore_opp: %d\n", host->crypto_vcore_opp);
+
+	return 0;
+}
+
+static ssize_t ufs_perf_proc_write(struct file *file, const char *ubuf,
+				   size_t count, loff_t *data)
+{
+	struct ufs_mtk_host *host = PDE_DATA(file->f_mapping->host);
+	unsigned long op = UFS_CMD_UNKNOWN;
+	char cmd[16] = {0};
+	loff_t buff_pos = 0;
+	int ret;
+
+	ret = simple_write_to_buffer(cmd, 16, &buff_pos, ubuf, count);
+	if (ret < 0) {
+		dev_info(host->hba->dev, "%s: failed to read user data\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	cmd[ret] = '\0';
+	if (kstrtoul(cmd, 10, &op))
+		return -EINVAL;
+
+	if (op == 1 && !host->perf_mode) {
+		ret = ufs_mtk_perf_setup_crypto_clk(host, true);
+		if (!ret)
+			host->perf_mode = true;
+	} else if (op == 0 && host->perf_mode) {
+		ret = ufs_mtk_perf_setup_crypto_clk(host, false);
+		if (!ret)
+			host->perf_mode = false;
+	} else
+		return -EINVAL;
+
+	return count;
+}
+
 
 static int ufs_proc_open(struct inode *inode, struct file *file)
 {
@@ -500,8 +573,22 @@ static int ufs_help_proc_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, ufs_help_proc_show, inode->i_private);
 }
+
 static const struct file_operations ufs_help_fops = {
 	.open = ufs_help_proc_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int ufs_perf_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ufs_perf_proc_show, PDE_DATA(inode));
+}
+
+static const struct file_operations ufs_perf_fops = {
+	.open = ufs_perf_proc_open,
+	.write = ufs_perf_proc_write,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
@@ -513,11 +600,19 @@ static const struct file_operations ufs_help_fops = {
 #define PROC_PERM		0440
 #endif
 
-int ufs_mtk_debug_proc_init(void)
+int ufs_mtk_debug_proc_init(struct ufs_hba *hba)
 {
+	struct ufs_mtk_host *host;
 	struct proc_dir_entry *prEntry;
 	kuid_t uid;
 	kgid_t gid;
+
+	if (!hba || !hba->priv) {
+		pr_info("%s: NULL host, exiting\n", __func__);
+		return -EINVAL;
+	}
+
+	host = hba->priv;
 
 	uid = make_kuid(&init_user_ns, 0);
 	gid = make_kgid(&init_user_ns, 1001);
@@ -527,12 +622,21 @@ int ufs_mtk_debug_proc_init(void)
 	if (prEntry)
 		proc_set_user(prEntry, uid, gid);
 	else
-		pr_info("[%s]: failed to create /proc/ufs_debug\n", __func__);
+		pr_info("%s: failed to create /proc/ufs_debug\n", __func__);
 
 	prEntry = proc_create("ufs_help", PROC_PERM, NULL, &ufs_help_fops);
 
 	if (!prEntry)
-		pr_info("[%s]: failed to create /proc/ufs_help\n", __func__);
+		pr_info("%s: failed to create /proc/ufs_help\n", __func__);
+
+	/* allow write permission in all builds */
+	prEntry = proc_create_data("ufs_perf", 0660, NULL, &ufs_perf_fops,
+				   host);
+
+	if (prEntry)
+		proc_set_user(prEntry, uid, gid);
+	else
+		pr_info("%s: failed to create /proc/ufs_perf\n", __func__);
 
 	return 0;
 }

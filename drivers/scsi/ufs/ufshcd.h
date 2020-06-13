@@ -294,6 +294,9 @@ enum ufs_scsi_dev_cfg {
 	UFS_SCSI_DEV_SLAVE_DESTROY
 };
 
+#define UFS_RESCTL_CMD_SEND        BIT(0)
+#define UFS_RESCTL_CMD_COMP        BIT(1)
+
 /**
  * struct ufs_hba_variant_ops - variant specific callbacks
  * @name: variant name
@@ -312,6 +315,8 @@ enum ufs_scsi_dev_cfg {
  *			to be set.
  * @setup_xfer_req: called before any transfer request is issued
  *                  to set some things
+ * @complete_xfer_req: called after any transfer request is completed
+ *                  to release some things
  * @setup_task_mgmt: called before any task management request is issued
  *                  to set some things
  * @hibern8_notify: called around hibern8 enter/exit
@@ -340,6 +345,7 @@ struct ufs_hba_variant_ops {
 					struct ufs_pa_layer_attr *,
 					struct ufs_pa_layer_attr *);
 	void	(*setup_xfer_req)(struct ufs_hba *, int, bool);
+	void	(*complete_xfer_req)(struct ufs_hba *);
 	void	(*setup_task_mgmt)(struct ufs_hba *, int, u8);
 	void    (*hibern8_notify)(struct ufs_hba *, enum uic_cmd_dme,
 					enum ufs_notify_change_status);
@@ -358,10 +364,9 @@ struct ufs_hba_variant_ops {
 
 	/*
 	 * MTK PATCH:
-	 * DeepIdle and SODI resource request vops
+	 * Resource control
 	 */
-	void	(*deepidle_resource_req)(struct ufs_hba *,
-					unsigned int resource);
+	void	(*res_ctrl)(struct ufs_hba *hba, unsigned int op);
 
 	/*
 	 * MTK PATCH: Lock for deepidle or SODI.
@@ -459,17 +464,17 @@ struct ufs_init_prefetch {
 	u32 icc_level;
 };
 
-#define UIC_ERR_REG_HIST_LENGTH 8
+#define UFS_ERR_REG_HIST_LENGTH 8
 /**
- * struct ufs_uic_err_reg_hist - keeps history of uic errors
+ * struct ufs_err_reg_hist - keeps history of uic errors
  * @pos: index to indicate cyclic buffer position
  * @reg: cyclic buffer for registers value
  * @tstamp: cyclic buffer for time stamp
  */
-struct ufs_uic_err_reg_hist {
+struct ufs_err_reg_hist {
 	int pos;
-	u32 reg[UIC_ERR_REG_HIST_LENGTH];
-	ktime_t tstamp[UIC_ERR_REG_HIST_LENGTH];
+	u32 reg[UFS_ERR_REG_HIST_LENGTH];
+	ktime_t tstamp[UFS_ERR_REG_HIST_LENGTH];
 };
 
 /**
@@ -483,15 +488,37 @@ struct ufs_uic_err_reg_hist {
  * @nl_err: tracks nl-uic errors
  * @tl_err: tracks tl-uic errors
  * @dme_err: tracks dme errors
+ * @auto_hibern8_err: tracks auto-hibernate errors
+ * @fatal_err: tracks fatal errors
+ * @linkup_err: tracks link-startup errors
+ * @resume_err: tracks resume errors
+ * @suspend_err: tracks suspend errors
+ * @dev_reset: tracks device reset events
+ * @host_reset: tracks host reset events
+ * @task_abort: tracks task abort events
  */
 struct ufs_stats {
 	u32 hibern8_exit_cnt;
 	ktime_t last_hibern8_exit_tstamp;
-	struct ufs_uic_err_reg_hist pa_err;
-	struct ufs_uic_err_reg_hist dl_err;
-	struct ufs_uic_err_reg_hist nl_err;
-	struct ufs_uic_err_reg_hist tl_err;
-	struct ufs_uic_err_reg_hist dme_err;
+
+	/* uic specific errors */
+	struct ufs_err_reg_hist pa_err;
+	struct ufs_err_reg_hist dl_err;
+	struct ufs_err_reg_hist nl_err;
+	struct ufs_err_reg_hist tl_err;
+	struct ufs_err_reg_hist dme_err;
+
+	/* fatal errors */
+	struct ufs_err_reg_hist auto_hibern8_err;
+	struct ufs_err_reg_hist fatal_err;
+	struct ufs_err_reg_hist link_startup_err;
+	struct ufs_err_reg_hist resume_err;
+	struct ufs_err_reg_hist suspend_err;
+
+	/* abnormal events */
+	struct ufs_err_reg_hist dev_reset;
+	struct ufs_err_reg_hist host_reset;
+	struct ufs_err_reg_hist task_abort;
 };
 
 /* MTK PATCH UFS Host Controller debug print bitmask */
@@ -612,6 +639,9 @@ struct ufs_hba {
 	struct device_attribute rpm_lvl_attr;
 	struct device_attribute spm_lvl_attr;
 	int pm_op_in_progress;
+
+	/* Auto-Hibernate Idle Timer register value */
+	u32 ahit;
 
 	struct ufshcd_lrb *lrb;
 	unsigned long lrb_in_use;
@@ -871,6 +901,11 @@ return true;
 #endif
 }
 
+static inline bool ufshcd_is_auto_hibern8_supported(struct ufs_hba *hba)
+{
+	return (hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT);
+}
+
 #define ufshcd_writel(hba, val, reg)	\
 	writel((val), (hba)->mmio_base + (reg))
 #define ufshcd_readl(hba, reg)	\
@@ -912,11 +947,10 @@ static inline void ufshcd_vops_auto_hibern8(struct ufs_hba *hba, bool enable)
 }
 
 /* MTK PATCH */
-static inline void ufshcd_vops_deepidle_resource_req(struct ufs_hba *hba,
-	unsigned int resource)
+static inline void ufshcd_vops_res_ctrl(struct ufs_hba *hba, unsigned int op)
 {
-	if (hba->vops && hba->vops->deepidle_resource_req)
-		hba->vops->deepidle_resource_req(hba, resource);
+	if (hba->vops && hba->vops->res_ctrl)
+		hba->vops->res_ctrl(hba, op);
 }
 
 /* MTK PATCH */
@@ -1141,6 +1175,12 @@ static inline void ufshcd_vops_setup_xfer_req(struct ufs_hba *hba, int tag,
 		return hba->vops->setup_xfer_req(hba, tag, is_scsi_cmd);
 }
 
+static inline void ufshcd_vops_complete_xfer_req(struct ufs_hba *hba)
+{
+	if (hba->vops && hba->vops->complete_xfer_req)
+		return hba->vops->complete_xfer_req(hba);
+}
+
 static inline void ufshcd_vops_setup_task_mgmt(struct ufs_hba *hba,
 					int tag, u8 tm_function)
 {
@@ -1190,13 +1230,15 @@ static inline void ufshcd_vops_dbg_register_dump(struct ufs_hba *hba)
  *
  * API prototypes for MTK vendor-specific usage.
  */
+int ufshcd_clock_scaling_prepare(struct ufs_hba *hba);
+void ufshcd_clock_scaling_unprepare(struct ufs_hba *hba);
 void ufshcd_enable_intr(struct ufs_hba *hba, u32 intrs);
 void ufshcd_disable_intr(struct ufs_hba *hba, u32 intrs);
 int ufshcd_hba_enable(struct ufs_hba *hba);
 int ufshcd_make_hba_operational(struct ufs_hba *hba);
 void ufshcd_print_host_state(struct ufs_hba *hba,
 	u32 mphy_info, struct seq_file *m, char **buff, unsigned long *size);
-void ufshcd_print_all_uic_err_hist(struct ufs_hba *hba,
+void ufshcd_print_all_err_hist(struct ufs_hba *hba,
 	struct seq_file *m, char **buff, unsigned long *size);
 int ufshcd_query_attr(struct ufs_hba *hba,
 	enum query_opcode opcode,

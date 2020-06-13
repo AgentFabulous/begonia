@@ -20,6 +20,8 @@ struct ufs_cmd_hlist_struct {
 	enum ufs_trace_event event;
 	u8 opcode;
 	u8 lun;
+	u8 crypted;
+	u8 keyslot;
 	pid_t pid;
 	u32 tag;
 	u32 transfer_len;
@@ -77,7 +79,10 @@ do { \
 enum {
 	UFS_CMDS_DUMP = 0,
 	UFS_GET_PWR_MODE = 1,
-	UFS_DUMP_HEALTH_DESCRIPTOR = 2
+	UFS_DUMP_HEALTH_DESCRIPTOR = 2,
+	UFS_CMD_HIST_BEGIN = 3,
+	UFS_CMD_HIST_STOP = 4,
+	UFS_CMD_UNKNOWN
 };
 
 #define UFS_PRINFO_PROC_MSG(evt, fmt, args...) \
@@ -121,7 +126,7 @@ do {	\
 	} \
 } while (0)
 
-int ufs_mtk_debug_proc_init(void);
+int ufs_mtk_debug_proc_init(struct ufs_hba *hba);
 void ufs_mtk_dbg_add_trace(struct ufs_hba *hba,
 	enum ufs_trace_event event, u32 tag,
 	u8 lun, u32 transfer_len, sector_t lba, u8 opcode,

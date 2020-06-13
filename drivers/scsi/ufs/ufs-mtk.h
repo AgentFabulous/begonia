@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -21,6 +22,7 @@
 #include <linux/of.h>
 #include <linux/rpmb.h>
 #include <linux/hie.h>
+#include <linux/pm_qos.h>
 #include "ufshcd.h"
 
 #define UPIU_COMMAND_CRYPTO_EN_OFFSET	23
@@ -67,7 +69,8 @@ enum ufs_trace_event {
 	UFS_TRACE_REG_TOGGLE,
 	UFS_TRACE_ABORTING,
 	UFS_TRACE_DI_FAIL,
-	UFS_TRACE_DEVICE_RESET
+	UFS_TRACE_DEVICE_RESET,
+	UFS_TRACE_PERF_MODE,
 };
 
 enum {
@@ -84,16 +87,10 @@ enum {
 };
 
 enum {
-	/* request resource for DMA operations, e.g., DRAM */
-	UFS_MTK_RESREQ_DMA_OP,
-	/* request resource for mphy not in H8, e.g., main PLL, 26 mhz clock */
-	UFS_MTK_RESREQ_MPHY_NON_H8
-};
-
-enum {
 	UFS_H8                      = 0x0,
 	UFS_H8_SUSPEND              = 0x1,
 };
+#define H8_POLL_TOUT_MS             100
 
 struct ufs_cmd_str_struct {
 	char str[32];
@@ -177,8 +174,33 @@ struct ufs_crypt_info {
 	struct scsi_cmnd *cmd;
 };
 
+struct ufs_mtk_host {
+	struct ufs_hba *hba;
 
-extern u32 ufs_mtk_auto_hibern8_timer_ms;
+	/* performance mode */
+	bool perf_mode;
+	int crypto_vcore_opp;
+	struct clk *crypto_clk_mux;
+	struct clk *crypto_parent_clk_normal;
+	struct clk *crypto_parent_clk_perf;
+	struct pm_qos_request *req_vcore;
+
+	bool spm_sw_mode;
+	atomic_t pm_qos_state;
+	struct pm_qos_request pm_qos_req;
+	struct delayed_work pm_qos_get;
+	struct delayed_work pm_qos_rel;
+	spinlock_t qos_lock;
+	int pm_qos_value;
+};
+
+enum {
+	PMQOS_UNREQ = 0,
+	PMQOS_REQ = 1,
+	PMQOS_UNREQING = 2,
+	PMQOS_REQING = 3
+};
+
 extern bool ufs_mtk_auto_hibern8_enabled;
 extern enum ufs_dbg_lvl_t ufs_mtk_dbg_lvl;
 extern struct ufs_hba *ufs_mtk_hba;
@@ -199,7 +221,9 @@ void ufs_mtk_hwfde_cfg_cmd(struct ufs_hba *hba,
 	struct scsi_cmnd *cmd);
 int ufs_mtk_linkup_fail_handler(struct ufs_hba *hba, int left_retry);
 void ufs_mtk_parse_auto_hibern8_timer(struct ufs_hba *hba);
-void ufs_mtk_parse_pm_levels(struct ufs_hba *hba);
+void ufs_mtk_parse_dt(struct ufs_hba *hba);
+bool ufs_mtk_perf_is_supported(struct ufs_mtk_host *host);
+int ufs_mtk_perf_setup_crypto_clk(struct ufs_mtk_host *host, bool perf);
 int ufs_mtk_ioctl_ffu(struct scsi_device *dev, void __user *buf_user);
 int ufs_mtk_ioctl_get_fw_ver(struct scsi_device *dev, void __user *buf_user);
 int ufs_mtk_ioctl_query(struct ufs_hba *hba, u8 lun, void __user *buf_user);

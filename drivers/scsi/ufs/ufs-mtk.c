@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -10,15 +12,17 @@
  */
 
 #include "ufs.h"
+#include <linux/bitfield.h>
+#include <linux/blk_types.h>
+#include <linux/blkdev.h>
 #include <linux/hie.h>
 #include <linux/nls.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
-#include <linux/rpmb.h>
-#include <linux/blkdev.h>
-#include <linux/blk_types.h>
+#include <linux/pm_qos.h>
 #include <linux/reboot.h>
+#include <linux/rpmb.h>
 
 #include "ufshcd.h"
 #include "ufshcd-pltfrm.h"
@@ -27,9 +31,6 @@
 #include "ufs-mtk-block.h"
 #include "ufs-mtk-platform.h"
 #include "ufs-mtk-dbg.h"
-#ifdef SR_CLKEN_RC_READY
-#include "mtk_srclken_rc.h"
-#endif
 
 #ifdef CONFIG_HIE
 #include <mt-plat/keyhint.h>
@@ -42,13 +43,14 @@
 #include <linux/crc16.h>
 #endif
 
+#include "mtk_spm_resource_req.h"
+
 /* Query request retries */
 #define QUERY_REQ_RETRIES 10
 
 /* refer to ufs_mtk_init() for default value of these globals */
 int  ufs_mtk_rpm_autosuspend_delay;    /* runtime PM: auto suspend delay */
 bool ufs_mtk_rpm_enabled;              /* runtime PM: on/off */
-u32  ufs_mtk_auto_hibern8_timer_ms;
 bool ufs_mtk_auto_hibern8_enabled;
 bool ufs_mtk_host_deep_stall_enable;
 bool ufs_mtk_host_scramble_enable;
@@ -65,6 +67,8 @@ static bool ufs_mtk_is_unmap_cmd(char cmd_op);
  */
 /* Self init Encryption and No Encryption array */
 static u8 di_init;
+/* Logical block count */
+static u64 logblk_cnt;
 /* For Encryption */
 static u16 *LBA_CRC16_ARRAY;
 /* For No Encryption */
@@ -77,7 +81,6 @@ void ufs_mtk_di_init(struct ufs_hba *hba)
 {
 	u8 ud_buf[UNIT_DESC_PARAM_ERASE_BLK_SIZE] = { 0 };
 	int len = UNIT_DESC_PARAM_ERASE_BLK_SIZE;
-	u64 logblk_cnt;
 
 	/* Already init */
 	if (di_init != 0)
@@ -149,6 +152,15 @@ int ufs_mtk_di_cmp(struct ufs_hba *hba, struct scsi_cmnd *cmd)
 
 	lba = cmd->cmnd[5] | (cmd->cmnd[4] << 8) | (cmd->cmnd[3] << 16) |
 		(cmd->cmnd[2] << 24);
+
+	if ((u64)lba >= logblk_cnt) {
+		dev_info(hba->dev,
+			"%s: lba err! expected: logblk_cnt: 0x%llx, LBA: 0x%x\n",
+			__func__, logblk_cnt, lba);
+		WARN_ON(1);
+		return -EIO;
+	}
+
 	if (cmd->cmnd[0] == READ_16) /* HPB use READ_16, blk_cnt fix 1 */
 		blk_cnt = 1;
 	else
@@ -327,6 +339,7 @@ static int ufs_mtk_hie_cfg_request(unsigned int mode,
 {
 	struct ufs_crypt_info *info = (struct ufs_crypt_info *)priv;
 	struct ufshcd_lrb *lrbp;
+	struct ufs_hba *hba = info->hba;
 	u32 i;
 	u32 *key_ptr;
 	unsigned long flags;
@@ -344,6 +357,11 @@ static int ufs_mtk_hie_cfg_request(unsigned int mode,
 #endif
 
 	spin_lock_irqsave(info->hba->host->host_lock, flags);
+
+	if (!(hba->crypto_feature & UFS_CRYPTO_HW_FBE_ENCRYPTED)) {
+		mt_secure_call(MTK_SIP_KERNEL_CRYPTO_HIE_INIT, 0, 0, 0, 0);
+		hba->crypto_feature |= UFS_CRYPTO_HW_FBE_ENCRYPTED;
+	}
 
 	/* get key index from key hint, or install new key to key hint */
 	key_idx = kh_get_hint(ufs_mtk_get_kh(), key, &need_update);
@@ -412,7 +430,8 @@ static int ufs_mtk_hie_cfg_request(unsigned int mode,
 		for (i = 0; i < 32; i++) {
 			ufshcd_writel(info->hba, cpt_cfg.cfgx_raw[i],
 				(addr + i * 4));
-			dev_dbg(info->hba->dev, "0x%x=0x%x\n",
+			dev_dbg(info->hba->dev, "[%d] 0x%x=0x%x\n",
+				key_idx,
 				(addr + i * 4), cpt_cfg.cfgx_raw[i]);
 		}
 
@@ -459,9 +478,6 @@ static int ufs_mtk_hie_cfg_request(unsigned int mode,
 	/* remember to give "tweak" for AES-XTS */
 	lrbp->crypto_dunl = dunl;
 	lrbp->crypto_dunu = dunu;
-
-	/* mark data has ever gone through encryption/decryption path */
-	info->hba->crypto_feature |= UFS_CRYPTO_HW_FBE_ENCRYPTED;
 
 	return 0;
 }
@@ -541,7 +557,7 @@ int ufs_mtk_run_batch_uic_cmd(struct ufs_hba *hba,
 
 int ufs_mtk_cfg_unipro_cg(struct ufs_hba *hba, bool enable)
 {
-	u32 tmp;
+	u32 tmp = 0;
 
 	if (enable) {
 		ufshcd_dme_get(hba, UIC_ARG_MIB(VENDOR_SAVEPOWERCONTROL), &tmp);
@@ -662,10 +678,6 @@ void ufs_mtk_hwfde_cfg_cmd(struct ufs_hba *hba, struct scsi_cmnd *cmd)
 
 		/* mark data has ever gone through encryption/decryption path */
 		hba->crypto_feature |= UFS_CRYPTO_HW_FDE_ENCRYPTED;
-
-	} else {
-		/* disable inline encryption */
-		lrbp->crypto_en = 0;
 	}
 }
 
@@ -699,16 +711,193 @@ static bool ufs_mtk_is_valid_pm_lvl(int lvl)
 		return false;
 }
 
+static int ufs_mtk_host_clk_get(struct device *dev, const char *name,
+				struct clk **clk_out)
+{
+	struct clk *clk;
+	int err = 0;
+
+	clk = devm_clk_get(dev, name);
+	if (IS_ERR(clk))
+		err = PTR_ERR(clk);
+	else
+		*clk_out = clk;
+
+	return err;
+}
+
+bool ufs_mtk_perf_is_supported(struct ufs_mtk_host *host)
+{
+	if (!host->crypto_clk_mux ||
+	    !host->crypto_parent_clk_normal ||
+	    !host->crypto_parent_clk_perf ||
+	    !host->req_vcore ||
+	    host->crypto_vcore_opp < 0)
+		return false;
+	else
+		return true;
+}
+
+int ufs_mtk_perf_setup_crypto_clk(struct ufs_mtk_host *host, bool perf)
+{
+	int err = 0;
+	bool rpm_resumed = false;
+	bool clk_prepared = false;
+
+	if (!ufs_mtk_perf_is_supported(host)) {
+		dev_info(host->hba->dev, "%s: perf mode is unsupported\n",
+			 __func__);
+		err = -ENOTSUPP;
+		goto out;
+	}
+
+	/* runtime resume shall be prior to blocking requests */
+	pm_runtime_get_sync(host->hba->dev);
+	rpm_resumed = true;
+
+	/*
+	 * reuse clk scaling preparation function to wait until all
+	 * on-going commands are done, and then block future commands
+	 */
+	err = ufshcd_clock_scaling_prepare(host->hba);
+	if (err) {
+		dev_info(host->hba->dev,
+			 "%s: ufshcd_clock_scaling_prepare(): %d\n",
+			 __func__, err);
+		goto out;
+	}
+
+	clk_prepared = true;
+
+	err = clk_prepare_enable(host->crypto_clk_mux);
+	if (err) {
+		dev_info(host->hba->dev, "%s: clk_prepare_enable(): %d\n",
+			 __func__, err);
+		goto out;
+	}
+
+	if (perf) {
+		pm_qos_update_request(host->req_vcore,
+				      host->crypto_vcore_opp);
+		err = clk_set_parent(host->crypto_clk_mux,
+				     host->crypto_parent_clk_perf);
+	} else {
+		err = clk_set_parent(host->crypto_clk_mux,
+				     host->crypto_parent_clk_normal);
+		pm_qos_update_request(host->req_vcore,
+				      PM_QOS_VCORE_OPP_DEFAULT_VALUE);
+	}
+
+	if (err)
+		dev_info(host->hba->dev, "%s: clk_set_parent(): %d\n",
+			 __func__, err);
+
+	clk_disable_unprepare(host->crypto_clk_mux);
+
+out:
+	/*
+	 * add event before any possible incoming commands
+	 * by unblocking requests in ufshcd_clock_scaling_unprepare()
+	 */
+	dev_info(host->hba->dev, "perf mode: request %s %s\n",
+		 perf ? "on" : "off",
+		 err ? "failed" : "ok");
+	ufs_mtk_dbg_add_trace(host->hba, UFS_TRACE_PERF_MODE,
+		perf, 0, (u32)err,
+		0, 0, 0, 0, 0, 0);
+
+	if (clk_prepared)
+		ufshcd_clock_scaling_unprepare(host->hba);
+
+	if (rpm_resumed)
+		pm_runtime_put_sync(host->hba->dev);
+
+	return err;
+}
+
+static int ufs_mtk_perf_init_crypto(struct ufs_hba *hba)
+{
+	int err = 0;
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
+	struct device_node *np = hba->dev->of_node;
+
+	err = ufs_mtk_host_clk_get(hba->dev,
+				   "ufs-vendor-crypto-clk-mux",
+				   &host->crypto_clk_mux);
+	if (err) {
+		dev_info(hba->dev,
+			"%s: failed to get ufs-vendor-crypto-clk-mux, err: %d",
+			__func__, err);
+		goto out;
+	}
+
+	err = ufs_mtk_host_clk_get(hba->dev,
+				   "ufs-vendor-crypto-normal-parent-clk",
+				   &host->crypto_parent_clk_normal);
+	if (err) {
+		dev_info(hba->dev,
+			"%s: failed to get ufs-vendor-crypto-normal-parent-clk, err: %d",
+			__func__, err);
+		goto out;
+	}
+
+	err = ufs_mtk_host_clk_get(hba->dev,
+				   "ufs-vendor-crypto-perf-parent-clk",
+				   &host->crypto_parent_clk_perf);
+	if (err) {
+		dev_info(hba->dev,
+			"%s: failed to get ufs-vendor-crypto-perf-parent-clk, err: %d",
+			__func__, err);
+		goto out;
+	}
+
+	err = of_property_read_s32(np, "mediatek,perf-crypto-vcore",
+				   &host->crypto_vcore_opp);
+	if (err) {
+		dev_info(hba->dev,
+			"%s: failed to get mediatek,perf-crypto-vcore",
+			__func__);
+		host->crypto_vcore_opp = -1;
+		goto out;
+	}
+
+	/* init VCORE QOS */
+	host->req_vcore = devm_kzalloc(hba->dev, sizeof(*host->req_vcore),
+				       GFP_KERNEL);
+	if (!host->req_vcore) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	pm_qos_add_request(host->req_vcore, PM_QOS_VCORE_OPP,
+			   PM_QOS_VCORE_OPP_DEFAULT_VALUE);
+out:
+	return err;
+}
+
 /**
  * ufs_mtk_init - find other essential mmio bases
  * @hba: host controller instance
  */
 static int ufs_mtk_init(struct ufs_hba *hba)
 {
+	struct ufs_mtk_host *host;
+	int err = 0;
+
+	host = devm_kzalloc(hba->dev, sizeof(*host), GFP_KERNEL);
+	if (!host) {
+		err = -ENOMEM;
+		dev_info(hba->dev,
+			 "%s: no memory for mtk ufs host\n", __func__);
+		goto out;
+	}
+
+	host->hba = hba;
+	ufshcd_set_variant(hba, host);
+
 	/* initialize globals */
 	ufs_mtk_rpm_autosuspend_delay = -1;
 	ufs_mtk_rpm_enabled = false;
-	ufs_mtk_auto_hibern8_timer_ms = 0;
 	ufs_mtk_auto_hibern8_enabled = false;
 	ufs_mtk_host_deep_stall_enable = 0;
 	ufs_mtk_host_scramble_enable = 0;
@@ -741,8 +930,7 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 
 	ufs_mtk_advertise_hci_quirks(hba);
 
-	/* Get PM level from device tree */
-	ufs_mtk_parse_pm_levels(hba);
+	ufs_mtk_parse_dt(hba);
 
 	/*
 	 * If rpm_lvl and and spm_lvl are not already set to valid levels,
@@ -762,7 +950,9 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 	/* Get auto-hibern8 timeout from device tree */
 	ufs_mtk_parse_auto_hibern8_timer(hba);
 
-	return 0;
+	ufs_mtk_perf_init_crypto(hba);
+out:
+	return err;
 }
 
 static int ufs_mtk_pre_pwr_change(struct ufs_hba *hba,
@@ -801,8 +991,14 @@ static int ufs_mtk_pre_pwr_change(struct ufs_hba *hba,
 	final->gear_rx = 1;
 	final->gear_tx = 1;
 #endif
-	final->lane_rx = 1;
-	final->lane_tx = 1;
+	/* Change by dts setting */
+	if (hba->lanes_per_direction == 2) {
+		final->lane_rx = 2;
+		final->lane_tx = 2;
+	} else {
+		final->lane_rx = 1;
+		final->lane_tx = 1;
+	}
 	final->hs_rate = PA_HS_MODE_B;
 	final->pwr_rx = FAST_MODE;
 	final->pwr_tx = FAST_MODE;
@@ -845,18 +1041,43 @@ static int ufs_mtk_init_mphy(struct ufs_hba *hba)
 	return 0;
 }
 
-static int ufs_mtk_init_crypto(struct ufs_hba *hba)
+static int ufs_mtk_enable_crypto(struct ufs_hba *hba)
 {
 	/* avoid resetting host during resume flow or when link is not off */
 	if (hba->pm_op_in_progress || !ufshcd_is_link_off(hba))
 		return 0;
 
-#ifdef CONFIG_MTK_HW_FDE
-
-	/* restore HW FDE related settings by re-using resume operation */
+	/* restore vendor crypto setting by re-using resume operation */
 	mt_secure_call(MTK_SIP_KERNEL_HW_FDE_UFS_CTL, (1 << 2), 0, 0, 0);
 
-	dev_info(hba->dev, "crypto cfg initialized\n");
+	return 0;
+}
+
+static int ufs_mtk_probe_crypto(struct ufs_hba *hba)
+{
+#ifdef CONFIG_HIE
+	int ret;
+	union ufs_cpt_cap cpt_cap;
+
+	ret = hie_register_device(&ufs_hie_dev);
+	if (ret)
+		return ret;
+	/*
+	 * enable hie key hint feature
+	 *
+	 * key_bits = 512 bits for all possible FBE crypto algorithms
+	 * key_slot = crypto configuration slots
+	 */
+	cpt_cap.cap_raw = ufshcd_readl(hba, UFS_REG_CRYPTO_CAPABILITY);
+	ret = kh_register(ufs_mtk_get_kh(), 512, cpt_cap.cap.cfg_cnt + 1);
+	if (ret)
+		return ret;
+
+	hba->crypto_feature |= UFS_CRYPTO_HW_FBE;
+#endif
+
+#if defined(CONFIG_MTK_HW_FDE)
+	hba->crypto_feature |= UFS_CRYPTO_HW_FDE;
 #endif
 
 	return 0;
@@ -892,16 +1113,17 @@ static int ufs_mtk_hce_enable_notify(struct ufs_hba *hba,
 	case PRE_CHANGE:
 		break;
 	case POST_CHANGE:
-		ret = ufs_mtk_init_crypto(hba);
+		ret = ufs_mtk_enable_crypto(hba);
 		/*
 		 * After HCE enable, need disable xoufs_req_s in ufshci
 		 * when xoufs hw solution is not ready.
 		 */
-#ifdef SR_CLKEN_RC_READY
-		if (srclken_get_stage() != SRCLKEN_FULL_SET)
-
-			ufshcd_writel(hba, 0, REG_UFS_ADDR_XOUFS_ST);
-#else
+#ifndef UFS_REF_CLK_CTRL_BY_UFSHCI
+		/*
+		 * Old chip not use this, disable it always after HCE enable
+		 * to deactivate UFS_SRCCLKENA/UFS_INFRA_REQ/UFS_VRF18_REQ
+		 * after ufs_mtk_pltfrm_resume.
+		 */
 		ufshcd_writel(hba, 0, REG_UFS_ADDR_XOUFS_ST);
 #endif
 		break;
@@ -961,11 +1183,6 @@ static int ufs_mtk_post_link(struct ufs_hba *hba)
 		ret = 0;	/* skip error */
 	}
 
-#ifdef CONFIG_HIE
-	/* init ufs crypto IP for HIE */
-	mt_secure_call(MTK_SIP_KERNEL_CRYPTO_HIE_INIT, 0, 0, 0, 0);
-#endif
-
 	/* enable unipro clock gating feature */
 	ufs_mtk_cfg_unipro_cg(hba, true);
 
@@ -1008,12 +1225,9 @@ static int ufs_mtk_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 		ufs_mtk_pltfrm_suspend(hba);
 
-#ifdef CONFIG_MTK_HW_FDE
-		/* HW FDE related suspend operation */
+		/* vendor-specific crypto suspend */
 		mt_secure_call(MTK_SIP_KERNEL_HW_FDE_UFS_CTL, (1 << 1),
 			0, 0, 0);
-#endif
-
 #ifdef CONFIG_HIE
 		kh_suspend(ufs_mtk_get_kh());
 #endif
@@ -1059,16 +1273,22 @@ static int ufs_mtk_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		 *       will be enabled inside.
 		 */
 		ret = ufshcd_hba_enable(hba);
-		if (ret)
+		if (ret) {
+			dev_err(hba->dev, "%s: hba_enable failed. ret = %d\n",
+				__func__, ret);
 			return ret;
+		}
 
 		/* Leave vendor-specific power down mode to resume
 		 * UniPro state
 		 */
 		ret = ufshcd_dme_set(hba,
 			UIC_ARG_MIB_SEL(VENDOR_UNIPROPOWERDOWNCONTROL, 0), 0);
-		if (ret)
+		if (ret) {
+			dev_err(hba->dev, "%s: UniProPowerDownControl failed. ret = %d\n",
+				__func__, ret);
 			return ret;
+		}
 
 		/*
 		 * Leave hibern8 state
@@ -1088,23 +1308,25 @@ static int ufs_mtk_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 		/* Re-start hba */
 		ret = ufshcd_make_hba_operational(hba);
-		if (ret)
+		if (ret) {
+			dev_err(hba->dev, "%s: make_hba_operational failed. ret = %d\n",
+				__func__, ret);
 			return ret;
+		}
 
-#ifdef CONFIG_MTK_HW_FDE
-		/* HW FDE related resume operation */
+		/* vendor-specific crypto resume */
 		mt_secure_call(MTK_SIP_KERNEL_HW_FDE_UFS_CTL, (1 << 2),
 			0, 0, 0);
-#endif
 	}
 
 	return ret;
 }
 
-void ufs_mtk_parse_pm_levels(struct ufs_hba *hba)
+void ufs_mtk_parse_dt(struct ufs_hba *hba)
 {
 	struct device *dev = hba->dev;
 	struct device_node *np = dev->of_node;
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
 	u32 val;
 
 	if (np) {
@@ -1126,6 +1348,11 @@ void ufs_mtk_parse_pm_levels(struct ufs_hba *hba)
 		if (of_property_read_u32(np, "mediatek,rpm-autosuspend-delay",
 			&ufs_mtk_rpm_autosuspend_delay))
 			ufs_mtk_rpm_autosuspend_delay = -1;
+
+		if (of_property_read_bool(np, "mediatek,spm_sw_mode"))
+			host->spm_sw_mode = true;
+		else
+			host->spm_sw_mode = false;
 	}
 }
 
@@ -1133,15 +1360,30 @@ void ufs_mtk_parse_auto_hibern8_timer(struct ufs_hba *hba)
 {
 	struct device *dev = hba->dev;
 	struct device_node *np = dev->of_node;
+	unsigned long flags;
+	u32 ahit;
+	u32 ah_ms = 0;
 
 	if (np) {
 		if (of_property_read_u32(np, "mediatek,auto-hibern8-timer",
-			&ufs_mtk_auto_hibern8_timer_ms))
-			ufs_mtk_auto_hibern8_timer_ms = 0;
+			&ah_ms))
+			ah_ms = 0;
 	}
 
-	dev_info(hba->dev, "auto-hibern8 timer %d ms\n",
-		ufs_mtk_auto_hibern8_timer_ms);
+	dev_info(hba->dev, "auto-hibern8 timer %d ms\n", ah_ms);
+
+	if (!ah_ms)
+		return;
+
+	/* update auto-hibern8 timer */
+	ahit = FIELD_PREP(UFSHCI_AHIBERN8_TIMER_MASK, ah_ms) |
+	       FIELD_PREP(UFSHCI_AHIBERN8_SCALE_MASK, 3);
+	spin_lock_irqsave(hba->host->host_lock, flags);
+	if (hba->ahit == ahit)
+		goto out_unlock;
+	hba->ahit = ahit;
+out_unlock:
+	spin_unlock_irqrestore(hba->host->host_lock, flags);
 }
 
 /**
@@ -1429,12 +1671,6 @@ int ufs_mtk_ioctl_ffu(struct scsi_device *dev, void __user *buf_user)
 	if (err) {
 		dev_err(hba->dev, "%s: query bDeviceFFUStatus failed, err %d\n",
 			__func__, err);
-		/*
-		 * UFS might not be used normally after FFU.
-		 * Just reboot system (including device) to avoid following
-		 * false alarm. For example, I/O errors.
-		 */
-		emergency_restart();
 		goto out_release_mem;
 	}
 
@@ -1447,6 +1683,13 @@ out_release_mem:
 	kfree(idata);
 	kfree(idata_user);
 out:
+	/*
+	 * UFS might not be used normally after FFU.
+	 * Just reboot system (including device) to avoid following
+	 * false alarm. For example, I/O errors.
+	 */
+	emergency_restart();
+
 	return err;
 }
 
@@ -1829,20 +2072,17 @@ void ufs_mtk_runtime_pm_init(struct scsi_device *sdev)
 static void ufs_mtk_auto_hibern8(struct ufs_hba *hba, bool enable)
 {
 	/* if auto-hibern8 is not enabled by device tree, return */
-	if (!ufs_mtk_auto_hibern8_timer_ms)
+	if (!hba->ahit)
 		return;
 
-	dev_dbg(hba->dev, "ah8: %d, t: %d ms\n", enable,
-		ufs_mtk_auto_hibern8_timer_ms);
+	dev_dbg(hba->dev, "ah8: %d, ahit: 0x%x\n", enable, hba->ahit);
 
 	/* if already enabled or disabled, return */
 	if (!(ufs_mtk_auto_hibern8_enabled ^ enable))
 		return;
 
 	if (enable) {
-		/* set timer scale as "ms" and timer */
-		ufshcd_writel(hba, (0x03 << 10 | ufs_mtk_auto_hibern8_timer_ms),
-			REG_AUTO_HIBERNATE_IDLE_TIMER);
+		ufshcd_writel(hba, hba->ahit, REG_AUTO_HIBERNATE_IDLE_TIMER);
 
 		ufs_mtk_auto_hibern8_enabled = true;
 	} else {
@@ -2100,6 +2340,151 @@ void ufs_mtk_dbg_dump_scsi_cmd(struct ufs_hba *hba,
 #endif
 }
 
+#ifdef SPM_READY
+void ufs_mtk_res_ctrl(struct ufs_hba *hba, unsigned int op)
+{
+	int res_type = 0;
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
+
+	if (!host->spm_sw_mode)
+		return;
+
+	if (!hba->outstanding_tasks && !hba->outstanding_reqs) {
+		if (op == UFS_RESCTL_CMD_SEND) {
+			if (hba->active_uic_cmd)
+				res_type = 1;
+			else
+				res_type = 2;
+		} else if (op == UFS_RESCTL_CMD_COMP)
+			res_type = 1;
+	}
+
+	if (res_type == 1)
+		spm_resource_req(SPM_RESOURCE_USER_UFS,
+				 SPM_RESOURCE_MAINPLL | SPM_RESOURCE_CK_26M);
+	else if (res_type == 2)
+		spm_resource_req(SPM_RESOURCE_USER_UFS, SPM_RESOURCE_ALL);
+}
+#else
+#define ufs_mtk_res_ctrl	NULL
+#endif
+
+void ufs_mtk_pm_qos_get(struct work_struct *work)
+{
+	struct ufs_mtk_host *host =
+		container_of(work, struct ufs_mtk_host, pm_qos_get.work);
+	struct ufs_hba *hba = host->hba;
+	unsigned long flags;
+
+	/* check again if really need get pm qos */
+	if (!hba->outstanding_reqs)
+		return;
+
+	spin_lock_irqsave(&host->qos_lock, flags);
+	switch (atomic_read(&host->pm_qos_state)) {
+	case PMQOS_REQING:
+		atomic_set(&host->pm_qos_state, PMQOS_REQ);
+		host->pm_qos_value = 0;
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+
+		pm_qos_update_request(&host->pm_qos_req, host->pm_qos_value);
+		break;
+
+	default:
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+		break;
+	}
+}
+
+void ufs_mtk_pm_qos_rel(struct work_struct *work)
+{
+	struct ufs_mtk_host *host =
+		container_of(work, struct ufs_mtk_host, pm_qos_rel.work);
+	struct ufs_hba *hba = host->hba;
+	unsigned long flags;
+
+	/* check again if really need release pm qos */
+	if (hba->outstanding_reqs)
+		return;
+
+	spin_lock_irqsave(&host->qos_lock, flags);
+	switch (atomic_read(&host->pm_qos_state)) {
+	case PMQOS_UNREQING:
+		atomic_set(&host->pm_qos_state, PMQOS_UNREQ);
+		host->pm_qos_value = PM_QOS_DEFAULT_VALUE;
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+
+		pm_qos_update_request(&host->pm_qos_req, host->pm_qos_value);
+		break;
+
+	default:
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+		break;
+	}
+}
+
+void ufs_mtk_setup_xfer_req(struct ufs_hba *hba, int tag, bool is_scsi_cmd)
+{
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
+	unsigned long flags;
+
+	/* Request pm qos if no request ongoing */
+	if (hba->outstanding_reqs)
+		return;
+
+	spin_lock_irqsave(&host->qos_lock, flags);
+	switch (atomic_read(&host->pm_qos_state)) {
+	case PMQOS_UNREQ:
+		atomic_set(&host->pm_qos_state, PMQOS_REQING);
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+
+		schedule_delayed_work(&host->pm_qos_get, 0);
+		break;
+
+	case PMQOS_UNREQING:
+		atomic_set(&host->pm_qos_state, PMQOS_REQ);
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+
+		cancel_delayed_work(&host->pm_qos_rel);
+		break;
+
+	default:
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+		break;
+	}
+}
+
+void ufs_mtk_complete_xfer_req(struct ufs_hba *hba)
+{
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
+	unsigned long flags;
+
+	/* Release pm qos if no request ongoing */
+	if (hba->outstanding_reqs)
+		return;
+
+	spin_lock_irqsave(&host->qos_lock, flags);
+	switch (atomic_read(&host->pm_qos_state)) {
+	case PMQOS_REQ:
+		atomic_set(&host->pm_qos_state, PMQOS_UNREQING);
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+
+		schedule_delayed_work(&host->pm_qos_rel, 10);
+		break;
+
+	case PMQOS_REQING:
+		atomic_set(&host->pm_qos_state, PMQOS_UNREQ);
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+
+		cancel_delayed_work(&host->pm_qos_get);
+		break;
+
+	default:
+		spin_unlock_irqrestore(&host->qos_lock, flags);
+		break;
+	}
+}
+
 /**
  * struct ufs_hba_mtk_vops - UFS MTK specific variant operations
  *
@@ -2117,7 +2502,8 @@ static struct ufs_hba_variant_ops ufs_hba_mtk_vops = {
 	ufs_mtk_hce_enable_notify,    /* hce_enable_notify */
 	ufs_mtk_link_startup_notify,  /* link_startup_notify */
 	ufs_mtk_pwr_change_notify,    /* pwr_change_notify */
-	NULL,		 /* setup_xfer_req */
+	ufs_mtk_setup_xfer_req,       /* setup_xfer_req */
+	ufs_mtk_complete_xfer_req,    /* complete_xfer_req */
 	NULL,		 /* setup_task_mgmt */
 	NULL,		 /* hibern8_notify */
 	NULL,            /* apply_dev_quirks */
@@ -2126,7 +2512,7 @@ static struct ufs_hba_variant_ops ufs_hba_mtk_vops = {
 	ufs_mtk_dbg_register_dump,    /* dbg_register_dump */
 	NULL,			 /* phy_initialization */
 	ufs_mtk_auto_hibern8,         /* auto_hibern8 */
-	ufs_mtk_pltfrm_deepidle_resource_req, /* deepidle_resource_req */
+	ufs_mtk_res_ctrl,             /* res_ctrl */
 	ufs_mtk_pltfrm_deepidle_lock, /* deepidle_lock */
 	ufs_mtk_scsi_dev_cfg          /* scsi_dev_cfg */
 };
@@ -2141,6 +2527,7 @@ static int ufs_mtk_probe(struct platform_device *pdev)
 {
 	int err;
 	struct ufs_hba *hba;
+	struct ufs_mtk_host *host;
 	struct device *dev = &pdev->dev;
 	int boot_type;
 	void __iomem *ufs_base;
@@ -2157,12 +2544,19 @@ static int ufs_mtk_probe(struct platform_device *pdev)
 		dev_err(dev, "ufs iomap failed\n");
 		return -ENODEV;
 	};
+#ifndef UFS_REF_CLK_CTRL_BY_UFSHCI
+	/* Old chip not use this, disable it always */
 	writel(0, ufs_base + REG_UFS_ADDR_XOUFS_ST);
-
-	// Add get_boot_type check and return ENODEV if not ufs boot
+#endif
+	/* Add get_boot_type check and return ENODEV if not ufs boot */
 	boot_type = get_boot_type();
-	if (boot_type != BOOTDEV_UFS)
+	if (boot_type != BOOTDEV_UFS) {
+#ifdef UFS_REF_CLK_CTRL_BY_UFSHCI
+		/* New chip disable it when eMMC boot */
+		writel(0, ufs_base + REG_UFS_ADDR_XOUFS_ST);
+#endif
 		return -ENODEV;
+	}
 
 	ufs_mtk_biolog_init();
 
@@ -2175,27 +2569,20 @@ static int ufs_mtk_probe(struct platform_device *pdev)
 
 	hba = platform_get_drvdata(pdev);
 
-#ifdef CONFIG_HIE
+	host = ufshcd_get_variant(hba);
+	host->pm_qos_value = PM_QOS_DEFAULT_VALUE;
+	pm_qos_add_request(&host->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+			   host->pm_qos_value);
+	atomic_set(&host->pm_qos_state, PMQOS_UNREQ);
 
-	hie_register_device(&ufs_hie_dev);
+	INIT_DELAYED_WORK(&host->pm_qos_get, ufs_mtk_pm_qos_get);
+	INIT_DELAYED_WORK(&host->pm_qos_rel, ufs_mtk_pm_qos_rel);
 
-	/*
-	 * enable hie key hint feature
-	 *
-	 * key_bits = 512 bits for all possible FBE crypto algorithms
-	 * key_slot = 16 crypto configuration slots
-	 */
-	kh_register(ufs_mtk_get_kh(), 512, 16);
+	spin_lock_init(&host->qos_lock);
 
-	hba->crypto_feature |= UFS_CRYPTO_HW_FBE;
-
-#endif
-
-#if defined(CONFIG_MTK_HW_FDE)
-
-	hba->crypto_feature |= UFS_CRYPTO_HW_FDE;
-
-#endif
+	err = ufs_mtk_probe_crypto(hba);
+	if (err)
+		dev_info(dev, "ufs_mtk_probe_crypto() failed %d\n", err);
 
 out:
 	return err;
@@ -2210,10 +2597,13 @@ out:
 static int ufs_mtk_remove(struct platform_device *pdev)
 {
 	struct ufs_hba *hba =  platform_get_drvdata(pdev);
+	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
 
 	pm_runtime_get_sync(&(pdev)->dev);
 	ufshcd_remove(hba);
 	ufs_mtk_biolog_exit();
+	pm_qos_remove_request(&host->pm_qos_req);
+
 	return 0;
 }
 

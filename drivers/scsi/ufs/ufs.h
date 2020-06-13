@@ -3,6 +3,7 @@
  *
  * This code is based on drivers/scsi/ufs/ufs.h
  * Copyright (C) 2011-2013 Samsung India Software Operations
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Authors:
  *	Santosh Yaraganavi <santosh.sy@samsung.com>
@@ -560,6 +561,8 @@ struct ufs_vreg {
 	int max_uV;
 	int min_uA;
 	int max_uA;
+	int fixed_uV;
+	int plus_uV;
 };
 
 /* MTK PATCH */
