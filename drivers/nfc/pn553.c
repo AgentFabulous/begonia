@@ -256,7 +256,7 @@ static ssize_t pn544_dev_read(struct file *filp, char __user *buf, size_t count,
 	if (count > MAX_BUFFER_SIZE)
 		count = MAX_BUFFER_SIZE;
 
-
+	//pr_debug("%s : reading   %zu bytes.\n", __func__, count);
 
 	mutex_lock(&pn544_dev->read_mutex);
 
@@ -342,7 +342,7 @@ static ssize_t pn544_dev_write(struct file *filp, const char __user *buf, size_t
 		pr_err("%s : failed to copy from user space\n", __func__);
 		return -EFAULT;
 	}
-
+	//pr_debug("%s : writing %zu bytes.\n", __func__, count);
 	/* Write data */
 	ret = i2c_master_send(pn544_dev->client, tmp, count);
 	if (ret != count) {
@@ -381,7 +381,7 @@ static void p61_get_access_state(struct pn544_dev *pn544_dev, p61_access_state_t
 {
 
 	if (current_state == NULL) {
-
+		//*current_state = P61_STATE_INVALID;
 		pr_err
 		    ("%s : invalid state of p61_access_state_t current state  \n",
 		     __func__);
@@ -393,8 +393,8 @@ static void p61_get_access_state(struct pn544_dev *pn544_dev, p61_access_state_t
 static void p61_access_lock(struct pn544_dev *pn544_dev)
 {
 	pr_info("%s: Enter \n", __func__);
-
-
+	//pr_info("%s: Enter  pn544 dev state mutex  is %s,\n", __func__,
+	//	&pn544_dev->p61_state_mutex);
 	mutex_lock(&pn544_dev->p61_state_mutex);
 	pr_info("%s: Exit\n", __func__);
 }
@@ -452,7 +452,7 @@ long p61_cold_reset(void)
 		if (wait_for_completion_timeout(&ese_cold_reset_sema, tempJ) ==
 		    0) {
 			pr_err("%s: Timeout", __func__);
-			ese_cold_reset_rsp[3] = -EAGAIN;
+			ese_cold_reset_rsp[3] = -EAGAIN;	// Failure case
 		}
 	} else {		/* NFC_OFF */
 		/* call the pn544_dev_read() */
@@ -495,7 +495,7 @@ static int signal_handler(p61_access_state_t state, long nfc_pid)
 				    ("send_sig_info failed..... sigret %d.\n",
 				     sigret);
 				ret = -1;
-
+				//msleep(60);
 			}
 		} else {
 			pr_info("finding task from PID failed\r\n");
@@ -508,7 +508,7 @@ static int signal_handler(p61_access_state_t state, long nfc_pid)
 
 static void svdd_sync_onoff(long nfc_service_pid, p61_access_state_t origin)
 {
-	int timeout = 100;
+	int timeout = 100;	//100 ms timeout
 	unsigned long tempJ = msecs_to_jiffies(timeout);
 	pr_info("%s: Enter nfc_service_pid: %ld\n", __func__, nfc_service_pid);
 	if (nfc_service_pid) {
@@ -534,7 +534,7 @@ static int release_svdd_wait(void)
 
 static void dwp_OnOff(long nfc_service_pid, p61_access_state_t origin)
 {
-	int timeout = 100;
+	int timeout = 100;	//100 ms timeout
 	unsigned long tempJ = msecs_to_jiffies(timeout);
 	if (nfc_service_pid) {
 		if (0 == signal_handler(origin, nfc_service_pid)) {
@@ -579,7 +579,7 @@ long pn544_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct pn544_dev *pn544_dev = g_pn544_dev;
 	pr_info("%s :enter cmd = %x, arg = %ld\n", __func__, cmd, arg);
-
+	//pn544_dev = filp->private_data;
 	if (NULL == pn544_dev)
 		return 0;
 
@@ -668,13 +668,13 @@ long pn544_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				}
 
 				pn544_dev->nfc_ven_enabled = true;
-
+//#ifndef VEN_ALWAYS_ON
 				if (pn544_dev->spi_ven_enabled == false
 				    || (pn544_dev->chip_pwr_scheme ==
 					PN80T_EXT_PMU_SCHEME)) {
 					gpio_set_value(pn544_dev->ven_gpio, 1);
 				}
-
+//#endif
 			} else if (arg == 0) {
 				/* power off */
 				pr_info("%s power off\n", __func__);
@@ -691,14 +691,14 @@ long pn544_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 				pn544_dev->nfc_ven_enabled = false;
 				/* Don't change Ven state if spi made it high */
-
+//#ifndef VEN_ALWAYS_ON
 				if ((pn544_dev->spi_ven_enabled == false
 				     && !(pn544_dev->secure_timer_cnt))
 				    || (pn544_dev->chip_pwr_scheme ==
 					PN80T_EXT_PMU_SCHEME)) {
 					gpio_set_value(pn544_dev->ven_gpio, 0);
 				}
-
+//#endif
 				/* HiKey Compilation fix */
 			} else if (arg == 3) {
 				/*NFC Service called ISO-RST */
