@@ -43,13 +43,4 @@ config XGENE_PMU
         help
           Say y if you want to use APM X-Gene SoC performance monitors.
 
-config ARM_DSU_PMU
-	tristate "ARM DynamIQ Shared Unit (DSU) PMU"
-	depends on PERF_EVENTS
-	help
-	  Provides support for performance monitor unit in ARM DynamIQ Shared
-	  Unit (DSU). The DSU integrates one or more cores  with an L3 memory
-	  system, control logic. The PMU allows counting various events related
-	  to DSU.
-
 endmenu
