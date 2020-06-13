@@ -908,7 +908,7 @@ int cpufreq_platform_cooling_register(void)
 	int cpu;
 
 	for_each_cpu(cpu, cpu_online_mask) {
-		policy = cpufreq_cpu_get(cpu);
+		policy = cpufreq_cpu_get_raw(cpu);
 		if (!policy) {
 			pr_err("no policy for cpu%d\n", cpu);
 			continue;

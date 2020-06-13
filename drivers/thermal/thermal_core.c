@@ -65,8 +65,11 @@ static atomic_t in_suspend;
 static bool power_off_triggered;
 static atomic_t switch_mode = ATOMIC_INIT(-1);
 static atomic_t temp_state = ATOMIC_INIT(0);
+static atomic_t lighter_event = ATOMIC_INIT(0);
 static char boost_buf[128];
 static struct device thermal_message_dev;
+const char *board_sensor;
+static char board_sensor_temp[128];
 
 static struct thermal_governor *def_governor;
 
@@ -964,8 +967,8 @@ static void bind_cdev(struct thermal_cooling_device *cdev)
  */
 static struct thermal_cooling_device *
 __thermal_cooling_device_register(struct device_node *np,
-				char *type, void *devdata,
-				const struct thermal_cooling_device_ops *ops)
+				  char *type, void *devdata,
+				  const struct thermal_cooling_device_ops *ops)
 {
 	struct thermal_cooling_device *cdev;
 	struct thermal_zone_device *pos = NULL;
@@ -1236,6 +1239,28 @@ thermal_temp_state_store(struct device *dev,
 static DEVICE_ATTR(temp_state, 0664,
 		thermal_temp_state_show, thermal_temp_state_store);
 static ssize_t
+thermal_lighter_event_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+       return snprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&lighter_event));
+}
+
+static ssize_t
+thermal_lighter_event_store(struct device *dev,
+				struct device_attribute *attr, const char *buf, size_t len)
+{
+       int val = -1;
+
+       val = simple_strtol(buf, NULL, 10);
+
+       atomic_set(&lighter_event, val);
+
+       return len;
+}
+
+static DEVICE_ATTR(lighter_event, 0664,
+		thermal_lighter_event_show, thermal_lighter_event_store);
+static ssize_t
 cpu_limits_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
@@ -1276,6 +1301,39 @@ thermal_screen_state_show(struct device *dev,
 static DEVICE_ATTR(screen_state, 0664,
 		thermal_screen_state_show, NULL);
 #endif
+
+static ssize_t
+thermal_board_sensor_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	if (!board_sensor)
+		board_sensor = "invalid";
+
+	return snprintf(buf, PAGE_SIZE, "%s", board_sensor);
+}
+
+static DEVICE_ATTR(board_sensor, 0664,
+		thermal_board_sensor_show, NULL);
+
+static ssize_t
+thermal_board_sensor_temp_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+       return snprintf(buf, PAGE_SIZE, board_sensor_temp);
+}
+
+static ssize_t
+thermal_board_sensor_temp_store(struct device *dev,
+				struct device_attribute *attr, const char *buf, size_t len)
+{
+       snprintf(board_sensor_temp, PAGE_SIZE, buf);
+
+       return len;
+}
+
+static DEVICE_ATTR(board_sensor_temp, 0664,
+		thermal_board_sensor_temp_show, thermal_board_sensor_temp_store);
+
 static int create_thermal_message_node(void)
 {
        int ret = 0;
@@ -1296,6 +1354,9 @@ static int create_thermal_message_node(void)
 		ret = sysfs_create_file(&thermal_message_dev.kobj, &dev_attr_temp_state.attr);
 		if (ret < 0)
 		       pr_warn("Thermal: create temp state node failed\n");
+		ret = sysfs_create_file(&thermal_message_dev.kobj, &dev_attr_lighter_event.attr);
+		if (ret < 0)
+		       pr_warn("Thermal: create lighter event node failed\n");
 
 		ret = sysfs_create_file(&thermal_message_dev.kobj, &dev_attr_cpu_limits.attr);
 		if (ret < 0)
@@ -1303,8 +1364,15 @@ static int create_thermal_message_node(void)
 #ifdef CONFIG_FB
 		ret = sysfs_create_file(&thermal_message_dev.kobj, &dev_attr_screen_state.attr);
 		if (ret < 0)
-			pr_warn("Thermal: create batt message node failed\n");
+			pr_warn("Thermal: create screen state node failed\n");
 #endif
+		ret = sysfs_create_file(&thermal_message_dev.kobj, &dev_attr_board_sensor.attr);
+		if (ret < 0)
+		       pr_warn("Thermal: create board sensor node failed\n");
+
+		ret = sysfs_create_file(&thermal_message_dev.kobj, &dev_attr_board_sensor_temp.attr);
+		if (ret < 0)
+		       pr_warn("Thermal: create board sensor temp node failed\n");
        }
 
        return ret;
@@ -1312,8 +1380,11 @@ static int create_thermal_message_node(void)
 
 static void destroy_thermal_message_node(void)
 {
+       sysfs_remove_file(&thermal_message_dev.kobj, &dev_attr_board_sensor_temp.attr);
+       sysfs_remove_file(&thermal_message_dev.kobj, &dev_attr_board_sensor.attr);
        sysfs_remove_file(&thermal_message_dev.kobj, &dev_attr_cpu_limits.attr);
        sysfs_remove_file(&thermal_message_dev.kobj, &dev_attr_temp_state.attr);
+       sysfs_remove_file(&thermal_message_dev.kobj, &dev_attr_lighter_event.attr);
        sysfs_remove_file(&thermal_message_dev.kobj, &dev_attr_boost.attr);
        sysfs_remove_file(&thermal_message_dev.kobj, &dev_attr_sconfig.attr);
 #ifdef CONFIG_FB
@@ -1726,6 +1797,22 @@ static struct notifier_block thermal_pm_nb = {
 	.notifier_call = thermal_pm_notify,
 };
 
+static int of_parse_thermal_message(void)
+{
+	struct device_node *np;
+
+	np = of_find_node_by_name(NULL, "thermal-message");
+	if (!np)
+		return -EINVAL;
+
+	if (of_property_read_string(np, "board-sensor", &board_sensor))
+		return -EINVAL;
+
+	pr_info("%s board sensor: %s\n", __func__, board_sensor);
+
+	return 0;
+}
+
 static int __init thermal_init(void)
 {
 	int result;
@@ -1744,6 +1831,12 @@ static int __init thermal_init(void)
 		pr_warn("Thermal: register screen state callback failed\n");
 	}
 #endif
+
+	result = of_parse_thermal_message();
+	if (result)
+		pr_warn("Thermal: Can not parse thermal message node, return %d\n",
+			result);
+
 	result = create_thermal_message_node();
 	if (result)
 		pr_warn("Thermal: create thermal message node failed, return %d\n",
