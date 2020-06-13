@@ -2,7 +2,7 @@
  * drivers/base/power/wakeup.c - System wakeup events framework
  *
  * Copyright (c) 2010 Rafael J. Wysocki <rjw@sisk.pl>, Novell Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This file is released under the GPLv2.
  */
@@ -1069,20 +1069,19 @@ static int print_wakeup_source_stats(struct seq_file *m,
 	return 0;
 }
 
-
 static void *wakeup_sources_stats_seq_start(struct seq_file *m, loff_t *pos)
 {
 	struct wakeup_source *ws;
 	loff_t n = *pos;
 	int *srcuidx = m->private;
 
-	if (n == 0) {
+	if(n == 0) {
 		seq_puts(m, "name\t\tactive_count\tevent_count\twakeup_count\t"
 			"expire_count\tactive_since\ttotal_time\tmax_time\t"
 			"last_change\tprevent_suspend_time\n");
 	}
 
-	*srcuidx = srcu_read_lock(&wakeup_srcu);
+        *srcuidx = srcu_read_lock(&wakeup_srcu);
 	list_for_each_entry_rcu(ws, &wakeup_sources, entry) {
 		if (n-- <= 0)
 			return ws;
@@ -1135,7 +1134,6 @@ static const struct seq_operations wakeup_sources_stats_seq_ops = {
 	.stop  = wakeup_sources_stats_seq_stop,
 	.show  = wakeup_sources_stats_seq_show,
 };
-
 
 static int wakeup_sources_stats_open(struct inode *inode, struct file *file)
 {

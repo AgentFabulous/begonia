@@ -2,6 +2,7 @@
  * Arch specific cpu topology information
  *
  * Copyright (C) 2016, ARM Ltd.
+ * Copyright (C) 2020 XiaoMi, Inc.
  * Written by: Juri Lelli, ARM Ltd.
  *
  * This file is subject to the terms and conditions of the GNU General Public
@@ -29,6 +30,9 @@ DEFINE_PER_CPU(unsigned long, max_cpu_freq);
 DEFINE_PER_CPU(unsigned long, max_freq_scale) = SCHED_CAPACITY_SCALE;
 DEFINE_PER_CPU(unsigned long, min_freq_scale) = 0;
 
+#ifdef CONFIG_NONLINEAR_FREQ_CTL
+#include "arch_topology_plus.c"
+#else
 void arch_set_freq_scale(struct cpumask *cpus, unsigned long cur_freq,
 			 unsigned long max_freq)
 {
@@ -80,6 +84,7 @@ void arch_set_min_freq_scale(struct cpumask *cpus,
 	for_each_cpu(cpu, cpus)
 		per_cpu(min_freq_scale, cpu) = scale;
 }
+#endif
 
 static DEFINE_MUTEX(cpu_scale_mutex);
 DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
@@ -196,7 +201,7 @@ int detect_share_cap_flag(void)
 	struct cpufreq_policy *policy;
 
 	for_each_possible_cpu(cpu) {
-		policy = cpufreq_cpu_get(cpu);
+		policy = cpufreq_cpu_get_raw(cpu);
 
 		if (!policy)
 			return 0;
@@ -366,7 +371,11 @@ static void update_topology_flags_workfn(struct work_struct *work)
 static u32 capacity_scale;
 static u32 *raw_capacity;
 
+#if defined(CONFIG_MACH_MT6739)
+static int free_raw_capacity(void)
+#else
 static int __init free_raw_capacity(void)
+#endif
 {
 	kfree(raw_capacity);
 	raw_capacity = NULL;
