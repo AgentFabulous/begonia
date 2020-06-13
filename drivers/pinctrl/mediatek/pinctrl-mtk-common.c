@@ -39,12 +39,10 @@
 #include "../pinconf.h"
 #include "../pinctrl-utils.h"
 #include "pinctrl-mtk-common.h"
-
 #if defined(CONFIG_PINCTRL_MTK_ALTERNATIVE)
 #include "pinctrl-mtk-common_debug.h"
 struct mtk_pinctrl *pctl_alt;
 #endif
-
 #define MAX_GPIO_MODE_PER_REG 5
 #define GPIO_MODE_BITS        3
 #define GPIO_MODE_PREFIX "GPIO"
@@ -432,6 +430,37 @@ int mtk_pctrl_spec_pull_set_samereg(struct mtk_pinctrl *pctl,
 	return 0;
 }
 
+int mtk_spec_pull_get_samereg(struct regmap *regmap,
+		const struct mtk_pin_spec_pupd_set_samereg *pupd_infos,
+		unsigned int info_num, unsigned int pin)
+{
+	unsigned int i;
+	unsigned int reg_pupd;
+	unsigned int val = 0, bit_pupd, bit_r0, bit_r1;
+	const struct mtk_pin_spec_pupd_set_samereg *spec_pupd_pin;
+	bool find = false;
+
+	for (i = 0; i < info_num; i++) {
+		if (pin == pupd_infos[i].pin) {
+			find = true;
+			break;
+		}
+	}
+
+	if (!find)
+		return -1;
+
+	spec_pupd_pin = pupd_infos + i;
+	reg_pupd = spec_pupd_pin->offset;
+
+	regmap_read(regmap, reg_pupd, &val);
+	bit_pupd = !(val & BIT(spec_pupd_pin->pupd_bit));
+	bit_r0 = !!(val & BIT(spec_pupd_pin->r0_bit));
+	bit_r1 = !!(val & BIT(spec_pupd_pin->r1_bit));
+
+	return (bit_pupd)|(bit_r0<<1)|(bit_r1<<2)|(1<<3);
+}
+
 static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
 		unsigned int pin, bool enable, bool isup, unsigned int arg)
 {
@@ -470,13 +499,6 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
 			pctl->devdata->n_pin_pullsel,
 			pctl->devdata->pin_pullsel_grps);
 		return 0;
-	}
-
-	/* For generic pull config, default arg value should be 0 or 1. */
-	if (arg != 0 && arg != 1) {
-		dev_err(pctl->dev, "invalid pull-up argument %d on pin %d .\n",
-			arg, pin);
-		return -EINVAL;
 	}
 
 	bit = BIT(pin & pctl->devdata->port_mask);
@@ -1436,6 +1458,11 @@ static void mtk_eint_ack(struct irq_data *d)
 
 	writel(mask, reg);
 }
+static void mtk_eint_mask_ack(struct irq_data *d)
+{
+	mtk_eint_mask(d);
+	mtk_eint_ack(d);
+}
 
 static struct irq_chip mtk_pinctrl_irq_chip = {
 	.name = "mt-eint",
@@ -1443,6 +1470,7 @@ static struct irq_chip mtk_pinctrl_irq_chip = {
 	.irq_mask = mtk_eint_mask,
 	.irq_unmask = mtk_eint_unmask,
 	.irq_ack = mtk_eint_ack,
+	.irq_mask_ack = mtk_eint_mask_ack,
 	.irq_set_type = mtk_eint_set_type,
 	.irq_set_wake = mtk_eint_irq_set_wake,
 	.irq_request_resources = mtk_pinctrl_irq_request_resources,
@@ -1803,9 +1831,6 @@ int mtk_pctrl_init(struct platform_device *pdev,
 		return -EINVAL;
 	}
 
-#if defined(CONFIG_PINCTRL_MTK_ALTERNATIVE)
-	goto after_check_regmap2;
-#endif
 	node = of_parse_phandle(np, "mediatek,pctl-regmap", 0);
 	if (node) {
 		pctl->regmap1 = syscon_node_to_regmap(node);
@@ -1826,9 +1851,6 @@ int mtk_pctrl_init(struct platform_device *pdev,
 			return PTR_ERR(pctl->regmap2);
 	}
 
-#if defined(CONFIG_PINCTRL_MTK_ALTERNATIVE)
-after_check_regmap2:
-#endif
 	if (data->regmap_num > 2) {
 		for (i = 0; i <= data->regmap_num; i++) {
 			node = of_parse_phandle(np, "mediatek,pctl-regmap", i);
@@ -1899,11 +1921,11 @@ after_check_regmap2:
 
 #if defined(CONFIG_PINCTRL_MTK_ALTERNATIVE)
 	if (mtk_gpio_create_attr(&pdev->dev))
-		pr_warn("[pinctrl]mtk_gpio create attribute error\n");
+		pr_debug("[pinctrl]mtk_gpio create attribute error\n");
 #endif
 
 	if (!of_property_read_bool(np, "interrupt-controller")) {
-		pr_warn("[pinctrl]init:interrupt-controller node no found\n");
+		pr_debug("[pinctrl]init:interrupt-controller node no found\n");
 		return 0;
 	}
 

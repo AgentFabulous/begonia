@@ -428,6 +428,10 @@ int mtk_pctrl_spec_pull_set_samereg(struct mtk_pinctrl *pctl,
 		unsigned int info_num, unsigned int pin,
 		unsigned char align, bool isup, unsigned int r1r0);
 
+int mtk_spec_pull_get_samereg(struct regmap *regmap,
+		const struct mtk_pin_spec_pupd_set_samereg *pupd_infos,
+		unsigned int info_num, unsigned int pin);
+
 int mtk_pconf_spec_set_ies_smt_range(struct regmap *regmap,
 		const struct mtk_pin_ies_smt_set *ies_smt_infos, unsigned int info_num,
 		unsigned int pin, unsigned char align, int value);

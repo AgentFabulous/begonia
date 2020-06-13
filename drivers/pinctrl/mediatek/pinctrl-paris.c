@@ -538,7 +538,7 @@ ssize_t mtk_pctrl_show_one_pin(struct mtk_pinctrl *hw,
 	unsigned int gpio, char *buf, unsigned int bufLen)
 {
 	const struct mtk_pin_desc *desc;
-	int pinmux, pullup, pullen, r1 = -1, r0 = -1, len = 0;
+	int pinmux, pullup = 0, pullen = 0, r1 = -1, r0 = -1, len = 0;
 
 	if (gpio > hw->soc->npins)
 		return -EINVAL;
@@ -976,11 +976,6 @@ int mtk_paris_pinctrl_probe(struct platform_device *pdev,
 	err = pinctrl_enable(hw->pctrl);
 	if (err)
 		return err;
-
-#ifdef CONFIG_DEBUG_FS
-	if (mtk_gpio_create_attr(&pdev->dev))
-		pr_warn("[pinctrl]mtk_gpio create attribute error\n");
-#endif
 
 	err = mtk_build_eint(hw, pdev);
 	if (err)
