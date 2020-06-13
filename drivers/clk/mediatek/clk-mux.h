@@ -43,4 +43,35 @@ struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
 				 struct regmap *regmap,
 				 spinlock_t *lock);
 
+struct mtk_mux_upd {
+	int id;
+	const char *name;
+	const char * const *parent_names;
+
+	u32 mux_ofs;
+	u32 upd_ofs;
+
+	s8 mux_shift;
+	s8 mux_width;
+	s8 gate_shift;
+	s8 upd_shift;
+
+	s8 num_parents;
+};
+/*
+ *#define MUX_UPD(_id, _name, _parents, _mux_ofs, _shift, _width, _gate,\
+ *			_upd_ofs, _upd) {				\
+ *		.id = _id,						\
+ *		.name = _name,						\
+ *		.mux_ofs = _mux_ofs,					\
+ *		.upd_ofs = _upd_ofs,					\
+ *		.mux_shift = _shift,					\
+ *		.mux_width = _width,					\
+ *		.gate_shift = _gate,					\
+ *		.upd_shift = _upd,					\
+ *		.parent_names = _parents,				\
+ *		.num_parents = ARRAY_SIZE(_parents),			\
+ *	}
+ */
+
 #endif /* __DRV_CLK_MUX_H */

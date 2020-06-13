@@ -25,6 +25,7 @@ enum subsys_id {
 	SUBSYS_APMCU,
 	SUBSYS_TEST,
 	SUBSYS_RESERVED,
+	DEVAPC_SUBSYS_CLKMGR,
 };
 
 struct devapc_vio_callbacks {

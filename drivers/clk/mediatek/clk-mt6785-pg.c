@@ -4528,7 +4528,10 @@ static int subsys_is_on(enum subsys_id id)
 	int r;
 	struct subsys *sys = id_to_sys(id);
 
-	WARN_ON(!sys);
+	if (!sys) {
+		WARN_ON(!sys);
+		return -EINVAL;
+	}
 
 	r = sys->ops->get_state(sys);
 
@@ -4574,7 +4577,10 @@ static int enable_subsys(enum subsys_id id)
 	struct subsys *sys = id_to_sys(id);
 	struct pg_callbacks *pgcb;
 
-	WARN_ON(!sys);
+	if (!sys) {
+		WARN_ON(!sys);
+		return -EINVAL;
+	}
 
 #if MT_CCF_BRINGUP
 	/*pr_debug("[CCF] %s: sys=%s, id=%d\n", __func__, sys->name, id);*/
@@ -4635,7 +4641,10 @@ static int disable_subsys(enum subsys_id id)
 	struct subsys *sys = id_to_sys(id);
 	struct pg_callbacks *pgcb;
 
-	WARN_ON(!sys);
+	if (!sys) {
+		WARN_ON(!sys);
+		return -EINVAL;
+	}
 
 #if MT_CCF_BRINGUP
 	/*pr_debug("[CCF] %s: sys=%s, id=%d\n", __func__, sys->name, id);*/
@@ -5073,9 +5082,11 @@ static void __init mt_scpsys_init(struct device_node *node)
 		smi_common_reg, clk_data);
 
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-	if (r)
-		pr_notice("[CCF] %s:could not register clock provide\n",
-			__func__);
+	if (r) {
+		pr_notice("%s(): could not register clock provider: %d\n",
+			__func__, r);
+		kfree(clk_data);
+	}
 
 	ckgen_base = ckgen_reg;
 	/*MM Bus*/
@@ -5339,6 +5350,17 @@ static void dump_cg_state(const char *clkname)
 	pr_notice("[%-17s: %3d]\n",
 		__clk_get_name(c),
 		__clk_get_enable_count(c));
+}
+
+unsigned int cam_if_on(void)
+{
+	unsigned int sta = spm_read(PWR_STATUS);
+	unsigned int sta_s = spm_read(PWR_STATUS_2ND);
+
+	if ((sta & CAM_PWR_STA_MASK) && (sta_s & CAM_PWR_STA_MASK))
+		return 1;
+	else
+		return 0;
 }
 
 void subsys_if_on(void)

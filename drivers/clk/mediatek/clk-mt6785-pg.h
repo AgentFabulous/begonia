@@ -63,6 +63,7 @@ extern unsigned int mt_get_abist_freq(unsigned int ID);
 extern unsigned int mt_get_ckgen_freq(unsigned int ID);
 extern void print_enabled_clks_once(void);
 extern void mtk_wcn_cmb_stub_clock_fail_dump(void);
+extern unsigned int cam_if_on(void);
 /*ram console api*/
 /*
  *[0] bus protect reg
