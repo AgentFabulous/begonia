@@ -37,8 +37,6 @@
 #include "mtk_iommu_ext.h"
 #endif
 
-//#define IOMMU_DEBUG_ENABLED
-
 static struct kset *iommu_group_kset;
 static DEFINE_IDA(iommu_group_ida);
 static unsigned int iommu_def_domain_type = IOMMU_DOMAIN_DMA;
@@ -686,6 +684,7 @@ EXPORT_SYMBOL_GPL(iommu_group_remove_device);
 
 static int iommu_group_device_count(struct iommu_group *group)
 {
+#ifndef CONFIG_MTK_IOMMU_V2
 	struct group_device *entry;
 	int ret = 0;
 
@@ -693,6 +692,9 @@ static int iommu_group_device_count(struct iommu_group *group)
 		ret++;
 
 	return ret;
+#else
+	return 1;
+#endif
 }
 
 /**
@@ -1388,7 +1390,6 @@ void iommu_detach_device(struct iommu_domain *domain, struct device *dev)
 		WARN_ON(1);
 		goto out_unlock;
 	}
-
 	__iommu_detach_group(domain, group);
 
 out_unlock:
@@ -1693,19 +1694,18 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 	min_pagesz = 1 << __ffs(domain->pgsize_bitmap);
 
 	for_each_sg(sg, s, nents, i) {
+
+#if defined(CONFIG_MTK_PSEUDO_M4U) && defined(CONFIG_MTK_IOMMU_V2)
 		/*
 		 * FIXME: Mediatek workaround for the buffer that don't has
 		 * "struct page"
 		 */
-#ifndef CONFIG_MTK_PSEUDO_M4U
-		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
-#else
 		phys_addr_t phys;
 		if (!IS_ERR(sg_page(s))) {
 			phys = page_to_phys(sg_page(s)) + s->offset;
 #ifdef IOMMU_DEBUG_ENABLED
 			if (i == 0 || i == nents-1)
-				pr_notice("%s, %d, sg[%d],domain:%p, iova:0x%lx, nents=%d, mapped=0x%lx, phys=0x%lx, length=0x%lx, offset=0x%lx\n",
+				pr_notice("%s, %d, sg[%d],domain:%p, iova:0x%lx, nents=%d, mapped=0x%lx, phys=0x%lx, length=0x%x\n",
 					__func__, __LINE__, i,
 					domain, iova + mapped,
 					nents, mapped, phys, s->length);
@@ -1715,19 +1715,18 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 			s->length = sg_dma_len(s);
 #ifdef IOMMU_DEBUG_ENABLED
 			if (i == 0 || i == nents-1)
-				pr_notice("%s, %d, sg[%d],domain:%p, iova:0x%lx, nents=%d, mapped=0x%lx, phys=0x%lx, length=0x%lx, offset=0x%lx\n",
+				pr_notice("%s, %d, sg[%d],domain:%p, iova:0x%lx, nents=%d, mapped=0x%lx, phys=0x%lx, length=0x%x\n",
 					__func__, __LINE__, i,
 					domain, iova + mapped,
 					nents, mapped, phys, s->length);
 #endif
 		} else {
-			pr_notice("%s, %d, invalid sg_phys=0x%lx, sg_dma_addr=0x%lx\n",
-				__func__, __LINE__,
-				sg_phys(s), sg_dma_address(s));
+			pr_notice("%s, %d, invalid\n", __func__, __LINE__);
 			return 0;
 		}
+#else
+		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
 #endif
-
 		/*
 		 * We are mapping on IOMMU page boundaries, so offset within
 		 * the page must be 0. However, the IOMMU may support pages
@@ -1741,11 +1740,11 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 		if (ret)
 			goto out_err;
 
-#ifdef IOMMU_DEBUG_ENABLED
+#if 0 //def IOMMU_DEBUG_ENABLED
 		if (i == 0 || i == nents-1)
-			pr_notice("%s, %d, sg%d, double check mapping result:  iova:0x%lx, phys:0x%lx",
+			pr_notice("%s, %d, sg%d, double check mapping result:  iova:0x%lx, phys:0x%lx, phys_expect:0x%lx",
 				__func__, __LINE__, i, iova+mapped,
-				iommu_iova_to_phys(domain, iova+mapped));
+				iommu_iova_to_phys(domain, iova+mapped), phys);
 #endif
 		mapped += s->length;
 	}
