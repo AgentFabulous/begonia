@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012-2019 NXP Semiconductors
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

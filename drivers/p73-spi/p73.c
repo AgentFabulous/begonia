@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012-2014 NXP Semiconductors
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,26 +57,26 @@ extern void mt_spi_disable_master_clk(struct spi_device *spidev);
 /* Device driver's configuration macro */
 /* Macro to configure poll/interrupt based req*/
 #undef P61_IRQ_ENABLE
-
+//#define P61_IRQ_ENABLE
 
 /* Macro to configure Hard/Soft reset to P61 */
-
+//#define P61_HARD_RESET
 #undef P61_HARD_RESET
 
 
-
-
+//#define P61_IRQ   33 /* this is the same used in omap3beagle.c */
+//#define P61_RST  138
 
 /* Macro to define SPI clock frequency */
 
-
-
+//#define P61_SPI_CLOCK_7Mzh
+//#undef P61_SPI_CLOCK_20Mzh
 #undef P61_SPI_CLOCK_13_3_Mzh
 #undef P61_SPI_CLOCK_8Mzh
-
+//#define P61_SPI_CLOCK_7Mzh
 #define P61_SPI_CLOCK_20Mzh
 #ifdef P61_SPI_CLOCK_13_3_Mzh
-
+//#define P61_SPI_CLOCK 13300000L;Further debug needed
 #define P61_SPI_CLOCK     19000000L;
 #else
 #ifdef P61_SPI_CLOCK_7Mzh
@@ -120,11 +120,11 @@ struct p61_dev {
 	struct mutex write_mutex;	/* write mutex */
 	struct spi_device *spi;	/* spi device structure */
 	struct miscdevice p61_device;	/* char device as misc driver */
-
-
-
+	//unsigned int rst_gpio; /* SW Reset gpio */
+	//unsigned int irq_gpio; /* P61 will interrupt DH for any ntf */
+	//bool irq_enabled; /* flag to indicate irq is used */
 	unsigned char enable_poll_mode;	/* enable the poll mode */
-
+	//spinlock_t irq_enabled_lock; /*spin lock for read irq */
 };
 
 const struct mtk_chip_config nfc_ctrdata = {
@@ -308,14 +308,14 @@ static long p61_dev_ioctl(struct file *filp, unsigned int cmd,
 		if (arg == 2) {
 		} else if (arg == 1) {
 				P61_DBG_MSG(KERN_ALERT " Soft Reset");
-
-
-
+				//gpio_set_value(p61_dev->rst_gpio, 1);
+				//msleep(20);
+				//gpio_set_value(p61_dev->rst_gpio, 0);
 				msleep(50);
 				ret = spi_read(p61_dev->spi, (void *)buf, sizeof(buf));
 				msleep(50);
-
-
+				//gpio_set_value(p61_dev->rst_gpio, 1);
+				//msleep(20);
 
 			}
 			break;
@@ -477,7 +477,7 @@ static ssize_t p61_dev_read(struct file *filp, char *buf, size_t count,
 	if (p61_dev->enable_poll_mode) {
 		P61_DBG_MSG(" %s Poll Mode Enabled \n", __FUNCTION__);
 
-
+		//P61_DBG_MSG(KERN_INFO "SPI_READ returned 0x%x", count);
 		ret = spi_read(p61_dev->spi, (void *)&rx_buffer[0], count);
 		if (0 > ret) {
 			P61_ERR_MSG(KERN_ALERT "spi_read failed [SOF] \n");
@@ -560,8 +560,8 @@ static int p61_hw_setup(struct p61_spi_platform_data *platform_data,
 	P61_DBG_MSG("Exit : %s\n", __FUNCTION__);
 	return ret;
 
-
-
+	//fail_gpio:
+	//gpio_free(platform_data->rst_gpio);
 
 	return ret;
 }
@@ -622,7 +622,7 @@ static int p61_probe(struct spi_device *spi)
 	struct p61_spi_platform_data *platform_data = NULL;
 	struct p61_spi_platform_data platform_data1;
 	struct p61_dev *p61_dev = NULL;
-
+	//struct mtk_chip_config *chip_config = spi->controller_data;
 
 	P61_DBG_MSG("%s chip select : %d , bus number = %d \n",
 		    __FUNCTION__, spi->chip_select, spi->master->bus_num);
@@ -634,11 +634,11 @@ static int p61_probe(struct spi_device *spi)
 		/* RC : rename the platformdata1 name */
 		/* TBD: This is only for Panda as we are passing NULL for platform data */
 		P61_ERR_MSG("%s : p61 probe fail\n", __func__);
-
-
+		//platform_data1.irq_gpio = P61_IRQ;
+		//platform_data1.rst_gpio = P61_RST;
 		platform_data = &platform_data1;
 		P61_ERR_MSG("%s : p61 probe fail1\n", __func__);
-
+		//return  -ENODEV;
 	}
 #else
 	ret = p61_parse_dt(&spi->dev, &platform_data1);
@@ -659,7 +659,7 @@ static int p61_probe(struct spi_device *spi)
 		P61_ERR_MSG("Failed to p61_enable_P61_IRQ_ENABLE\n");
 		goto err_exit0;
 	}
-
+	// set clock deassert mode for nxp chipset
 	/*if (chip_config == NULL) {
 		P61_ERR_MSG("Replaced chip_info!\n");
 	} else {
@@ -670,7 +670,7 @@ static int p61_probe(struct spi_device *spi)
 	spi->bits_per_word = 8;
 	spi->mode = SPI_MODE_0;
 	spi->max_speed_hz = P61_SPI_CLOCK;
-
+	//spi->chip_select = SPI_NO_CS;
 	ret = spi_setup(spi);
 	if (ret < 0) {
 		P61_ERR_MSG("failed to do spi_setup()\n");
@@ -682,8 +682,8 @@ static int p61_probe(struct spi_device *spi)
 	p61_dev->p61_device.name = "p73";
 	p61_dev->p61_device.fops = &p61_dev_fops;
 	p61_dev->p61_device.parent = &spi->dev;
-
-
+	//p61_dev->irq_gpio = platform_data->irq_gpio;
+	//p61_dev->rst_gpio  = platform_data->rst_gpio;
 
 	dev_set_drvdata(&spi->dev, p61_dev);
 
@@ -750,7 +750,7 @@ static int p61_remove(struct spi_device *spi)
 	struct p61_dev *p61_dev = p61_get_data(spi);
 	P61_DBG_MSG("Entry : %s\n", __FUNCTION__);
 
-
+	//gpio_free(p61_dev->rst_gpio);
 
 	mutex_destroy(&p61_dev->read_mutex);
 	misc_deregister(&p61_dev->p61_device);
@@ -812,8 +812,8 @@ static int __init p61_dev_init(void)
 	P61_DBG_MSG("Entry : %s\n", __FUNCTION__);
 	printk("[nxp]p61_dev_init");
 
-
-
+	//return spi_register_driver(&p61_driver);
+	//---add spi driver---
 	ret = spi_register_driver(&p61_driver);
 	if (ret) {
 		P61_DBG_MSG("nxp failed to add spi driver");
