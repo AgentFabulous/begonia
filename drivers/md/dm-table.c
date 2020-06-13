@@ -1815,36 +1815,6 @@ static bool dm_table_supports_discards(struct dm_table *t)
 	return true;
 }
 
-static int device_requires_stable_pages(struct dm_target *ti,
-					struct dm_dev *dev, sector_t start,
-					sector_t len, void *data)
-{
-	struct request_queue *q = bdev_get_queue(dev->bdev);
-
-	return q && bdi_cap_stable_pages_required(q->backing_dev_info);
-}
-
-/*
- * If any underlying device requires stable pages, a table must require
- * them as well.  Only targets that support iterate_devices are considered:
- * don't want error, zero, etc to require stable pages.
- */
-static bool dm_table_requires_stable_pages(struct dm_table *t)
-{
-	struct dm_target *ti;
-	unsigned i;
-
-	for (i = 0; i < dm_table_get_num_targets(t); i++) {
-		ti = dm_table_get_target(t, i);
-
-		if (ti->type->iterate_devices &&
-		    ti->type->iterate_devices(ti, device_requires_stable_pages, NULL))
-			return true;
-	}
-
-	return false;
-}
-
 void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 			       struct queue_limits *limits)
 {
@@ -1866,6 +1836,10 @@ void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 			fua = true;
 	}
 	blk_queue_write_cache(q, wc, fua);
+
+	/* Inherit inline-crypt capability of underlying devices. */
+	if (dm_table_supports_flush(t, (1UL << QUEUE_FLAG_INLINECRYPT)))
+		queue_flag_set_unlocked(QUEUE_FLAG_INLINECRYPT, q);
 
 	if (dm_table_supports_dax(t))
 		queue_flag_set_unlocked(QUEUE_FLAG_DAX, q);
@@ -1892,15 +1866,6 @@ void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 		queue_flag_set_unlocked(QUEUE_FLAG_NO_SG_MERGE, q);
 
 	dm_table_verify_integrity(t);
-
-	/*
-	 * Some devices don't use blk_integrity but still want stable pages
-	 * because they do their own checksumming.
-	 */
-	if (dm_table_requires_stable_pages(t))
-		q->backing_dev_info->capabilities |= BDI_CAP_STABLE_WRITES;
-	else
-		q->backing_dev_info->capabilities &= ~BDI_CAP_STABLE_WRITES;
 
 	/*
 	 * Determine whether or not this queue's I/O timings contribute

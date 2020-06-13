@@ -3021,6 +3021,7 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	wake_up_process(cc->write_thread);
 
 	}
+
 	ti->num_flush_bios = 1;
 
 	return 0;
