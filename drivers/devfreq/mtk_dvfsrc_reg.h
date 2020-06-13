@@ -18,11 +18,15 @@
 
 #include "mtk_dvfsrc_reg_mt6775.h"
 
+#elif defined(CONFIG_MACH_MT6765)
+#include <mtk_dvfsrc_reg_mt6765.h>
 #elif defined(CONFIG_MACH_MT6771)
 
 #include "mtk_dvfsrc_reg_mt6771.h"
 #elif defined(CONFIG_MACH_MT6768)
 #include <mtk_dvfsrc_reg_mt6768.h>
+#elif defined(CONFIG_MACH_MT6765)
+#include <mtk_dvfsrc_reg_mt6765.h>
 #else
 #include <mtk_dvfsrc_reg_mt67xx.h>
 #endif

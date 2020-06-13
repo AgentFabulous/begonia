@@ -31,12 +31,13 @@
 
 #include "helio-dvfsrc_v2.h"
 #include "mtk_dvfsrc_reg.h"
+#include <linux/regulator/consumer.h>
 
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
 #include <sspm_ipi.h>
 #include <sspm_ipi_pin.h>
 #endif
-
+static struct regulator *vcore_reg_id;
 static struct helio_dvfsrc *dvfsrc;
 static DEFINE_MUTEX(sw_req1_mutex);
 static DEFINE_SPINLOCK(force_req_lock);
@@ -160,12 +161,86 @@ static void dvfsrc_set_sw_bw(int type, int data)
 	}
 }
 
+
+int is_dvfsrc_opp_fixed(void)
+{
+	int ret;
+	unsigned long flags;
+
+	if (!is_dvfsrc_enabled())
+		return 1;
+
+	if (!(dvfsrc_read(DVFSRC_BASIC_CONTROL) & 0x100))
+		return 1;
+
+	if (helio_dvfsrc_flag_get() != 0)
+		return 1;
+
+	spin_lock_irqsave(&force_req_lock, flags);
+	ret = is_opp_forced();
+	spin_unlock_irqrestore(&force_req_lock, flags);
+
+	return ret;
+}
+
+static int get_target_level(void)
+{
+	return (dvfsrc_read(DVFSRC_LEVEL) & 0xFFFF);
+}
+
+u32 get_dvfs_final_level(void)
+{
+#if 0
+	u32 level_register = dvfsrc_read(DVFSRC_LEVEL);
+	u32 target_level, current_level;
+
+	target_level = level_register & 0xFFFF;
+	current_level = level_register >> CURRENT_LEVEL_SHIFT;
+
+	if (target_level != 0)
+		return min(current_level, target_level);
+	else
+		return current_level;
+#endif
+	return dvfsrc_read(DVFSRC_LEVEL) >> CURRENT_LEVEL_SHIFT;
+}
+
+int get_sw_req_vcore_opp(void)
+{
+	int opp = -1;
+	int sw_req = -1;
+
+	/* return opp 0, if dvfsrc not enable */
+	if (!is_dvfsrc_enabled())
+		return 0;
+	/* 1st get sw req opp  no lock protect is ok*/
+	if (!is_opp_forced()) {
+		sw_req = (dvfsrc_read(DVFSRC_SW_REQ) >> VCORE_SW_AP_SHIFT);
+		sw_req = sw_req & VCORE_SW_AP_MASK;
+		sw_req = VCORE_OPP_NUM - sw_req - 1;
+		/* 2nd read current level to get current vcore opp */
+		opp = get_cur_vcore_opp();
+		if (opp > sw_req) {
+			/* should not happen */
+			dvfsrc_dump_reg(NULL);
+			aee_kernel_warning("DVFSRC",
+						"%s: failed.", __func__);
+		}
+		return sw_req;  /* return sw_request, as vcore floor level*/
+	}
+	opp = get_cur_vcore_opp();
+	return opp; /* return opp , as vcore fixed level*/
+}
+
 static int commit_data(int type, int data, int check_spmfw)
 {
 	int ret = 0;
 	int level = 16, opp = 16;
 	unsigned long flags;
-
+#if defined(CONFIG_MTK_ENG_BUILD)
+	int opp_uv = 0;
+	int vcore_uv = 0;
+#endif
 	if (!is_dvfsrc_enabled())
 		return ret;
 
@@ -193,6 +268,7 @@ static int commit_data(int type, int data, int check_spmfw)
 		dvfsrc_set_sw_req(level, EMI_SW_AP_MASK, EMI_SW_AP_SHIFT);
 
 		if (!is_opp_forced() && check_spmfw) {
+			udelay(1);
 			ret = dvfsrc_wait_for_completion(
 					get_cur_ddr_opp() <= opp,
 					DVFSRC_TIMEOUT);
@@ -207,15 +283,34 @@ static int commit_data(int type, int data, int check_spmfw)
 
 		opp = data;
 		level = VCORE_OPP_NUM - data - 1;
-
+		mb(); /* make sure setting first */
 		dvfsrc_set_sw_req(level, VCORE_SW_AP_MASK, VCORE_SW_AP_SHIFT);
-
+		mb(); /* make sure checking then */
 		if (!is_opp_forced() && check_spmfw) {
+			udelay(1);
+			ret = dvfsrc_wait_for_completion(
+					(get_target_level() == 0),
+					DVFSRC_TIMEOUT);
+			udelay(1);
 			ret = dvfsrc_wait_for_completion(
 					get_cur_vcore_opp() <= opp,
 					DVFSRC_TIMEOUT);
 		}
-
+#if defined(CONFIG_MTK_ENG_BUILD)
+		if (!is_opp_forced() && check_spmfw) {
+			if (vcore_reg_id) {
+				vcore_uv = regulator_get_voltage(vcore_reg_id);
+				opp_uv = get_vcore_uv_table(opp);
+				if (vcore_uv < opp_uv) {
+					pr_info("DVFS FAIL = %d %d 0x%x\n",
+				vcore_uv, opp_uv, dvfsrc_read(DVFSRC_LEVEL));
+					dvfsrc_dump_reg(NULL);
+					aee_kernel_warning("DVFSRC",
+						"%s: failed.", __func__);
+				}
+			}
+		}
+#endif
 		mutex_unlock(&sw_req1_mutex);
 		break;
 	case PM_QOS_SCP_VCORE_REQUEST:
@@ -229,6 +324,7 @@ static int commit_data(int type, int data, int check_spmfw)
 				VCORE_SCP_GEAR_MASK, VCORE_SCP_GEAR_SHIFT);
 
 		if (!is_opp_forced() && check_spmfw) {
+			udelay(1);
 			ret = dvfsrc_wait_for_completion(
 					get_cur_vcore_opp() <= opp,
 					DVFSRC_TIMEOUT);
@@ -270,6 +366,7 @@ static int commit_data(int type, int data, int check_spmfw)
 		}
 		dvfsrc_set_force_start(1 << level);
 		if (check_spmfw) {
+			udelay(1);
 			ret = dvfsrc_wait_for_completion(
 					get_cur_vcore_dvfs_opp() == opp,
 					DVFSRC_TIMEOUT);
@@ -283,7 +380,7 @@ static int commit_data(int type, int data, int check_spmfw)
 	}
 
 	if (ret < 0) {
-		pr_err("%s: type: 0x%x, data: 0x%x, opp: %d, level: %d\n",
+		pr_info("%s: type: 0x%x, data: 0x%x, opp: %d, level: %d\n",
 				__func__, type, data, opp, level);
 		dvfsrc_dump_reg(NULL);
 		aee_kernel_warning("DVFSRC", "%s: failed.", __func__);
@@ -307,6 +404,11 @@ void helio_dvfsrc_enable(int dvfsrc_en)
 
 	if (!spm_load_firmware_status())
 		return;
+
+	if (dvfsrc->dvfsrc_enabled == dvfsrc_en && dvfsrc_en == 1) {
+		pr_info("DVFSRC already enabled\n");
+		return;
+	}
 
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
 	helio_dvfsrc_sspm_ipi_init(dvfsrc_en);
@@ -359,7 +461,7 @@ static int helio_dvfsrc_common_init(void)
 	dvfsrc_opp_table_init();
 
 	if (!spm_load_firmware_status()) {
-		pr_err("SPM FIRMWARE IS NOT READY\n");
+		pr_info("SPM FIRMWARE IS NOT READY\n");
 		return -ENODEV;
 	}
 
@@ -735,6 +837,9 @@ static int helio_dvfsrc_probe(struct platform_device *pdev)
 	pm_qos_notifier_register();
 
 	helio_dvfsrc_common_init();
+	vcore_reg_id = regulator_get(&pdev->dev, "vcore");
+	if (!vcore_reg_id)
+		pr_info("regulator_get vcore_reg_id failed\n");
 
 	if (of_property_read_u32(np, "dvfsrc_flag",
 		(u32 *) &dvfsrc->dvfsrc_flag))
@@ -768,7 +873,7 @@ static __maybe_unused int helio_dvfsrc_suspend(struct device *dev)
 
 	ret = devfreq_suspend_device(dvfsrc->devfreq);
 	if (ret < 0) {
-		dev_err(dev, "failed to suspend the devfreq devices\n");
+		pr_info("failed to suspend the devfreq devices\n");
 		return ret;
 	}
 
@@ -781,7 +886,7 @@ static __maybe_unused int helio_dvfsrc_resume(struct device *dev)
 
 	ret = devfreq_resume_device(dvfsrc->devfreq);
 	if (ret < 0) {
-		dev_err(dev, "failed to resume the devfreq devices\n");
+		pr_info("failed to resume the devfreq devices\n");
 		return ret;
 	}
 	return ret;
@@ -806,7 +911,7 @@ static int __init helio_dvfsrc_init(void)
 
 	ret = devfreq_add_governor(&helio_dvfsrc_governor);
 	if (ret) {
-		pr_err("%s: failed to add governor: %d\n", __func__, ret);
+		pr_info("%s: failed to add governor: %d\n", __func__, ret);
 		return ret;
 	}
 
@@ -826,7 +931,7 @@ static void __exit helio_dvfsrc_exit(void)
 
 	ret = devfreq_remove_governor(&helio_dvfsrc_governor);
 	if (ret)
-		pr_err("%s: failed to remove governor: %d\n", __func__, ret);
+		pr_info("%s: failed to remove governor: %d\n", __func__, ret);
 }
 module_exit(helio_dvfsrc_exit)
 

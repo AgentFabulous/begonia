@@ -30,13 +30,16 @@
 #include <mtk_spm_vcore_dvfs.h>
 #include <mtk_spm_vcore_dvfs_ipi.h>
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
-#include <sspm_ipi.h>
+#include <v1/sspm_ipi.h>
 #include <sspm_ipi_pin.h>
 #endif
 
 #include <mtk_vcorefs_governor.h>
 
 #include <mt-plat/aee.h>
+
+#include <linux/regulator/consumer.h>
+static struct regulator *vcore_reg_id;
 
 __weak void helio_dvfsrc_platform_init(struct helio_dvfsrc *dvfsrc) { }
 __weak void spm_check_status_before_dvfs(void) { }
@@ -95,7 +98,7 @@ char *dvfsrc_get_opp_table_info(char *p)
 
 	return p;
 }
-#if !defined(CONFIG_MACH_MT6771)
+#if !defined(CONFIG_MACH_MT6771) && !defined(CONFIG_MACH_MT6765)
 
 int dvfsrc_get_bw(int type)
 {
@@ -247,7 +250,7 @@ static void helio_dvfsrc_enable(struct helio_dvfsrc *dvfsrc)
 {
 	mutex_lock(&dvfsrc->devfreq->lock);
 
-#if !defined(CONFIG_MACH_MT6771)
+#if !defined(CONFIG_MACH_MT6771) && !defined(CONFIG_MACH_MT6765)
 	dvfsrc_write(dvfsrc, DVFSRC_VCORE_REQUEST,
 		(dvfsrc_read(dvfsrc, DVFSRC_VCORE_REQUEST) & ~(0x3 << 20)));
 	dvfsrc_write(dvfsrc, DVFSRC_EMI_REQUEST,
@@ -259,16 +262,41 @@ static void helio_dvfsrc_enable(struct helio_dvfsrc *dvfsrc)
 	mutex_unlock(&dvfsrc->devfreq->lock);
 }
 
+int is_dvfsrc_opp_fixed(void)
+{
+	if (!is_qos_can_work())
+		return 1;
+
+	if ((spm_dvfs_flag_init()&
+		(SPM_FLAG_DIS_VCORE_DVS|SPM_FLAG_DIS_VCORE_DFS)) != 0)
+		return 1;
+
+	if (dvfsrc->skip)
+		return 1;
+
+#if defined(CONFIG_MACH_MT6771)
+	if (is_force_opp_enable())
+		return 1;
+#endif
+
+	return 0;
+}
+
 static int commit_data(struct helio_dvfsrc *dvfsrc, int type, int data)
 {
 	int ret = 0;
 	int level = 0;
 	int opp = 0;
 	int last_cnt = 0;
+	int opp_uv;
+	int vcore_uv = 0;
 
 	mutex_lock(&dvfsrc->devfreq->lock);
 
 	if (!dvfsrc->enable)
+		goto out;
+
+	if (is_force_opp_enable())
 		goto out;
 
 	if (dvfsrc->skip)
@@ -288,7 +316,7 @@ static int commit_data(struct helio_dvfsrc *dvfsrc, int type, int data)
 			pr_info("rc_level: 0x%x (last: %d -> %d)\n",
 				dvfsrc_read(dvfsrc, DVFSRC_LEVEL),
 				last_cnt, dvfsrc_read(dvfsrc, DVFSRC_LAST));
-			/* hh, temp fix build error */
+
 			/* aee_kernel_warning(NULL); */
 			/* goto out; */
 		}
@@ -333,6 +361,10 @@ static int commit_data(struct helio_dvfsrc *dvfsrc, int type, int data)
 		dvfsrc_write(dvfsrc, DVFSRC_SW_REQ,
 				(dvfsrc_read(dvfsrc, DVFSRC_SW_REQ)
 				& ~(0x3)) | level);
+		udelay(1);
+		ret = wait_for_completion
+		(is_dvfsrc_in_progress(dvfsrc) == 0, DVFSRC_TIMEOUT);
+		udelay(1);
 #if defined(CONFIG_MACH_MT6771)
 		opp = get_min_opp_for_ddr(data);
 		ret = wait_for_completion(spm_vcorefs_get_dvfs_opp() <= opp,
@@ -347,9 +379,8 @@ static int commit_data(struct helio_dvfsrc *dvfsrc, int type, int data)
 			("[%s] wair not complete, class: %d, data: 0x%x\n",
 			__func__, type, data);
 			spm_vcorefs_dump_dvfs_regs(NULL);
-			/* hh, temp fix build error */
-			/* aee_kernel_warning("VCOREFS", */
-			/* "emi_opp cannot be done."); */
+			aee_kernel_warning("VCOREFS",
+			"emi_opp cannot be done.");
 		}
 
 		break;
@@ -367,7 +398,10 @@ static int commit_data(struct helio_dvfsrc *dvfsrc, int type, int data)
 		dvfsrc_write(dvfsrc, DVFSRC_VCORE_REQUEST2,
 				(dvfsrc_read(dvfsrc, DVFSRC_VCORE_REQUEST2)
 				& ~(0x03000000)) | level);
-
+		udelay(1);
+		ret = wait_for_completion
+		(is_dvfsrc_in_progress(dvfsrc) == 0, DVFSRC_TIMEOUT);
+		udelay(1);
 #if defined(CONFIG_MACH_MT6771)
 		opp = get_min_opp_for_vcore(data);
 		ret = wait_for_completion(spm_vcorefs_get_dvfs_opp() <= opp,
@@ -382,9 +416,23 @@ static int commit_data(struct helio_dvfsrc *dvfsrc, int type, int data)
 			("[%s] not complete, class: %d, data: 0x%x\n",
 			__func__, type, data);
 			spm_vcorefs_dump_dvfs_regs(NULL);
-			/* hh, temp fix build error */
-			/* aee_kernel_warning("VCOREFS", */
-			/* "vcore_opp cannot be done."); */
+			aee_kernel_warning("VCOREFS",
+			"vcore_opp cannot be done.");
+		}
+
+		if (vcore_reg_id) {
+			vcore_uv = regulator_get_voltage(vcore_reg_id);
+			opp_uv = get_vcore_opp_volt(get_min_opp_for_vcore(opp));
+				if (vcore_uv < opp_uv) {
+					pr_info("DVFS FAIL= %d %d 0x%08x %08x\n",
+					vcore_uv, opp_uv,
+					dvfsrc_read(dvfsrc, DVFSRC_LEVEL),
+					spm_vcorefs_get_dvfs_opp());
+
+					aee_kernel_warning("DVFSRC",
+						"VCORE failed.",
+						__func__);
+				}
 		}
 		break;
 	case PM_QOS_VCORE_DVFS_FIXED_OPP:
@@ -422,9 +470,8 @@ static int commit_data(struct helio_dvfsrc *dvfsrc, int type, int data)
 				("[%s] not complete, class: %d, data: 0x%x\n",
 				__func__, type, data);
 				spm_vcorefs_dump_dvfs_regs(NULL);
-				/* hh, temp fix build error */
-				/* aee_kernel_exception("VCOREFS", */
-				/* "dvfsrc cannot be done."); */
+				aee_kernel_exception("VCOREFS",
+				"dvfsrc cannot be done.");
 			}
 
 		}
@@ -439,7 +486,7 @@ out:
 	return ret;
 }
 
-#if !defined(CONFIG_MACH_MT6771)
+#if !defined(CONFIG_MACH_MT6771) && !defined(CONFIG_MACH_MT6765)
 void dvfsrc_set_vcore_request(unsigned int mask, unsigned int vcore_level)
 {
 	int r = 0;
@@ -452,8 +499,7 @@ void dvfsrc_set_vcore_request(unsigned int mask, unsigned int vcore_level)
 		(is_dvfsrc_in_progress(dvfsrc) == 0, SPM_DVFS_TIMEOUT);
 	if (r < 0) {
 		spm_vcorefs_dump_dvfs_regs(NULL);
-		/* hh, temp fix build error */
-		/* aee_kernel_exception("VCOREFS", "dvfsrc cannot be idle."); */
+		aee_kernel_exception("VCOREFS", "dvfsrc cannot be idle.");
 		goto out;
 	}
 
@@ -465,8 +511,7 @@ void dvfsrc_set_vcore_request(unsigned int mask, unsigned int vcore_level)
 	SPM_DVFS_TIMEOUT);
 	if (r < 0) {
 		spm_vcorefs_dump_dvfs_regs(NULL);
-		/* hh, temp fix build error */
-		/* aee_kernel_exception("VCOREFS", "dvfsrc cannot be done."); */
+		aee_kernel_exception("VCOREFS", "dvfsrc cannot be done.");
 	}
 
 out:
@@ -632,11 +677,15 @@ static int helio_dvfsrc_probe(struct platform_device *pdev)
 
 	helio_dvfsrc_platform_init(dvfsrc);
 
+	vcore_reg_id = regulator_get(&pdev->dev, "vcore");
+	if (!vcore_reg_id)
+		pr_info("regulator_get vcore_reg_id failed\n");
+
 	dvfsrc->devfreq = devm_devfreq_add_device(&pdev->dev,
 						 &helio_devfreq_profile,
 						 "helio_dvfsrc",
 						 NULL);
-#if !defined(CONFIG_MACH_MT6771)
+#if !defined(CONFIG_MACH_MT6771) && !defined(CONFIG_MACH_MT6765)
 	vcore_opp_init();
 	dvfsrc_init_opp_table();
 	spm_check_status_before_dvfs();

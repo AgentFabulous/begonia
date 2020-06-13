@@ -22,10 +22,6 @@
 #include <helio-dvfsrc-mt6775.h>
 #elif defined(CONFIG_MACH_MT6771)
 #include <helio-dvfsrc-mt6771.h>
-#elif defined(CONFIG_MACH_MT6768)
-#include <helio-dvfsrc-mt6768.h>
-#else
-#include <helio-dvfsrc-mt67xx.h>
 #endif
 
 struct reg_config {
@@ -96,6 +92,8 @@ extern void dvfsrc_update_sspm_ddr_opp_table(int opp, unsigned int ddr_khz);
 
 extern int dvfsrc_get_bw(int type);
 extern int get_cur_vcore_dvfs_opp(void);
+
+extern int is_dvfsrc_opp_fixed(void);
 
 #define DVFSRC_REG(dvfsrc, offset) (dvfsrc->regs + offset)
 #define DVFSRC_SRAM_REG(dvfsrc, offset) (dvfsrc->sram_regs + offset)

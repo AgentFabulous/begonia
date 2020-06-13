@@ -20,6 +20,8 @@
 
 #if defined(CONFIG_MACH_MT6768)
 #include <helio-dvfsrc-mt6768.h>
+#elif defined(CONFIG_MACH_MT6765)
+#include <helio-dvfsrc-mt6765.h>
 #else
 #include <helio-dvfsrc-mt67xx.h>
 #endif
@@ -158,6 +160,7 @@ extern void get_spm_reg(char *p);
 extern void spm_dvfs_pwrap_cmd(int pwrap_cmd, int pwrap_vcore);
 extern int helio_dvfsrc_platform_init(struct helio_dvfsrc *dvfsrc);
 extern u32 spm_get_dvfs_level(void);
+extern u32 spm_get_dvfs_final_level(void);
 extern u32 spm_get_pcm_reg9_data(void);
 extern void dvfsrc_set_power_model_ddr_request(unsigned int level);
 /* met profile function */
@@ -168,5 +171,7 @@ extern int vcorefs_get_src_req_num(void);
 extern char **vcorefs_get_src_req_name(void);
 extern unsigned int *vcorefs_get_src_req(void);
 extern u32 vcorefs_get_md_scenario(void);
+extern u32 get_dvfs_final_level(void);
+extern int get_sw_req_vcore_opp(void);
 #endif /* __HELIO_DVFSRC_H */
 

@@ -214,7 +214,7 @@ static ssize_t dvfsrc_opp_table_show(struct device *dev,
 		return sprintf(buf, "Failed to access dvfsrc\n");
 
 	mutex_lock(&dvfsrc->devfreq->lock);
-	for (i = 0; i < VCORE_DVFS_OPP_NUM; i++) {
+	for (i = VCORE_DVFS_OPP_0; i < VCORE_DVFS_OPP_NUM; i++) {
 		p += snprintf(p, buff_end - p, "[OPP%-2d]: %-8u uv %-8u khz\n",
 				i, get_vcore_uv(i), get_ddr_khz(i));
 	}
