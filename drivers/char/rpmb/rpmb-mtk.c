@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -686,8 +686,10 @@ int rpmb_req_get_wc_ufs(u8 *key, u32 *wc, u8 *frame)
 
 			data.ocmd.frames = rpmb_alloc_frames(1);
 
-			if (data.ocmd.frames == NULL)
+			if (data.ocmd.frames == NULL) {
+				kfree(data.icmd.frames);
 				return RPMB_ALLOC_ERROR;
+			}
 		}
 
 		/*
@@ -1045,8 +1047,10 @@ int rpmb_req_ioctl_write_data_ufs(struct rpmb_ioc_param *param)
 
 		data.ocmd.frames = rpmb_alloc_frames(1);
 
-		if (data.ocmd.frames == NULL)
+		if (data.ocmd.frames == NULL) {
+			kfree(data.icmd.frames);
 			return RPMB_ALLOC_ERROR;
+		}
 
 		/*
 		 * Initial data buffer for HMAC computation.
@@ -1055,8 +1059,11 @@ int rpmb_req_ioctl_write_data_ufs(struct rpmb_ioc_param *param)
 		 */
 
 		dataBuf_start = dataBuf = kzalloc(284 * tran_blkcnt, 0);
-		if (!dataBuf_start)
+		if (!dataBuf_start) {
+			kfree(data.icmd.frames);
+			kfree(data.ocmd.frames);
 			return RPMB_ALLOC_ERROR;
+		}
 
 		/*
 		 * Prepare frame contents
@@ -1263,8 +1270,10 @@ int rpmb_req_ioctl_read_data_ufs(struct rpmb_ioc_param *param)
 
 		data.ocmd.frames = rpmb_alloc_frames(tran_blkcnt);
 
-		if (data.ocmd.frames == NULL)
+		if (data.ocmd.frames == NULL) {
+			kfree(data.icmd.frames);
 			return RPMB_ALLOC_ERROR;
+		}
 
 		/*
 		 * Initial data buffer for HMAC computation.
@@ -1273,8 +1282,11 @@ int rpmb_req_ioctl_read_data_ufs(struct rpmb_ioc_param *param)
 		 */
 
 		dataBuf_start = dataBuf = kzalloc(284 * tran_blkcnt, 0);
-		if (!dataBuf_start)
+		if (!dataBuf_start) {
+			kfree(data.icmd.frames);
+			kfree(data.ocmd.frames);
 			return RPMB_ALLOC_ERROR;
+		}
 
 		get_random_bytes(nonce, RPMB_SZ_NONCE);
 
