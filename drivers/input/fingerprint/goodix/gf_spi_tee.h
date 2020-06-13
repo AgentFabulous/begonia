@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2013-2016, Shenzhen Huiding Technology Co., Ltd.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  * All Rights Reserved.
  */
 #ifndef __GF_SPI_TEE_H
@@ -132,8 +132,8 @@ typedef struct {
 	unsigned int cs_setuptime;
 	unsigned int cs_holdtime;
 	unsigned int cs_idletime;
-	unsigned int speed_hz;
-	unsigned int duty_cycle;
+	unsigned int speed_hz;	//spi clock rate
+	unsigned int duty_cycle;	//The time ratio of active level in a period. Default value is 50. that means high time and low time is same.
 	enum gf_spi_cpol cpol;
 	enum gf_spi_cpol cpha;
 } gf_spi_cfg_t;
@@ -229,7 +229,7 @@ struct gf_device {
 
 #ifndef SUPPORT_REE_SPI
 #define SUPPORT_REE_SPI
-
+//#define SUPPORT_REE_OSWEGO
 #endif
 
 #ifdef SUPPORT_REE_SPI

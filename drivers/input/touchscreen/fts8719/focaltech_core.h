@@ -3,7 +3,7 @@
  * FocalTech TouchScreen driver.
  *
  * Copyright (c) 2012-2019, Focaltech Ltd. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -76,7 +76,7 @@
 #define FTS_TOUCH_DATA_LEN  (FTS_MAX_POINTS_SUPPORT * FTS_ONE_TCH_LEN + 3)
 
 #define FTS_SPI_CLK_MAX                     10000000
-#define FTS_DEFAULT_SPI_FREQ				4500000
+#define FTS_DEFAULT_SPI_FREQ				4500000		//4.5M
 
 
 #define FTS_GESTURE_POINTS_MAX			  6

@@ -382,6 +382,96 @@ static ssize_t goodix_ts_chip_info_show(struct device  *dev,
 
 	return cnt;
 }
+static int flag_resume_enter_200Hz;
+static int goodix_ts_enable(struct goodix_ts_device *ts_dev, int en)
+{
+	u8 write_data, read_data;
+	u8 enter_200Hz[] = {0x38, 0x00, 0xC8};
+	u8 exit_200Hz[] = {0x38, 0x01, 0xC7};
+	int ret = 0;
+	u32 retry_time0 = 3;
+	u32 retry_time1 = 3;
+
+	if (ts_dev == NULL)
+		return -EINVAL;
+	while (retry_time0) {
+		/* 1. write 0xAA to 0x30F0 */
+		write_data = 0xAA;
+		ret = ts_dev->hw_ops->write_trans(ts_dev, 0x30F0,
+							&write_data, 1);
+		if (ret)
+			ts_err("goodix_i2c_write error!\n");
+
+		retry_time1 = 3;
+		usleep_range(1000, 1100);
+		while (retry_time1) {
+			/* 2. read 0xBB to 0x3100 */
+			ret = ts_dev->hw_ops->read_trans(ts_dev, 0x3100,
+							&read_data, 1);
+			if (!ret)
+				ts_err("goodix_i2c_read error!\n");
+
+			if (read_data == 0xBB) {
+				usleep_range(10000, 10100);
+				goto operate;
+			} else
+				retry_time1--;
+		}
+		retry_time0--;
+	}
+	return -EINVAL;
+operate:
+	if (en == 1)
+		/* en=1. enter: write change CMD 38 00 C8 */
+		ret = ts_dev->hw_ops->write_trans(ts_dev, 0x6F68,
+						enter_200Hz, 3);
+	else if (en == 0)
+		/* en=0. exit: write change CMD 38 01 C7 */
+		ret = ts_dev->hw_ops->write_trans(ts_dev, 0x6F68,
+						exit_200Hz, 3);
+	if (ret) {
+		ts_err("goodix_i2c_write error!\n");
+		return -EINVAL;
+	}
+	/* 3. write 0xCC */
+	write_data = 0xCC;
+	ret = ts_dev->hw_ops->write_trans(ts_dev, 0x30F0,
+					&write_data, 1);
+	if (ret) {
+		ts_err("goodix_i2c_write error!\n");
+		return -EINVAL;
+	}
+	flag_resume_enter_200Hz = en;
+	return 0;
+}
+static ssize_t goodix_ts_report_rate_change_store(
+		struct device *dev,
+		struct device_attribute *attr,
+		const char *buf,
+		size_t count)
+{
+	struct goodix_ts_core *core_data =
+		dev_get_drvdata(dev);
+	struct goodix_ts_device *ts_dev = core_data->ts_dev;
+	int en, ret = 0;
+
+	if (!buf) {
+		ts_err("%s() buf is NULL.Exit!\n", __func__);
+		return -EINVAL;
+	}
+
+	if (sscanf(buf, "%d", &en) != 1)
+		return -EINVAL;
+
+	if (en == 1 || en == 0) {
+		ret = goodix_ts_enable(ts_dev, en);
+		if (ret)
+			return -EINVAL;
+	} else
+		return -EINVAL;
+
+	return count;
+}
 
 /* show chip configuration data */
 static ssize_t goodix_ts_config_data_show(struct device *dev,
@@ -664,6 +754,8 @@ static ssize_t goodix_ts_irq_info_store(struct device *dev,
 static DEVICE_ATTR(extmod_info, 0444, goodix_ts_extmod_show, NULL);
 static DEVICE_ATTR(driver_info, 0444, goodix_ts_driver_info_show, NULL);
 static DEVICE_ATTR(chip_info, 0444, goodix_ts_chip_info_show, NULL);
+static DEVICE_ATTR(change_rate, 0220, NULL,
+				goodix_ts_report_rate_change_store);
 static DEVICE_ATTR(config_data, 0444, goodix_ts_config_data_show, NULL);
 static DEVICE_ATTR(reset, 0220, NULL, goodix_ts_reset_store);
 static DEVICE_ATTR(send_cfg, 0220, NULL, goodix_ts_send_cfg_store);
@@ -675,6 +767,7 @@ static struct attribute *sysfs_attrs[] = {
 	&dev_attr_extmod_info.attr,
 	&dev_attr_driver_info.attr,
 	&dev_attr_chip_info.attr,
+	&dev_attr_change_rate.attr,
 	&dev_attr_config_data.attr,
 	&dev_attr_reset.attr,
 	&dev_attr_send_cfg.attr,
@@ -1047,7 +1140,6 @@ int goodix_ts_power_off(struct goodix_ts_core *core_data)
 	return 0;
 }
 
-#ifndef AUTO_DETECT
 /**
  * goodix_ts_pinctrl_init - Get pinctrl handler and pinctrl_state
  * @core_data: pointer to touch core data
@@ -1055,10 +1147,11 @@ int goodix_ts_power_off(struct goodix_ts_core *core_data)
  */
 static int goodix_ts_pinctrl_init(struct goodix_ts_core *core_data)
 {
+	struct goodix_ts_board_data *ts_bdata = board_data(core_data);
 	int r = 0;
 
 	/* get pinctrl handler from of node */
-	core_data->pinctrl = devm_pinctrl_get(core_data->ts_dev->dev);
+	core_data->pinctrl = devm_pinctrl_get(ts_bdata->pinctrl_dev);
 	if (IS_ERR_OR_NULL(core_data->pinctrl)) {
 		ts_err("Failed to get pinctrl handler");
 		return PTR_ERR(core_data->pinctrl);
@@ -1105,12 +1198,56 @@ static int goodix_ts_pinctrl_init(struct goodix_ts_core *core_data)
 	}
 
 	return 0;
+
 exit_pinctrl_put:
-	devm_pinctrl_put(core_data->pinctrl);
+	pinctrl_put(core_data->pinctrl);
 	core_data->pinctrl = NULL;
 	return r;
 }
-#endif
+
+int goodix_ts_gpio_suspend(struct goodix_ts_core *core_data)
+{
+	int r = 0;
+
+	if (core_data->pinctrl) {
+		r = pinctrl_select_state(core_data->pinctrl,
+				core_data->pin_int_sta_suspend);
+		if (r < 0) {
+			ts_err("Failed to select int suspend state, r:%d", r);
+			goto err_suspend_pinctrl;
+		}
+		r = pinctrl_select_state(core_data->pinctrl,
+				core_data->pin_rst_sta_suspend);
+		if (r < 0) {
+			ts_err("Failed to select rst suspend state, r:%d", r);
+			goto err_suspend_pinctrl;
+		}
+	}
+err_suspend_pinctrl:
+	return r;
+}
+
+int goodix_ts_gpio_resume(struct goodix_ts_core *core_data)
+{
+	int r = 0;
+
+	if (core_data->pinctrl) {
+		r = pinctrl_select_state(core_data->pinctrl,
+					core_data->pin_int_sta_active);
+		if (r < 0) {
+			ts_err("Failed to select int active state, r:%d", r);
+			goto err_resume_pinctrl;
+		}
+		r = pinctrl_select_state(core_data->pinctrl,
+					core_data->pin_rst_sta_active);
+		if (r < 0) {
+			ts_err("Failed to select rst active state, r:%d", r);
+			goto err_resume_pinctrl;
+		}
+	}
+err_resume_pinctrl:
+		return r;
+}
 
 /**
  * goodix_ts_gpio_setup - Request gpio resources from GPIO subsysten
@@ -1133,27 +1270,33 @@ static int goodix_ts_gpio_setup(struct goodix_ts_core *core_data)
 	 * after kenerl3.13, gpio_ api is deprecated, new
 	 * driver should use gpiod_ api.
 	 */
-	r = devm_gpio_request_one(&core_data->pdev->dev,
+	if (gpio_is_valid(ts_bdata->reset_gpio)) {
+		r = devm_gpio_request_one(&core_data->pdev->dev,
 			ts_bdata->reset_gpio,
 			GPIOF_OUT_INIT_HIGH,
 			"ts_reset_gpio");
-	if (r < 0) {
-		ts_err("Failed to request reset gpio, r:%d", r);
-		return r;
+		if (r < 0) {
+			ts_err("Failed to request reset gpio, r:%d", r);
+			goto err_request_reset_gpio;
+		}
 	}
-
-	r = devm_gpio_request_one(&core_data->pdev->dev,
+	if (gpio_is_valid(ts_bdata->irq_gpio)) {
+		r = devm_gpio_request_one(&core_data->pdev->dev,
 			ts_bdata->irq_gpio,
 			GPIOF_IN,
 			"ts_irq_gpio");
-	if (r < 0) {
-		ts_err("Failed to request irq gpio, r:%d", r);
-		return r;
+		if (r < 0) {
+			ts_err("Failed to request irq gpio, r:%d", r);
+			goto err_request_eint_gpio;
+		}
 	}
+	return r;
 
-	return 0;
+err_request_eint_gpio:
+	gpio_free(ts_bdata->reset_gpio);
+err_request_reset_gpio:
+	return r;
 }
-
 /**
  * goodix_input_set_params - set input parameters
  */
@@ -1238,12 +1381,20 @@ int goodix_ts_input_dev_config(struct goodix_ts_core *core_data)
  *input_mt_init_slots(input_dev, ts_bdata->panel_max_id,
  *			INPUT_MT_DIRECT);
  */
-	input_mt_init_slots(input_dev,
+	r = input_mt_init_slots(input_dev,
 			ts_bdata->panel_max_id * 2 + 1,
 			INPUT_MT_DIRECT);
+	if (r < 0) {
+		ts_err("input_mt_init_slots err0");
+		return r;
+	}
 #else
-	input_mt_init_slots(input_dev,
+	r = input_mt_init_slots(input_dev,
 			ts_bdata->panel_max_id * 2 + 1);
+	if (r < 0) {
+		ts_err("input_mt_init_slots err1");
+		return r;
+	}
 #endif
 #endif
 
@@ -1508,20 +1659,11 @@ static int goodix_ts_suspend(struct goodix_ts_core *core_data)
 	atomic_set(&core_data->suspended, 1);
 
 #ifdef CONFIG_PINCTRL
-#ifndef AUTO_DETECT
-	if (core_data->pinctrl) {
-		r = pinctrl_select_state(core_data->pinctrl,
-				core_data->pin_int_sta_suspend);
-		if (r < 0)
-			ts_err("Failed to select int suspend state, r:%d", r);
-		r = pinctrl_select_state(core_data->pinctrl,
-				core_data->pin_rst_sta_suspend);
-		if (r < 0)
-			ts_err("Failed to select rst suspend state, r:%d", r);
+	r = goodix_ts_gpio_suspend(core_data);
+	if (r < 0) {
+		ts_err("Failed to select rst/eint suspend state: %d", r);
+		goto out;
 	}
-#else
-	r = i2c_touch_suspend();
-#endif
 #endif
 
 	/* inform exteranl modules */
@@ -1590,20 +1732,11 @@ static int goodix_ts_resume(struct goodix_ts_core *core_data)
 	mutex_unlock(&goodix_modules.mutex);
 
 #ifdef CONFIG_PINCTRL
-#ifndef AUTO_DETECT
-	if (core_data->pinctrl) {
-		r = pinctrl_select_state(core_data->pinctrl,
-					core_data->pin_int_sta_active);
-		if (r < 0)
-			ts_err("Failed to select int active pinstate, r:%d", r);
-		r = pinctrl_select_state(core_data->pinctrl,
-					core_data->pin_rst_sta_active);
-		if (r < 0)
-			ts_err("Failed to select rst active pinstate, r:%d", r);
+	r = goodix_ts_gpio_resume(core_data);
+	if (r < 0) {
+		ts_err("Failed to select rst/eint resume state: %d", r);
+		goto out;
 	}
-#else
-	r = i2c_touch_resume();
-#endif
 #endif
 
 	atomic_set(&core_data->suspended, 0);
@@ -1636,6 +1769,10 @@ out:
 	 * and charger detector to turn on the work
 	 */
 	goodix_ts_blocking_notify(NOTIFY_RESUME, NULL);
+	/* resume enter 200Hz */
+	r = goodix_ts_enable(ts_dev, flag_resume_enter_200Hz);
+	if (r)
+		ts_debug("enable 200Hz failed!!!");
 	ts_debug("Resume end");
 	return 0;
 }
@@ -1792,6 +1929,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 {
 	struct goodix_ts_core *core_data = NULL;
 	struct goodix_ts_device *ts_device;
+	struct goodix_ts_board_data *ts_bdata;
 	int r;
 	u8 read_val = 0;
 
@@ -1811,12 +1949,14 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	resume_core_data = core_data;
 	/* touch core layer is a platform driver */
 	core_data->pdev = pdev;
 	core_data->ts_dev = ts_device;
 	platform_set_drvdata(pdev, core_data);
 	core_data->cfg_group_parsed = false;
+
+	resume_core_data = core_data;
+	ts_bdata = board_data(core_data);
 
 	r = goodix_ts_power_init(core_data);
 	if (r < 0)
@@ -1826,9 +1966,13 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	if (r < 0)
 		goto regulator_err;
 
+	/* get GPIO resource */
+	r = goodix_ts_gpio_setup(core_data);
+	if (r < 0)
+		goto regulator_err;
+
 #ifdef CONFIG_PINCTRL
 	/* Pinctrl handle is optional. */
-#ifndef AUTO_DETECT
 	r = goodix_ts_pinctrl_init(core_data);
 	if (!r && core_data->pinctrl) {
 		r = pinctrl_select_state(core_data->pinctrl,
@@ -1841,12 +1985,6 @@ static int goodix_ts_probe(struct platform_device *pdev)
 			ts_err("Failed to select rst active pinstate, r:%d", r);
 	}
 #endif
-#endif
-
-	/* get GPIO resource */
-	r = goodix_ts_gpio_setup(core_data);
-	if (r < 0)
-		goto regulator_err;
 
 	/*create sysfs files*/
 	goodix_ts_sysfs_init(core_data);
@@ -1885,7 +2023,11 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	return r;
 
 err:
+	if (core_data->pinctrl)
+		pinctrl_put(core_data->pinctrl);
 	goodix_ts_sysfs_exit(core_data);
+	gpio_free(ts_bdata->reset_gpio);
+	gpio_free(ts_bdata->irq_gpio);
 regulator_err:
 	goodix_ts_power_off(core_data);
 	regulator_put(core_data->avdd);

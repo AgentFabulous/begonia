@@ -382,7 +382,7 @@ s32 gt1x_i2c_test(void)
 
 	GTP_DEBUG_FUNC();
 
-	while (retry++ < 3) {
+	while (retry++ < 5) {
 		ret = gt1x_i2c_read(GTP_REG_HW_INFO,
 			(u8 *) &hw_info, sizeof(hw_info));
 		if (!ret) {
@@ -1728,11 +1728,7 @@ s32 gt1x_init(void)
 		ret = gt1x_reset_guitar();
 		if (ret != 0) {
 			GTP_ERROR("GTP reset guitar failed!");
-			gt1x_init_failed = 1;
-			tpd_load_status = 0;
-			check_flag = true;
-			//continue;
-			return ret;
+			continue;
 		} else {
 			tpd_load_status = 1;
 			check_flag = true;

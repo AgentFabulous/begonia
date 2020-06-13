@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 - 2018 Novatek, Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * $Revision: 32206 $
  * $Date: 2018-08-10 19:23:04 +0800 (週五, 10 八月 2018) $
@@ -111,12 +111,14 @@ static void nvt_ts_late_resume(struct early_suspend *h);
 
 static int32_t nvt_ts_suspend(struct device *dev);
 static int32_t nvt_ts_resume(struct device *dev);
+static int32_t nvt_check_palm(uint8_t input_id, uint8_t *data);
+
 
 
 
 uint32_t ENG_RST_ADDR  = 0x7FFF80;
-uint32_t SWRST_N8_ADDR = 0;
-uint32_t SPI_RD_FAST_ADDR = 0;
+uint32_t SWRST_N8_ADDR = 0; //read from dtsi
+uint32_t SPI_RD_FAST_ADDR = 0;	//read from dtsi
 
 #if TOUCH_KEY_NUM > 0
 const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
@@ -128,19 +130,19 @@ const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
 
 #if WAKEUP_GESTURE
 const uint16_t gesture_key_array[] = {
-	KEY_POWER,
-	KEY_POWER,
-	KEY_POWER,
-	KEY_WAKEUP,
-	KEY_POWER,
-	KEY_POWER,
-	KEY_POWER,
-	KEY_POWER,
-	KEY_POWER,
-	KEY_POWER,
-	KEY_POWER,
-	KEY_POWER,
-	KEY_POWER,
+	KEY_POWER,  //GESTURE_WORD_C
+	KEY_POWER,  //GESTURE_WORD_W
+	KEY_POWER,  //GESTURE_WORD_V
+	KEY_WAKEUP,  //GESTURE_DOUBLE_CLICK
+	KEY_POWER,  //GESTURE_WORD_Z
+	KEY_POWER,  //GESTURE_WORD_M
+	KEY_POWER,  //GESTURE_WORD_O
+	KEY_POWER,  //GESTURE_WORD_e
+	KEY_POWER,  //GESTURE_WORD_S
+	KEY_POWER,  //GESTURE_SLIDE_UP
+	KEY_POWER,  //GESTURE_SLIDE_DOWN
+	KEY_POWER,  //GESTURE_SLIDE_LEFT
+	KEY_POWER,  //GESTURE_SLIDE_RIGHT
 };
 #endif
 
@@ -347,7 +349,7 @@ int32_t nvt_set_page(uint32_t addr)
 {
 	uint8_t buf[4] = {0};
 
-	buf[0] = 0xFF;
+	buf[0] = 0xFF;	//set index/page/addr command
 	buf[1] = (addr >> 15) & 0xFF;
 	buf[2] = (addr >> 7) & 0xFF;
 
@@ -402,12 +404,12 @@ void nvt_bld_crc_enable(void)
 	/* ---set xdata index to BLD_CRC_EN_ADDR--- */
 	nvt_set_page(ts->mmap->BLD_CRC_EN_ADDR);
 
-
+	//---read data from index---
 	buf[0] = ts->mmap->BLD_CRC_EN_ADDR & (0x7F);
 	buf[1] = 0xFF;
 	CTP_SPI_READ(ts->client, buf, 2);
 
-
+	//---write data to index---
 	buf[0] = ts->mmap->BLD_CRC_EN_ADDR & (0x7F);
 	buf[1] = buf[1] | (0x01 << 7);
 	CTP_SPI_WRITE(ts->client, buf, 2);
@@ -424,17 +426,17 @@ void nvt_fw_crc_enable(void)
 {
 	uint8_t buf[2] = {0};
 
-
+	//---set xdata index to EVENT BUF ADDR---
 	nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
 
-
+	//---clear fw reset status---
 	buf[0] = EVENT_MAP_RESET_COMPLETE & (0x7F);
 	buf[1] = 0x00;
 	CTP_SPI_WRITE(ts->client, buf, 2);
 
-
+	//---enable fw crc---
 	buf[0] = EVENT_MAP_HOST_CMD & (0x7F);
-	buf[1] = 0xAE;
+	buf[1] = 0xAE;	//enable fw crc command
 	CTP_SPI_WRITE(ts->client, buf, 2);
 }
 
@@ -447,16 +449,16 @@ return:
 *******************************************************/
 void nvt_boot_ready(void)
 {
-
+	//---write BOOT_RDY status cmds---
 	nvt_write_addr(ts->mmap->BOOT_RDY_ADDR, 1);
 
 	mdelay(5);
 
 	if (!ts->hw_crc) {
-
+		//---write BOOT_RDY status cmds---
 		nvt_write_addr(ts->mmap->BOOT_RDY_ADDR, 0);
 
-
+		//---write POR_CD cmds---
 		nvt_write_addr(ts->mmap->POR_CD_ADDR, 0xA0);
 	}
 }
@@ -471,10 +473,10 @@ return:
 *******************************************************/
 void nvt_eng_reset(void)
 {
-
+	//---eng reset cmds to ENG_RST_ADDR---
 	nvt_write_addr(ENG_RST_ADDR, 0x5A);
 
-	mdelay(1);
+	mdelay(1);	//wait tMCU_Idle2TP_REX_Hi after TP_RST
 }
 
 /*******************************************************
@@ -487,7 +489,7 @@ return:
 *******************************************************/
 void nvt_sw_reset(void)
 {
-
+	//---software reset cmds to SWRST_N8_ADDR---
 	nvt_write_addr(SWRST_N8_ADDR, 0x55);
 
 	msleep(10);
@@ -521,7 +523,7 @@ void nvt_bootloader_reset(void)
 	//---reset cmds to SWRST_N8_ADDR---
 	nvt_write_addr(SWRST_N8_ADDR, 0x69);
 
-	mdelay(5);
+	mdelay(5);	//wait tBRST2FR after Bootload RST
 
 	if (SPI_RD_FAST_ADDR) {
 		/* disable SPI_RD_FAST */
@@ -543,15 +545,15 @@ int32_t nvt_clear_fw_status(void)
 	const int32_t retry = 20;
 
 	for (i = 0; i < retry; i++) {
-
+		//---set xdata index to EVENT BUF ADDR---
 		nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HANDSHAKING_or_SUB_CMD_BYTE);
 
-
+		//---clear fw status---
 		buf[0] = EVENT_MAP_HANDSHAKING_or_SUB_CMD_BYTE;
 		buf[1] = 0x00;
 		CTP_SPI_WRITE(ts->client, buf, 2);
 
-
+		//---read fw status---
 		buf[0] = EVENT_MAP_HANDSHAKING_or_SUB_CMD_BYTE;
 		buf[1] = 0xFF;
 		CTP_SPI_READ(ts->client, buf, 2);
@@ -584,10 +586,10 @@ int32_t nvt_check_fw_status(void)
 	const int32_t retry = 50;
 
 	for (i = 0; i < retry; i++) {
-
+		//---set xdata index to EVENT BUF ADDR---
 		nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HANDSHAKING_or_SUB_CMD_BYTE);
 
-
+		//---read fw status---
 		buf[0] = EVENT_MAP_HANDSHAKING_or_SUB_CMD_BYTE;
 		buf[1] = 0x00;
 		CTP_SPI_READ(ts->client, buf, 2);
@@ -620,11 +622,11 @@ int32_t nvt_check_fw_reset_state(RST_COMPLETE_STATE check_reset_state)
 	int32_t retry = 0;
 	int32_t retry_max = (check_reset_state == RESET_STATE_INIT) ? 10 : 50;
 
-
+	//---set xdata index to EVENT BUF ADDR---
 	nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_RESET_COMPLETE);
 
 	while (1) {
-
+		//---read reset state---
 		buf[0] = EVENT_MAP_RESET_COMPLETE;
 		buf[1] = 0x00;
 		CTP_SPI_READ(ts->client, buf, 6);
@@ -661,10 +663,10 @@ int32_t nvt_read_pid(void)
 	uint8_t buf[3] = {0};
 	int32_t ret = 0;
 
-
+	//---set xdata index to EVENT BUF ADDR---
 	nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_PROJECTID);
 
-
+	//---read project id---
 	buf[0] = EVENT_MAP_PROJECTID;
 	buf[1] = 0x00;
 	buf[2] = 0x00;
@@ -672,7 +674,7 @@ int32_t nvt_read_pid(void)
 
 	ts->nvt_pid = (buf[2] << 8) + buf[1];
 
-
+	//---set xdata index to EVENT BUF ADDR---
 	nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
 
 	NVT_LOG("PID=%04X\n", ts->nvt_pid);
@@ -694,9 +696,8 @@ int32_t nvt_get_fw_info(void)
 	uint32_t retry_count = 0;
 	int32_t ret = 0;
 
-
 	/*READ CHIP ID*/
-
+	/* ---set xdata index to 0x1F600--- */
 	nvt_set_page(0x1F600);
 	buf[0] = 0x4E;
 	buf[1] = 0x00;
@@ -711,10 +712,10 @@ int32_t nvt_get_fw_info(void)
 	memset(buf, 0, 64);
 	/*****************/
 info_retry:
-
+	/* ---set xdata index to EVENT BUF ADDR--- */
 	nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_FWINFO);
 
-
+	/* ---read fw info--- */
 	buf[0] = EVENT_MAP_FWINFO;
 	CTP_SPI_READ(ts->client, buf, 17);
 	ts->fw_ver = buf[1];
@@ -724,7 +725,7 @@ info_retry:
 	ts->abs_y_max = (uint16_t)((buf[7] << 8) | buf[8]);
 	ts->max_button_num = buf[11];
 
-
+	/* ---clear x_num, y_num if fw info is broken--- */
 	if ((buf[1] + buf[2]) != 0xFF) {
 		NVT_ERR("FW info is broken! fw_ver=0x%02X, ~fw_ver=0x%02X\n", buf[1], buf[2]);
 		ts->fw_ver = 0;
@@ -751,7 +752,7 @@ info_retry:
 
 	NVT_LOG("FW type is 0x%02X, fw_ver=%d\n", buf[14], ts->fw_ver);
 
-
+	/* ---Get Novatek PID--- */
 	nvt_read_pid();
 
 	return ret;
@@ -819,7 +820,7 @@ static ssize_t nvt_flash_read(struct file *file, char __user *buff, size_t count
 	spi_wr = str[0] >> 7;
 	memcpy(buf, str+2, ((str[0] & 0x7F) << 8) | str[1]);
 
-	if (spi_wr == NVTWRITE) {
+	if (spi_wr == NVTWRITE) {	//SPI write
 		while (retries < 20) {
 			ret = CTP_SPI_WRITE(ts->client, buf, ((str[0] & 0x7F) << 8) | str[1]);
 			if (!ret)
@@ -835,7 +836,7 @@ static ssize_t nvt_flash_read(struct file *file, char __user *buff, size_t count
 			ret = -EIO;
 			goto out;
 		}
-	} else if (spi_wr == NVTREAD) {
+	} else if (spi_wr == NVTREAD) {	//SPI read
 		while (retries < 20) {
 			ret = CTP_SPI_READ(ts->client, buf, ((str[0] & 0x7F) << 8) | str[1]);
 			if (!ret)
@@ -847,7 +848,7 @@ static ssize_t nvt_flash_read(struct file *file, char __user *buff, size_t count
 		}
 
 		memcpy(str+2, buf, ((str[0] & 0x7F) << 8) | str[1]);
-
+		// copy buff to user if spi transfer
 		if (retries < 20) {
 			if (copy_to_user(buff, str, count)) {
 				ret = -EFAULT;
@@ -1319,7 +1320,7 @@ static void nvt_esd_check_func(struct work_struct *work)
 {
 	unsigned int timer = jiffies_to_msecs(jiffies - irq_timer);
 
-
+	//NVT_LOG("esd_check = %d (retry %d)\n", esd_check, esd_retry);	//DEBUG
 
 	if ((timer > NVT_TOUCH_ESD_CHECK_PERIOD) && esd_check) {
 		mutex_lock(&ts->lock);
@@ -1442,6 +1443,14 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	}
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	input_id = (uint8_t)(point_data[1] >> 3);
+
+	if (nvt_check_palm(input_id, point_data)) {
+		goto XFER_ERROR; /* to skip point data parsing */
+	}
+#endif
+
 #if WAKEUP_GESTURE
 	if (bTouchIsAwake == 0) {
 		input_id = (uint8_t)(point_data[1] >> 3);
@@ -1459,7 +1468,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 		if ((input_id == 0) || (input_id > ts->max_touch_num))
 			continue;
 
-		if (((point_data[position] & 0x07) == 0x01) || ((point_data[position] & 0x07) == 0x02)) {
+		if (((point_data[position] & 0x07) == 0x01) || ((point_data[position] & 0x07) == 0x02)) {	//finger down (enter & moving)
 #if NVT_TOUCH_ESD_PROTECT
 			/* update interrupt timer */
 			irq_timer = jiffies;
@@ -1496,7 +1505,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			input_report_abs(ts->input_dev, ABS_MT_POSITION_X, input_x);
 			input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, input_y);
 			input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, input_w);
-
+			//input_report_abs(ts->input_dev, ABS_MT_PRESSURE, input_p);
 
 #if MT_PROTOCOL_B
 #else /* MT_PROTOCOL_B */
@@ -1514,13 +1523,13 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			input_mt_slot(ts->input_dev, i);
 			input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
 			input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, false);
-
+			//input_report_abs(ts->input_dev, ABS_MT_PRESSURE, 0);
 			if (finger_cnt == 0 && test_bit(i, ts->slot_map))
 				input_report_key(ts->input_dev, BTN_TOUCH, 0);
 			clear_bit(i, ts->slot_map);
 		}
 	}
-
+	//input_report_key(ts->input_dev, BTN_TOUCH, (finger_cnt > 0));
 #else /* MT_PROTOCOL_B */
 	if (finger_cnt == 0) {
 		input_report_key(ts->input_dev, BTN_TOUCH, 0);
@@ -1570,12 +1579,12 @@ static int8_t nvt_ts_check_chip_ver_trim(void)
 	int32_t found_nvt_chip = 0;
 	int32_t ret = -1;
 
-
+	//---Check for 5 times---
 	for (retry = 5; retry > 0; retry--) {
 
 		nvt_bootloader_reset();
 
-
+		//---set xdata index to 0x1F600---
 		nvt_set_page(0x1F600);
 
 		buf[0] = 0x4E;
@@ -1589,11 +1598,11 @@ static int8_t nvt_ts_check_chip_ver_trim(void)
 		NVT_LOG("buf[1]=0x%02X, buf[2]=0x%02X, buf[3]=0x%02X, buf[4]=0x%02X, buf[5]=0x%02X, buf[6]=0x%02X\n",
 			buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
 
-
+		// compare read chip id on supported list
 		for (list = 0; list < (sizeof(trim_id_table) / sizeof(struct nvt_ts_trim_id_table)); list++) {
 			found_nvt_chip = 0;
 
-
+			// compare each byte
 			for (i = 0; i < NVT_ID_BYTE_MAX; i++) {
 				if (trim_id_table[list].mask[i]) {
 					if (buf[i + 1] != trim_id_table[list].id[i])
@@ -1722,7 +1731,56 @@ static int nvt_input_event(struct input_dev *dev, unsigned int type,
 
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
 
+#define FUNCPAGE_PALM 4
+#define PACKET_PALM_ON 3
+#define PACKET_PALM_OFF 4
+
 static struct xiaomi_touch_interface xiaomi_touch_interfaces;
+
+int32_t nvt_check_palm(uint8_t input_id, uint8_t *data)
+{
+	int32_t ret = 0;
+	uint8_t func_type = data[2];
+	uint8_t palm_state = data[3];
+
+	if ((input_id == DATA_PROTOCOL) && (func_type == FUNCPAGE_PALM)) {
+		ret = palm_state;
+		if (palm_state == PACKET_PALM_ON) {
+			NVT_LOG("get packet palm on event.\n");
+			update_palm_sensor_value(1);
+		} else if (palm_state == PACKET_PALM_OFF) {
+			NVT_LOG("get packet palm off event.\n");
+			update_palm_sensor_value(0);
+		} else {
+			NVT_ERR("invalid palm state %d!\n", palm_state);
+			ret = -1;
+		}
+	} else {
+		ret = 0;
+	}
+
+	return ret;
+}
+
+static int nvt_palm_sensor_write(int value)
+{
+	int ret = 0;
+
+	if (ts->palm_sensor_switch != value)
+		ts->palm_sensor_switch = value;
+	else
+		return 0;
+
+	if (!bTouchIsAwake) {
+		ts->palm_sensor_changed = false;
+		return 0;
+	}
+	ret = nvt_set_pocket_palm_switch(value);
+	if (!ret)
+		ts->palm_sensor_changed = true;
+
+	return ret;
+}
 
 static void nvt_init_touchmode_data(void)
 {
@@ -1799,7 +1857,7 @@ static int nvt_touchfeature_cmd_xsfer(uint8_t *touchfeature)
 	NVT_LOG("++\n");
 	NVT_LOG("cmd xsfer:%02x, %02x", touchfeature[0], touchfeature[1]);
 	msleep(35);
-
+	//---set xdata index to EVENT BUF ADDR---
 	ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
 	if (ret < 0) {
 		NVT_ERR("Set event buffer index fail!\n");
@@ -1976,7 +2034,7 @@ static int nvt_reset_mode(int mode)
 		for (i = 0; i < Touch_Mode_NUM; i++) {
 			xiaomi_touch_interfaces.touch_mode[i][SET_CUR_VALUE] =
 			xiaomi_touch_interfaces.touch_mode[i][GET_DEF_VALUE];
-			nvt_set_cur_value(i, xiaomi_touch_interfaces.touch_mode[mode][SET_CUR_VALUE]);
+			nvt_set_cur_value(i, xiaomi_touch_interfaces.touch_mode[i][SET_CUR_VALUE]);
 		}
 	} else {
 		NVT_ERR("%s, don't support\n",  __func__);
@@ -1995,15 +2053,19 @@ extern int nvt_touch_get_lockdown_from_display(unsigned char *plockdowninfo);
 
 static void tpdbg_shutdown(struct nvt_ts_data *ts_core, bool enable)
 {
+	mutex_lock(&ts->lock);
+
 	if (enable) {
-		if (nvt_write_addr(0x21C50, 0x1A) < 0) {
+		if (nvt_write_addr(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD, 0x1A) < 0) {
 			NVT_ERR("disable tp sensor failed!");
 		}
 	} else {
-		if (nvt_write_addr(0x21C50, 0x15) < 0) {
+		if (nvt_write_addr(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD, 0x15) < 0) {
 			NVT_ERR("enable tp sensor failed!");
 		}
 	}
+
+	mutex_unlock(&ts->lock);
 }
 
 
@@ -2174,7 +2236,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 		goto err_get_spi;
 	}
 
-
+	//---parse dts---
 	ret = nvt_parse_dt(&pdev->dev);
 	if (ret) {
 		NVT_ERR("parse dt error\n");
@@ -2185,7 +2247,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	ts->client = ts_xsfer;
 	spi_set_drvdata(ts->client, ts);
 
-
+	//---prepare for spi parameter---
 	if (ts->client->master->flags & SPI_MASTER_HALF_DUPLEX) {
 		NVT_ERR("Full duplex not supported by master\n");
 		ret = -EIO;
@@ -2228,7 +2290,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	}
 
 
-
+	//---request and config GPIOs---
 	ret = nvt_gpio_config(ts);
 	if (ret) {
 		NVT_ERR("gpio config error!\n");
@@ -2238,14 +2300,14 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	mutex_init(&ts->lock);
 	mutex_init(&ts->xbuf_lock);
 
-
+	//---eng reset before TP_RESX high
 	nvt_eng_reset();
 
 #if NVT_TOUCH_SUPPORT_HW_RST
 	gpio_set_value(ts->reset_gpio, 1);
 #endif
 
-
+	// need 10ms delay after POR(power on reset)
 	msleep(10);
 
 	//---check chip version trim---
@@ -2263,7 +2325,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	ts->abs_x_max = TOUCH_DEFAULT_MAX_WIDTH;
 	ts->abs_y_max = TOUCH_DEFAULT_MAX_HEIGHT;
 
-
+	//---allocate input device---
 	ts->input_dev = input_allocate_device();
 	if (ts->input_dev == NULL) {
 		NVT_ERR("allocate input device failed\n");
@@ -2280,7 +2342,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	ts->int_trigger_type = INT_TRIGGER_TYPE;
 
 
-
+	//---set input device info.---
 	ts->input_dev->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS) ;
 	ts->input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
 	ts->input_dev->propbit[0] = BIT(INPUT_PROP_DIRECT);
@@ -2289,19 +2351,19 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	input_mt_init_slots(ts->input_dev, ts->max_touch_num, 0);
 #endif
 
-
+	//input_set_abs_params(ts->input_dev, ABS_MT_PRESSURE, 0, TOUCH_FORCE_NUM, 0, 0);    //pressure = TOUCH_FORCE_NUM
 
 #if TOUCH_MAX_FINGER_NUM > 1
-	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
+	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);    //area = 255
 
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X, 0, ts->abs_x_max - 1, 0, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_Y, 0, ts->abs_y_max - 1, 0, 0);
 #if MT_PROTOCOL_B
-
+	// no need to set ABS_MT_TRACKING_ID, input_mt_init_slots() already set it
 #else
 	input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID, 0, ts->max_touch_num, 0, 0);
-#endif
-#endif
+#endif //MT_PROTOCOL_B
+#endif //TOUCH_MAX_FINGER_NUM > 1
 
 #if TOUCH_KEY_NUM > 0
 	for (retry = 0; retry < ts->max_button_num; retry++) {
@@ -2322,14 +2384,14 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	ts->input_dev->event = nvt_input_event;
 
 	input_set_drvdata(ts->input_dev, ts);
-
+	//---register input device---
 	ret = input_register_device(ts->input_dev);
 	if (ret) {
 		NVT_ERR("register input device (%s) failed. ret=%d\n", ts->input_dev->name, ret);
 		goto err_input_register_device_failed;
 	}
 
-
+	//---set int-pin & request irq---
 	ts->client->irq = gpio_to_irq(ts->irq_gpio);
 	if (ts->client->irq) {
 		NVT_LOG("int_trigger_type=%d\n", ts->int_trigger_type);
@@ -2376,7 +2438,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 		goto err_create_nvt_fwu_wq_failed;
 	}
 	INIT_DELAYED_WORK(&ts->nvt_fwu_work, Boot_Update_Firmware);
-
+	// please make sure boot update start after display reset(RESX) sequence
 	queue_delayed_work(nvt_fwu_wq, &ts->nvt_fwu_work, msecs_to_jiffies(14000));
 #endif
 
@@ -2393,7 +2455,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 			msecs_to_jiffies(NVT_TOUCH_ESD_CHECK_PERIOD));
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
-
+	//---set device node---
 #if NVT_TOUCH_PROC
 	ret = nvt_flash_proc_init();
 	if (ret != 0) {
@@ -2484,6 +2546,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 			xiaomi_touch_interfaces.setModeValue = nvt_set_cur_value;
 			xiaomi_touch_interfaces.resetMode = nvt_reset_mode;
 			xiaomi_touch_interfaces.getModeAll = nvt_get_mode_all;
+			xiaomi_touch_interfaces.palm_sensor_write = nvt_palm_sensor_write;
 			nvt_init_touchmode_data();
 			xiaomitouch_register_modedata(&xiaomi_touch_interfaces);
 #endif
@@ -2740,8 +2803,20 @@ static int32_t nvt_ts_suspend(struct device *dev)
 
 	bTouchIsAwake = 0;
 
-	if (ts->db_wakeup) {
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	if (ts->palm_sensor_switch) {
+		NVT_LOG("palm sensor on status, switch to off\n");
+		update_palm_sensor_value(0);
+		nvt_set_pocket_palm_switch(false);
+		ts->palm_sensor_switch = false;
+		ts->palm_sensor_changed = true;
+	}
+#endif
+	NVT_LOG("delay 10 ms\n");
+	mdelay(10);
 
+	if (ts->db_wakeup) {
+		//---write command to enter "wakeup gesture mode"---
 		buf[0] = EVENT_MAP_HOST_CMD;
 		buf[1] = 0x13;
 		CTP_SPI_WRITE(ts->client, buf, 2);
@@ -2751,7 +2826,7 @@ static int32_t nvt_ts_suspend(struct device *dev)
 		NVT_LOG("Enabled touch wakeup gesture\n");
 
 	} else {
-
+		//---write command to enter "deep sleep mode"---
 		buf[0] = EVENT_MAP_HOST_CMD;
 		buf[1] = 0x11;
 		CTP_SPI_WRITE(ts->client, buf, 2);
@@ -2806,7 +2881,7 @@ static int32_t nvt_ts_resume(struct device *dev)
 
 	NVT_LOG("start\n");
 
-
+	// please make sure display reset(RESX) sequence and mipi dsi cmds sent before this
 #if NVT_TOUCH_SUPPORT_HW_RST
 	gpio_set_value(ts->reset_gpio, 1);
 #endif
@@ -2833,6 +2908,14 @@ static int32_t nvt_ts_resume(struct device *dev)
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
 	bTouchIsAwake = 1;
+
+#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
+	if (ts->palm_sensor_switch && ts->palm_sensor_changed == false) {
+		NVT_LOG("palm sensor on status, switch to on\n");
+		nvt_set_pocket_palm_switch(true);
+		ts->palm_sensor_changed = true;
+	}
+#endif
 
 	mutex_unlock(&ts->lock);
 	tp_enable_doubleclick(!!ts->db_wakeup);/*if true, dbclick work until next suspend*/
@@ -2967,7 +3050,7 @@ static int32_t __init nvt_driver_init(void)
 
 	NVT_LOG("start\n");
 
-
+	//---add platform driver---
 	ret = platform_driver_register(&nvt_driver);
 	if (ret) {
 		NVT_ERR("failed to add nvt touch driver");

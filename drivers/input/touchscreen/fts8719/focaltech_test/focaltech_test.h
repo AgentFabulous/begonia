@@ -1,6 +1,6 @@
 /************************************************************************
 * Copyright (C) 2012-2019, Focaltech Systems (R)£¬All Rights Reserved.
-* Copyright (C) 2019 XiaoMi, Inc.
+* Copyright (C) 2020 XiaoMi, Inc.
 *
 * File Name: focaltech_test.h
 *
@@ -23,8 +23,8 @@
 #include <linux/slab.h>
 #include <linux/debugfs.h>
 #include <asm/uaccess.h>
-#include <linux/i2c.h>
-#include <linux/delay.h>
+#include <linux/i2c.h>//iic
+#include <linux/delay.h>//msleep
 #include <linux/string.h>
 #include <asm/unistd.h>
 #include <linux/vmalloc.h>

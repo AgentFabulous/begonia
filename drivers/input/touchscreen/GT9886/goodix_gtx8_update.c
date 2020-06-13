@@ -20,8 +20,6 @@
 #include "goodix_default_fw.h"
 
 #define TAG_FWU ""
-/* COMMON PART - START */
-#define TS_DEFAULT_FIRMWARE			"goodix_firmware.bin"
 
 #define FW_HEADER_SIZE				256
 #define FW_SUBSYS_INFO_SIZE			8
@@ -1356,14 +1354,12 @@ static struct goodix_ext_attribute goodix_fwu_attrs[] = {
 			goodix_sysfs_force_update_store),
 };
 
-static struct fw_update_ctrl fw_ctrl;
 static int goodix_syfs_init(struct goodix_ts_core *core_data,
 		struct goodix_ext_module *module)
 {
+	struct fw_update_ctrl *fw_ctrl = module->priv_data;
 	struct kobj_type *ktype;
 	int ret = 0, i;
-
-	memcpy(&fw_ctrl, module->priv_data, sizeof(struct fw_update_ctrl));
 
 	ktype = goodix_get_default_ktype();
 	ret = kobject_init_and_add(&module->kobj,
@@ -1385,12 +1381,15 @@ static int goodix_syfs_init(struct goodix_ts_core *core_data,
 		}
 	}
 
-	fw_ctrl.attr_fwimage.attr.name = "fwimage";
-	fw_ctrl.attr_fwimage.attr.mode = 0666;
-	fw_ctrl.attr_fwimage.size = 0;
-	fw_ctrl.attr_fwimage.write = goodix_sysfs_fwimage_store;
+	fw_ctrl->attr_fwimage.attr.name = "fwimage";
+	fw_ctrl->attr_fwimage.attr.mode = 0666;
+	fw_ctrl->attr_fwimage.size = 0;
+	fw_ctrl->attr_fwimage.write = goodix_sysfs_fwimage_store;
+	#ifdef CONFIG_DEBUG_LOCK_ALLOC
+	fw_ctrl->attr_fwimage.attr.ignore_lockdep = 1;
+	#endif
 	ret = sysfs_create_bin_file(&module->kobj,
-			&fw_ctrl.attr_fwimage);
+			&fw_ctrl->attr_fwimage);
 
 exit_sysfs_init:
 	return ret;
@@ -1403,6 +1402,8 @@ static int goodix_fw_update_init(struct goodix_ts_core *core_data,
 	struct task_struct *fwu_thrd;
 	struct fw_update_ctrl *fwu_ctrl;
 	static bool init_sysfs = true;
+	int ret;
+	char firmware_bin_name[32] = {0};
 
 	if (!core_data || !core_data->ts_dev)
 		return -ENODEV;
@@ -1424,12 +1425,20 @@ static int goodix_fw_update_init(struct goodix_ts_core *core_data,
 	fwu_ctrl->allow_resume = true;
 	fwu_ctrl->core_data = core_data;
 
+	/*get firmware_bin_name*/
+	ret = snprintf(firmware_bin_name, sizeof(firmware_bin_name),
+		"%s%s.bin", TS_DEFAULT_FIRMWARE, gt9886_firmware_buf);
+	if (ret >= sizeof(firmware_bin_name))
+		ts_err("get firmware_bin_name name FAILED!!!");
+
+	ts_info("firmware_bin_name: %s", firmware_bin_name);
+
 	/* find a valid firmware image name */
 	if (ts_bdata && ts_bdata->fw_name)
 		strlcpy(fwu_ctrl->fw_name, ts_bdata->fw_name,
 				sizeof(fwu_ctrl->fw_name));
 	else
-		strlcpy(fwu_ctrl->fw_name, TS_DEFAULT_FIRMWARE,
+		strlcpy(fwu_ctrl->fw_name, firmware_bin_name,
 				sizeof(fwu_ctrl->fw_name));
 
 	/* create sysfs interface */
@@ -1518,7 +1527,7 @@ static struct goodix_ext_module goodix_fwu_module = {
 
 static int __init goodix_fwu_module_init(void)
 {
-	ts_err("run goodix_fwu_module\n");
+	ts_info("run goodix_fwu_module\n");
 	return goodix_register_ext_module(&goodix_fwu_module);
 }
 

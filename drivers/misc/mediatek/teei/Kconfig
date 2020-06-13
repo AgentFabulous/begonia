@@ -1,5 +1,5 @@
-# Copyright (c) 2015-2017 MICROTRUST Incorporated
-# Copyright (C) 2019 XiaoMi, Inc.
+# Copyright (c) 2015-2019, MICROTRUST Incorporated
+# Copyright (C) 2020 XiaoMi, Inc.
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or
@@ -15,6 +15,7 @@ config MICROTRUST_TEE_SUPPORT
 	bool "Enable Microtrust TEEI Support"
 	select DMA_SHARED_BUFFER
 	select GENERIC_ALLOCATOR
+	select MTK_TEE_SANITY
 	default n
 	help
 	  Enables the support of Microtrust TEE drivers.
@@ -25,12 +26,12 @@ config MICROTRUST_TEE_SUPPORT
 config MICROTRUST_TEE_VERSION
 	string "MICROTRUST TEE Version"
 	depends on MICROTRUST_TEE_SUPPORT
-	default "280"
+	default "300"
 	help
 	  Enables the support of Microtrust new version.
 	  All Microtrust related TEE drivers will depend on this option.
-	  Say 270 if you would like to enable this feature.
-	  If unsure, say 280.
+	  Say 300 if you would like to enable this feature.
+	  If unsure, say 300.
 
 config MICROTRUST_TZ_DRIVER
 	tristate "Microtrust TEEI Driver"
@@ -44,7 +45,7 @@ config MICROTRUST_TZ_DRIVER
 	  If unsure, say Y.
 
 config MICROTRUST_TZ_DRIVER_MTK_BOOTPROF
-	bool "Enable MTK bootprof"
+	bool "Enable MTK bootprof to track boot progress of TEEI"
 	depends on MICROTRUST_TZ_DRIVER
 	depends on MTPROF
 	default y
@@ -54,6 +55,17 @@ config MICROTRUST_TZ_DRIVER_MTK_BOOTPROF
 	  notifying mtk bootprof driver in each check point.
 	  Say Y if you would like to enable this feature.
 	  If unsure, say Y.
+
+config MICROTRUST_TZ_DRIVER_MTK_TRACING
+	bool "Enable MTK tracing to profile TEEI"
+	depends on MICROTRUST_TZ_DRIVER
+	depends on TRACING
+	default n
+	help
+	  Enables the support of Mediatek tracing feature in Microtrust
+	  tz_driver. This feature is for tracking teei thread by MTK
+	  tracing mechanism.
+	  Say Y if you would like to enable this feature.
 
 config MICROTRUST_VFS_DRIVER
 	tristate "Microtrust Virtual File System Driver"

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 - 2018 Novatek, Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * $Revision: 32206 $
  * $Date: 2018-08-10 19:23:04 +0800 (週五, 10 八月 2018) $
@@ -53,18 +53,18 @@
 
 #define NVT_DEBUG 1
 
-
+//---GPIO number---
 #define NVTTOUCH_RST_PIN 980
 #define NVTTOUCH_INT_PIN 943
 
 
-
-
-
+//---INT trigger mode---
+//#define IRQ_TYPE_EDGE_RISING 1
+//#define IRQ_TYPE_EDGE_FALLING 2
 #define INT_TRIGGER_TYPE IRQ_TYPE_EDGE_RISING
 
 
-
+//---SPI driver info.---
 #define NVT_SPI_NAME "NVT-ts-spi"
 
 #if NVT_DEBUG
@@ -74,11 +74,11 @@
 #endif
 #define NVT_ERR(fmt, args...)    pr_err("[%s] %s %d: " fmt, NVT_SPI_NAME, __func__, __LINE__, ##args)
 
-
+//---Input device info.---
 #define NVT_TS_NAME "NVTCapacitiveTouchScreen"
 
 
-
+//---Touch info.---
 #define TOUCH_DEFAULT_MAX_WIDTH 1080
 #define TOUCH_DEFAULT_MAX_HEIGHT 2340
 #define TOUCH_MAX_FINGER_NUM 10
@@ -91,7 +91,7 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 /* Enable only when module have tp reset pin and connected to host */
 #define NVT_TOUCH_SUPPORT_HW_RST 1
 
-
+//---Customerized func.---
 #define NVT_TOUCH_PROC 1
 #define NVT_TOUCH_EXT_PROC 1
 #define NVT_TOUCH_MP 1
@@ -108,7 +108,7 @@ extern const uint16_t gesture_key_array[];
 #define DEFAULT_DEBUG_MP_NAME "novatek_debug_mp.bin"
 
 
-
+//---ESD Protect.---
 #define NVT_TOUCH_ESD_PROTECT 0
 #define NVT_TOUCH_ESD_CHECK_PERIOD 1500	/* ms */
 #define NVT_TOUCH_WDT_RECOVERY 1
@@ -195,10 +195,11 @@ struct nvt_ts_data {
 	struct dentry *debugfs;
 #endif
 	struct workqueue_struct *event_wq;
-	/*struct work_struct suspend_work;*/
 	struct work_struct resume_work;
 	int result_type;
 	int ic_state;
+	bool palm_sensor_changed;
+	bool palm_sensor_switch;
 };
 
 struct nvt_mode_switch {
@@ -214,10 +215,10 @@ struct nvt_flash_data{
 #endif
 
 typedef enum {
-	RESET_STATE_INIT = 0xA0,
-	RESET_STATE_REK,
-	RESET_STATE_REK_FINISH,
-	RESET_STATE_NORMAL_RUN,
+	RESET_STATE_INIT = 0xA0,// IC reset
+	RESET_STATE_REK,		// ReK baseline
+	RESET_STATE_REK_FINISH,	// baseline is ready
+	RESET_STATE_NORMAL_RUN,	// normal run
 	RESET_STATE_MAX  = 0xAF
 } RST_COMPLETE_STATE;
 
@@ -229,7 +230,7 @@ typedef enum {
     EVENT_MAP_PROJECTID                     = 0x9A,
 } SPI_EVENT_MAP;
 
-
+//---SPI READ/WRITE---
 #define SPI_WRITE_MASK(a)	(a | 0x80)
 #define SPI_READ_MASK(a)	(a & 0x7F)
 
@@ -241,10 +242,10 @@ typedef enum {
 	NVTREAD  = 1
 } NVT_SPI_RW;
 
-
+//---extern structures---
 extern struct nvt_ts_data *ts;
 
-
+//---extern functions---
 
 int32_t CTP_SPI_READ(struct spi_device *client, uint8_t *buf, uint16_t len);
 int32_t CTP_SPI_WRITE(struct spi_device *client, uint8_t *buf, uint16_t len);
@@ -264,6 +265,7 @@ int32_t nvt_set_page(uint32_t addr);
 int32_t nvt_write_addr(uint32_t addr, uint8_t data);
 void nvt_set_dbgfw_status(bool enable);
 bool nvt_get_dbgfw_status(void);
+int32_t nvt_set_pocket_palm_switch(uint8_t pocket_palm_switch);
 #if NVT_TOUCH_ESD_PROTECT
 extern void nvt_esd_check_enable(uint8_t enable);
 #endif /* #if NVT_TOUCH_ESD_PROTECT */

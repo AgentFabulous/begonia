@@ -49,8 +49,6 @@
 #include <linux/fb.h>
 #endif
 
-#define AUTO_DETECT
-
 /* macros definition */
 /* mtk touch factory test: "mtk-tpd2" */
 #define GOODIX_CORE_DRIVER_NAME	"mtk-tpd2"
@@ -70,6 +68,10 @@
 #define IC_TYPE_NONE		0
 #define IC_TYPE_NORMANDY	1
 #define IC_TYPE_NANJING		2
+#define PINCTRL_STATE_INT_ACTIVE    "ts_int_active"
+#define PINCTRL_STATE_RST_ACTIVE    "ts_reset_active"
+#define PINCTRL_STATE_INT_SUSPEND   "ts_int_suspend"
+#define PINCTRL_STATE_RST_SUSPEND   "ts_reset_suspend"
 
 #define GOODIX_TOUCH_EVENT	    0x80
 #define GOODIX_REQUEST_EVENT	0x40
@@ -184,6 +186,7 @@ struct goodix_ts_board_data {
 	const char *fw_name;
 	const char *cfg_bin_name;
 	bool esd_default_on;
+	struct device *pinctrl_dev;
 };
 
 /*

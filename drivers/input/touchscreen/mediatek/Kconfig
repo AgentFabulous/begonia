@@ -67,6 +67,16 @@ config TOUCHSCREEN_MTK_GT1151
 
 source "drivers/input/touchscreen/mediatek/GT1151/Kconfig"
 
+config TOUCHSCREEN_MTK_GSLX680
+	bool "gslX680 for Mediatek package"
+	help
+	  Say Y here if you have gslX680 touch panel.
+
+	  If unsure, say N.
+
+	  you can config it if you want to use MTK9XX_LM for
+	  touch panel.
+
 config TOUCHSCREEN_MTK_NT36xxx
 	bool "NT36xxx for Mediatek package"
 	default n
@@ -78,7 +88,71 @@ config TOUCHSCREEN_MTK_NT36xxx
 	  To compile this dirver as a module, choose M here: the
 	  module will be called.
 
+source "drivers/input/touchscreen/mediatek/NT36xxx/Kconfig"
 
+config TOUCHSCREEN_MTK_GT9XX_LM
+	bool "GT9XX_LM for Mediatek package"
+	help
+	  Say Y here if you have GT9XX_LM touch panel.
 
+	  If unsure, say N.
+
+	  you can config it if you want to use MTK9XX_LM for
+	  touch panel.
+
+source "drivers/input/touchscreen/mediatek/GT9XX_LM/Kconfig"
+
+config TOUCHSCREEN_FT5X26
+	bool "FT5X26 for Mediatek package"
+	help
+	  Say Y here if you have FT5X26 touch panel.
+
+	  If unsure, say N.
+
+	  To compile this dirver as a module, choose M here: the
+	  module will be called.
+
+config TOUCHSCREEN_FT5X26_WUXGA
+	bool "FT5X26 WUXGA for Mediatek package"
+	help
+	  Say Y here if you have FT5X26 touch panel.
+
+	  If unsure, say N.
+
+	  To compile this dirver as a module, choose M here: the
+	  module will be called.
+
+source "drivers/input/touchscreen/mediatek/FT5X26/Kconfig"
+
+config TOUCHSCREEN_MTK_GT5688
+	bool "GT1151 for Mediatek package"
+	help
+	  Say Y here if you have GT5688 touch panel.
+
+	  If unsure, say N.
+
+	  To compile this dirver as a module, choose M here: the
+	  module will be called.
+
+source "drivers/input/touchscreen/mediatek/GT5688/Kconfig"
+source "drivers/input/touchscreen/mediatek/hxchipset/Kconfig"
+
+config TOUCHSCREEN_MTK_GT911
+	bool "GT911 for Mediatek package"
+	help
+	  Say Y here if you have GT911 touch panel.
+
+	  If unsure, say N.
+	  this is a GT911 touch driver config, you can use it
+	  if you want.
+
+source "drivers/input/touchscreen/mediatek/GT911/Kconfig"
+
+config TOUCHSCREEN_MTK_FOCALTECH_FHD
+	bool "Focaltech FHD Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Focaltech touch panel.
+	  If unsure, say N.
 
 endif

@@ -78,10 +78,6 @@
 #define TS_DOZE_CLOSE_OK_DATA	0xBB
 #define TS_DOZE_ENABLE_DATA		0xCC
 #define	TS_CMD_REG_READY		0xFF
-#define PINCTRL_STATE_INT_ACTIVE    "ts_int_active"
-#define PINCTRL_STATE_RST_ACTIVE    "ts_reset_active"
-#define PINCTRL_STATE_INT_SUSPEND   "ts_int_suspend"
-#define PINCTRL_STATE_RST_SUSPEND   "ts_reset_suspend"
 
 /***********only for smt start****************/
 int tpd_res_max_x;
@@ -89,121 +85,9 @@ int tpd_res_max_y;
 
 module_param(tpd_res_max_x, int, 0664);
 module_param(tpd_res_max_y, int, 0664);
-/***********only for smt end******************/
-
-#ifdef CONFIG_PINCTRL
-
-struct touch_pinctrl {
-	struct pinctrl *pinctrl;
-	struct pinctrl_state *pin_int_sta_active;
-	struct pinctrl_state *pin_int_sta_suspend;
-	struct pinctrl_state *pin_rst_sta_active;
-	struct pinctrl_state *pin_rst_sta_suspend;
-};
-
-struct touch_pinctrl core_data;
-/**
- * goodix_ts_pinctrl_init - Get pinctrl handler and pinctrl_state
- * @core_data: pointer to touch core data
- * return: 0 ok, <0 failed
- */
-static int goodix_ts_pinctrl_init(struct touch_pinctrl *core_data,
-	struct i2c_client *client)
-{
-	int r = 0;
-
-	/* get pinctrl handler from of node */
-	core_data->pinctrl = devm_pinctrl_get(client->adapter->dev.parent);
-	if (IS_ERR_OR_NULL(core_data->pinctrl)) {
-		ts_err("Failed to get pinctrl handler");
-		return PTR_ERR(core_data->pinctrl);
-	}
-
-	/* int active state */
-	core_data->pin_int_sta_active = pinctrl_lookup_state(core_data->pinctrl,
-				PINCTRL_STATE_INT_ACTIVE);
-	if (IS_ERR_OR_NULL(core_data->pin_int_sta_active)) {
-		r = PTR_ERR(core_data->pin_int_sta_active);
-		ts_err("Failed to get pinctrl state:%s, r:%d",
-				PINCTRL_STATE_INT_ACTIVE, r);
-		goto exit_pinctrl_put;
-	}
-
-	/* rst active state */
-	core_data->pin_rst_sta_active = pinctrl_lookup_state(
-		core_data->pinctrl, PINCTRL_STATE_RST_ACTIVE);
-	if (IS_ERR_OR_NULL(core_data->pin_rst_sta_active)) {
-		r = PTR_ERR(core_data->pin_rst_sta_active);
-		ts_err("Failed to get pinctrl state:%s, r:%d",
-				PINCTRL_STATE_RST_ACTIVE, r);
-		goto exit_pinctrl_put;
-	}
-
-	/* int suspend state */
-	core_data->pin_int_sta_suspend = pinctrl_lookup_state(
-		core_data->pinctrl, PINCTRL_STATE_INT_SUSPEND);
-	if (IS_ERR_OR_NULL(core_data->pin_int_sta_suspend)) {
-		r = PTR_ERR(core_data->pin_int_sta_suspend);
-		ts_err("Failed to get pinctrl state:%s, r:%d",
-				PINCTRL_STATE_INT_SUSPEND, r);
-		goto exit_pinctrl_put;
-	}
-
-	/* int suspend state */
-	core_data->pin_rst_sta_suspend = pinctrl_lookup_state(
-		core_data->pinctrl, PINCTRL_STATE_RST_SUSPEND);
-	if (IS_ERR_OR_NULL(core_data->pin_rst_sta_suspend)) {
-		r = PTR_ERR(core_data->pin_rst_sta_suspend);
-		ts_err("Failed to get pinctrl state:%s, r:%d",
-				PINCTRL_STATE_RST_SUSPEND, r);
-		goto exit_pinctrl_put;
-	}
-
-	return 0;
-exit_pinctrl_put:
-	devm_pinctrl_put(core_data->pinctrl);
-	core_data->pinctrl = NULL;
-	return r;
-}
-
-int i2c_touch_suspend(void)
-{
-	int r = 0;
-
-	if (core_data.pinctrl) {
-		r = pinctrl_select_state(core_data.pinctrl,
-				core_data.pin_int_sta_suspend);
-		if (r < 0)
-			ts_err("Failed to select int suspend state, r:%d", r);
-		r = pinctrl_select_state(core_data.pinctrl,
-				core_data.pin_rst_sta_suspend);
-		if (r < 0)
-			ts_err("Failed to select rst suspend state, r:%d", r);
-	}
-
-	return r;
-}
-
-int i2c_touch_resume(void)
-{
-	int r = 0;
-
-	if (core_data.pinctrl) {
-		r = pinctrl_select_state(core_data.pinctrl,
-					core_data.pin_int_sta_active);
-		if (r < 0)
-			ts_err("Failed to select int active state, r:%d", r);
-		r = pinctrl_select_state(core_data.pinctrl,
-					core_data.pin_rst_sta_active);
-		if (r < 0)
-			ts_err("Failed to select rst active state, r:%d", r);
-	}
-
-	return r;
-
-}
-
-#endif
+/***********for config & firmware*************/
+const char *gt9886_firmware_buf;
+const char *gt9886_config_buf;
 
 #ifdef CONFIG_OF
 /**
@@ -302,6 +186,18 @@ static int goodix_parse_dt(struct device_node *node,
 		return -EINVAL;
 	}
 
+	r = of_property_read_string(node, "goodix,firmware-version",
+			&gt9886_firmware_buf);
+	if (r < 0)
+		ts_err("Invalid firmware version in dts : %d", r);
+
+	r = of_property_read_string(node, "goodix,config-version",
+			&gt9886_config_buf);
+	if (r < 0) {
+		ts_err("Invalid config version in dts : %d", r);
+		return -EINVAL;
+	}
+
 	board_data->avdd_name = "vtouch";
 	r = of_property_read_u32(node, "goodix,power-on-delay-us",
 				&board_data->power_on_delay_us);
@@ -329,7 +225,6 @@ static int goodix_parse_dt(struct device_node *node,
 		ts_err("Failed to parse resolutions:%d", r);
 		return r;
 	}
-
 
 	/* key map */
 	prop = of_find_property(node, "goodix,panel-key-map", NULL);
@@ -377,7 +272,6 @@ static int goodix_parse_dt(struct device_node *node,
 			board_data->panel_key_map[3],
 			board_data->panel_key_map[4]);
 	/*add end*/
-
 
 	ts_debug("[DT]id:%d, x:%d, y:%d, w:%d, p:%d",
 			board_data->panel_max_id,
@@ -600,7 +494,7 @@ int goodix_set_i2c_doze_mode(struct goodix_ts_device *dev, int enable)
 {
 	int result = -EINVAL;
 	int i;
-	u8 w_data, r_data;
+	u8 w_data, r_data = 0;
 
 	if (dev->ic_type != IC_TYPE_NORMANDY)
 		return 0;
@@ -828,7 +722,7 @@ static int goodix_read_version(struct goodix_ts_device *dev,
 		struct goodix_ts_version *version)
 {
 	u8 buffer[12];
-	u8 temp_buf[256], checksum;
+	u8 temp_buf[256] = {0}, checksum;
 	int r;
 	u8 pid_read_len = dev->reg.pid_len;
 	u8 vid_read_len = dev->reg.vid_len;
@@ -1298,7 +1192,7 @@ static int goodix_close_hidi2c_mode(struct goodix_ts_device *ts_dev)
 	int try_times;
 	int j;
 	unsigned char buffer[1];
-	unsigned char reg_sta;
+	unsigned char reg_sta = 0;
 	struct goodix_ts_cmd ts_cmd;
 
 	for (try_times = 0; try_times < 10; try_times++) {
@@ -1355,7 +1249,7 @@ exit:
 
 /* success return config length else return -1 */
 static int _goodix_do_read_config(struct goodix_ts_device *dev,
-					  u32 base_addr, u8 *buf)
+	u32 base_addr, u8 *buf)
 {
 	int sub_bags = 0;
 	int offset = 0;
@@ -1430,7 +1324,7 @@ err_out:
 
 /* success return config_len, <= 0 failed */
 static int goodix_read_config(struct goodix_ts_device *dev,
-					      u8 *config_data, u32 config_len)
+	u8 *config_data, u32 config_len)
 {
 	struct goodix_ts_cmd ts_cmd;
 	u8 cmd_flag;
@@ -1640,7 +1534,7 @@ int goodix_hw_reset(struct goodix_ts_device *dev)
 static int goodix_request_handler(struct goodix_ts_device *dev,
 		struct goodix_request_data *request_data)
 {
-	unsigned char buffer[1];
+	unsigned char buffer[1] = {0};
 	int r;
 
 	r = goodix_i2c_read_trans(dev, dev->reg.fw_request, buffer, 1);
@@ -1824,12 +1718,12 @@ static int goodix_remap_trace_id(struct goodix_ts_device *dev,
 		/*swap*/
 		if (need_swap) {
 			memcpy(temp_buf, small, BYTES_PER_COORD);
-			memcpy(small,
-					&coor_buf[BYTES_PER_COORD * i],
-					BYTES_PER_COORD);
+			memmove(small,
+				&coor_buf[BYTES_PER_COORD * i],
+				BYTES_PER_COORD);
 			memcpy(&coor_buf[BYTES_PER_COORD * i],
-					temp_buf,
-					BYTES_PER_COORD);
+				temp_buf,
+				BYTES_PER_COORD);
 		}
 	}
 
@@ -2075,7 +1969,7 @@ static int goodix_hw_resume(struct goodix_ts_device *dev)
 {
 	int r = 0;
 	int i, retry = GOODIX_BUS_RETRY_TIMES;
-	u8 temp_buf[256], checksum;
+	u8 temp_buf[256] = {0}, checksum;
 	u8 data[2] = {0x00};
 
 	for (; retry > 0; retry--) {
@@ -2201,17 +2095,6 @@ static int goodix_i2c_probe(struct i2c_client *client,
 
 	ts_info("%s IN", __func__);
 
-	r = goodix_ts_pinctrl_init(&core_data, client);
-	if (!r && core_data.pinctrl) {
-		r = pinctrl_select_state(core_data.pinctrl,
-					core_data.pin_int_sta_active);
-		if (r < 0)
-			ts_err("Failed to select int active pinstate, r:%d", r);
-		r = pinctrl_select_state(core_data.pinctrl,
-					core_data.pin_rst_sta_active);
-		if (r < 0)
-			ts_err("Failed to select rst active pinstate, r:%d", r);
-	}
 	r = i2c_check_functionality(client->adapter,
 		I2C_FUNC_I2C);
 	if (!r)
@@ -2249,9 +2132,10 @@ static int goodix_i2c_probe(struct i2c_client *client,
 		sizeof(struct goodix_ts_device), GFP_KERNEL);
 	if (!ts_device)
 		return -ENOMEM;
+	/* use pinctrl in core.c */
+	ts_bdata->pinctrl_dev = client->adapter->dev.parent;
 
-
-	ts_device->name = "GTx5 TouchDevcie";
+	ts_device->name = "GT9886 TouchDevcie";
 	ts_device->dev = &client->dev;
 	ts_device->board_data = ts_bdata;
 	ts_device->hw_ops = &hw_i2c_ops;
@@ -2264,9 +2148,9 @@ static int goodix_i2c_probe(struct i2c_client *client,
 	goodix_pdev->name = GOODIX_CORE_DRIVER_NAME;
 	goodix_pdev->id = 0;
 	goodix_pdev->num_resources = 0;
-	/*
+	/*GOODIX_CORE_DRIVER_NAME = mtk-tpd2
 	 * you could find this platform dev in
-	 * /sys/devices/platform/goodix_ts.0
+	 * /sys/devices/platform/GOODIX_CORE_DRIVER_NAME.0
 	 * goodix_pdev->dev.parent = &client->dev;
 	 */
 	goodix_pdev->dev.platform_data = ts_device;
@@ -2327,7 +2211,7 @@ static struct i2c_driver goodix_i2c_driver = {
 
 static int __init goodix_i2c_init(void)
 {
-	ts_info("GTx5xx HW layer init");
+	ts_info("GT9886 i2c layer init");
 	return i2c_add_driver(&goodix_i2c_driver);
 }
 
@@ -2339,6 +2223,6 @@ static void __exit goodix_i2c_exit(void)
 module_init(goodix_i2c_init);
 module_exit(goodix_i2c_exit);
 
-MODULE_DESCRIPTION("Goodix GTx5 Touchscreen Hardware Module");
+MODULE_DESCRIPTION("Goodix GT9886 Touchscreen Hardware Module");
 MODULE_AUTHOR("Goodix, Inc.");
 MODULE_LICENSE("GPL v2");

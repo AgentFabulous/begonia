@@ -45,21 +45,20 @@
 #endif
 struct tpd_filter_t tpd_filter;
 struct tpd_dts_info tpd_dts_data;
-/*
- *struct pinctrl *pinctrl1;
- *struct pinctrl_state *pins_default;
- *struct pinctrl_state *eint_as_int, *eint_output0,
- *		*eint_output1, *rst_output0, *rst_output1;
- */
+struct pinctrl *pinctrl1;
+struct pinctrl_state *pins_default;
+struct pinctrl_state *eint_as_int, *eint_output0,
+		*eint_output1, *rst_output0, *rst_output1;
 const struct of_device_id touch_of_match[] = {
 	{ .compatible = "mediatek,touch", },
+	{ .compatible = "mediatek,mt8167-touch", },
 	{},
 };
 
 void tpd_get_dts_info(void)
 {
 	struct device_node *node1 = NULL;
-	int key_dim_local[16], i;
+	int key_dim_local[16] = {0}, i = 0;
 
 	node1 = of_find_matching_node(node1, touch_of_match);
 	if (node1) {
@@ -146,12 +145,11 @@ void tpd_get_dts_info(void)
 	}
 }
 
-#if 0
 static DEFINE_MUTEX(tpd_set_gpio_mutex);
 void tpd_gpio_as_int(int pin)
 {
 	mutex_lock(&tpd_set_gpio_mutex);
-	TPD_DEBUG("[tpd]%s\n", __func__);
+	TPD_DEBUG("[tpd] %s\n", __func__);
 	if (pin == 1)
 		pinctrl_select_state(pinctrl1, eint_as_int);
 	mutex_unlock(&tpd_set_gpio_mutex);
@@ -236,8 +234,6 @@ int tpd_get_gpio_info(struct platform_device *pdev)
 	TPD_DEBUG("[tpd%d] mt_tpd_pinctrl----------\n", pdev->id);
 	return 0;
 }
-
-#endif
 
 static int tpd_misc_open(struct inode *inode, struct file *file)
 {
@@ -554,7 +550,7 @@ static int tpd_probe(struct platform_device *pdev)
 
 	if (misc_register(&tpd_misc_device))
 		pr_info("mtk_tpd: tpd_misc_device register failed\n");
-	/* tpd_get_gpio_info(pdev); */
+	tpd_get_gpio_info(pdev);
 	tpd = kmalloc(sizeof(struct tpd_device), GFP_KERNEL);
 	if (tpd == NULL)
 		return -ENOMEM;

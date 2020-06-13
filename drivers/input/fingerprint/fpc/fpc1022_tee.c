@@ -24,7 +24,7 @@
  *
  *
  * Copyright (c) 2015 Fingerprint Cards AB <tech@fingerprints.com>
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License Version 2
@@ -69,16 +69,16 @@
 #define FPC_TTW_HOLD_TIME 2000
 
 #define     FPC102X_REG_HWID      252
-
-
+//#define FPC1021_CHIP 0x0210
+//#define FPC1021_CHIP_MASK_SENSOR_TYPE 0xfff0
 #define FPC1022_CHIP 0x1000
 #define FPC1022_CHIP_MASK_SENSOR_TYPE 0xff00
 
-#define GPIO_GET(pin) __gpio_get_value(pin)
+#define GPIO_GET(pin) __gpio_get_value(pin)	//get input pin value
 
-#define GPIOIRQ 2
-
-
+#define GPIOIRQ 2		//XPT
+//void mt_spi_enable_clk(struct mt_spi_t *ms);
+//void mt_spi_disable_clk(struct mt_spi_t *ms);
 
 struct regulator *regu_buck;
 
@@ -99,12 +99,12 @@ struct fpc1022_data {
 	struct spi_device *spi;
 	int irq_gpio;
 	int irq_num;
-
+	//wwm//int rst_gpio;
 	struct pinctrl *pinctrl;
-	struct pinctrl_state *st_irq;
+	struct pinctrl_state *st_irq;	//xpt
 	struct pinctrl_state *st_rst_l;
 	struct pinctrl_state *st_rst_h;
-
+	//struct pinctrl_state *pins_miso_spi;
 
 	struct input_dev *idev;
 	char idev_name[32];
@@ -121,8 +121,10 @@ extern bool goodix_fp_exist;
 extern struct spi_device *spi_fingerprint;
 bool fpc1022_fp_exist = false;
 
-
+//static struct mt_spi_t *fpc_ms;
 static struct fpc1022_data *fpc1022;
+
+static int check_hwid(struct spi_device *spi);
 
 #ifndef CONFIG_SPI_MT65XX
 static const struct mt_chip_conf spi_mcc = {
@@ -159,22 +161,22 @@ u32 spi_speed = 1 * 1000000;
 
 static void fpc1022_get_irqNum(struct fpc1022_data *fpc1022)
 {
-
+	//u32 ints[2] = {0, 0};
 	struct device_node *node;
 
 	printk("%s\n", __func__);
 
-
+	// pinctrl_select_state(fpc1022->pinctrl, fpc1022->st_irq); //xpt
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,fpc1022_irq");
 
 	if (node) {
-
-
+		//xpt of_property_read_u32_array(node, "debounce", ints, ARRAY_SIZE(ints));
+		//xpt fpc1022->irq_gpio = ints[0];
 		/*debounce = ints[1];
 		   mt_gpio_set_debounce(gpiopin, debounce); */
 
-		fpc1022->irq_num = irq_of_parse_and_map(node, 0);
+		fpc1022->irq_num = irq_of_parse_and_map(node, 0);	//xpt
 		fpc1022->irq_gpio = of_get_named_gpio(node, "fpc,gpio_irq", 0);
 		printk("%s , fpc1022->irq_num = %d, fpc1022->irq_gpio = %d\n",
 		       __func__, fpc1022->irq_num, fpc1022->irq_gpio);
@@ -396,6 +398,25 @@ static int fpc1022_platform_probe(struct platform_device *pldev)
 		goto err_fpc1022_malloc;
 	}
 
+	//workaround to solve two spi device
+	if (spi_fingerprint == NULL) {
+		pr_notice("%s Line:%d spi device is NULL,cannot spi transfer\n",
+			  __func__, __LINE__);
+	} else {
+		ret = check_hwid(spi_fingerprint);
+		if (ret < 0) {
+			pr_notice("%s: %d get chipid fail. now exit\n",
+				  __func__, __LINE__);
+			return -EINVAL;
+		}
+		fpc1022_fp_exist = true;
+
+		fpc1022->spi = spi_fingerprint;
+		/********xinan_bp for dual_TA begain *********/
+		memcpy(&uuid_fp, &uuid_ta_fpc, sizeof(struct TEEC_UUID));
+		/********xinan_bp for dual_TA end *********/
+	}
+
 	fpc1022->dev = dev;
 	dev_set_drvdata(dev, fpc1022);
 	fpc1022->pldev = pldev;
@@ -406,14 +427,14 @@ static int fpc1022_platform_probe(struct platform_device *pldev)
 		ret = PTR_ERR(fpc1022->pinctrl);
 		goto err_pinctrl_get;
 	}
-
+	//fpc1022->st_irq = pinctrl_lookup_state(fpc1022->pinctrl, "fpc_irq");
 	fpc1022->st_irq = pinctrl_lookup_state(fpc1022->pinctrl, "default");
 	if (IS_ERR(fpc1022->st_irq)) {
 		ret = PTR_ERR(fpc1022->st_irq);
 		dev_err(dev, "pinctrl err, irq\n");
-
+		//goto err_lookup_state;
 	}
-
+	//C3D project workaround, 2 spi device on spi1, just use miso as 'cs-gpios', change to spi mode.
 	/*
 	   fpc1022->pins_miso_spi = pinctrl_lookup_state(fpc1022->pinctrl, "miso_spi");
 	   if (IS_ERR(fpc1022->pins_miso_spi)) {
@@ -673,8 +694,8 @@ static int fpc1022_spi_probe(struct spi_device *spi)
 	printk(KERN_INFO "%s\n", __func__);
 	pr_err("fpc1022_spi_probe \n");
 
-
-
+	//pr_err("%s() switch miso pin mode\n", __func__);
+	//pinctrl_select_state(fpc1022->pinctrl, fpc1022->pins_miso_spi);
 
 #ifndef CONFIG_SPI_MT65XX
 	spi->controller_data = (void *)&spi_mcc;
@@ -698,10 +719,10 @@ static int fpc1022_spi_probe(struct spi_device *spi)
 		goto err_check_hwid;
 	}
 	fpc1022_fp_exist = true;
-
+	//set_fp_vendor(FP_VENDOR_FPC);
 	pr_err("%s %d FPC fingerprint sensor detected\n", __func__, __LINE__);
 
-
+	//fpc_ms=spi_master_get_devdata(spi->master);
 	mt_spi_enable_master_clk(spi);
 	fpc1022->spi = spi;
 
@@ -734,7 +755,7 @@ static struct of_device_id fpc1022_spi_of_match[] = {
 #endif
 #if 0
 static struct of_device_id fpc1022_spi_of_match[] = {
-	{.compatible = "mediatek,fingerprint",},
+	{.compatible = "mediatek,fingerprint",},	//xpt { .compatible = "ix,btp", },
 	{}
 };
 #endif
@@ -755,7 +776,6 @@ static struct spi_driver spi_driver = {
 #endif
 static int __init fpc1022_init(void)
 {
-	int error = 0;
 	printk(KERN_INFO "%s\n", __func__);
 
 /*
@@ -779,41 +799,6 @@ static int __init fpc1022_init(void)
 		printk(KERN_INFO "%s: register platform driver success\n",
 		       __func__);
 
-	/*
-	   if(0 != spi_register_driver(&spi_driver))
-	   {
-	   printk(KERN_INFO "%s: register spi driver fail\n", __func__);
-	   return -EINVAL;
-	   }
-	   else
-	   printk(KERN_INFO "%s: register spi driver success\n", __func__);
-
-	 */
-
-
-	if (spi_fingerprint == NULL)
-		pr_notice("%s Line:%d spi device is NULL,cannot spi transfer\n",
-			  __func__, __LINE__);
-	else {
-		error = check_hwid(spi_fingerprint);
-
-		if (error < 0) {
-			pr_notice("%s: %d get chipid fail. now exit\n",
-				  __func__, __LINE__);
-
-			return -EINVAL;
-		}
-		fpc1022_fp_exist = true;
-
-
-
-		fpc1022->spi = spi_fingerprint;
-		/********xinan_bp for dual_TA begain *********/
-		memcpy(&uuid_fp, &uuid_ta_fpc, sizeof(struct TEEC_UUID));
-	/********xinan_bp for dual_TA end *********/
-
-	}
-
 	return 0;
 }
 
@@ -822,7 +807,7 @@ static void __exit fpc1022_exit(void)
 	printk(KERN_INFO "%s\n", __func__);
 
 	platform_driver_unregister(&fpc1022_driver);
-
+	//spi_unregister_driver(&spi_driver);
 }
 
 late_initcall(fpc1022_init);

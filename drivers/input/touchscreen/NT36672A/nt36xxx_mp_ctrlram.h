@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 - 2018 Novatek, Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * $Revision: 32206 $
  * $Date: 2018-08-10 19:23:04 +0800 (週五, 10 八月 2018) $
@@ -76,8 +76,8 @@ struct item_buf
 
 struct test_buf
 {
-
-
+//	spinlock_t tbuf_lock;
+//	bool update;
 	struct item_buf shorttest;
 	struct item_buf opentest;
 	struct item_buf fwmutualtest;

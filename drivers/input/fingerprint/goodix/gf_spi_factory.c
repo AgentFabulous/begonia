@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2013-2016, Shenzhen Huiding Technology Co., Ltd.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  * All Rights Reserved.
  */
 #include <linux/device.h>
@@ -15,13 +15,13 @@
 #include <linux/spi/spidev.h>
 
 /* MTK header */
+//#include "mt_spi.h"
+//#include "mt_spi_hal.h"
+//#include "mt_gpio.h"
+//#include "mach/gpio_const.h"
 
-
-
-
-
-
-
+//#include "mtk_spi.h"
+//#include "mtk_spi_hal.h"
 
 /*
 int  gf_ioctl_spi_init_cfg_cmd(struct mt_chip_conf *mcc, unsigned long arg){

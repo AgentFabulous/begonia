@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 - 2018 Novatek, Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * $Revision: 32206 $
  * $Date: 2018-08-10 19:23:04 +0800 (週五, 10 八月 2018) $
@@ -73,16 +73,16 @@ static const struct nvt_ts_mem_map NT36675_memory_map = {
 	/* Phase 2 Host Download */
 	.BOOT_RDY_ADDR            = 0x3F10D,
 	/* BLD CRC */
-	.BLD_LENGTH_ADDR          = 0x3F138,
-	.ILM_LENGTH_ADDR          = 0x3F118,
-	.DLM_LENGTH_ADDR          = 0x3F130,
-	.BLD_DES_ADDR             = 0x3F114,
-	.ILM_DES_ADDR             = 0x3F128,
-	.DLM_DES_ADDR             = 0x3F12C,
-	.G_ILM_CHECKSUM_ADDR      = 0x3F100,
-	.G_DLM_CHECKSUM_ADDR      = 0x3F104,
-	.R_ILM_CHECKSUM_ADDR      = 0x3F120,
-	.R_DLM_CHECKSUM_ADDR      = 0x3F124,
+	.BLD_LENGTH_ADDR          = 0x3F138,	//0x3F138 ~ 0x3F13A	(3 bytes)
+	.ILM_LENGTH_ADDR          = 0x3F118,	//0x3F118 ~ 0x3F11A	(3 bytes)
+	.DLM_LENGTH_ADDR          = 0x3F130,	//0x3F130 ~ 0x3F132	(3 bytes)
+	.BLD_DES_ADDR             = 0x3F114,	//0x3F114 ~ 0x3F116	(3 bytes)
+	.ILM_DES_ADDR             = 0x3F128,	//0x3F128 ~ 0x3F12A	(3 bytes)
+	.DLM_DES_ADDR             = 0x3F12C,	//0x3F12C ~ 0x3F12E	(3 bytes)
+	.G_ILM_CHECKSUM_ADDR      = 0x3F100,	//0x3F100 ~ 0x3F103	(4 bytes)
+	.G_DLM_CHECKSUM_ADDR      = 0x3F104,	//0x3F104 ~ 0x3F107	(4 bytes)
+	.R_ILM_CHECKSUM_ADDR      = 0x3F120,	//0x3F120 ~ 0x3F123 (4 bytes)
+	.R_DLM_CHECKSUM_ADDR      = 0x3F124,	//0x3F124 ~ 0x3F127 (4 bytes)
 	.BLD_CRC_EN_ADDR          = 0x3F30E,
 	.DMA_CRC_EN_ADDR          = 0x3F136,
 	.BLD_ILM_DLM_CRC_ADDR     = 0x3F133,
@@ -107,16 +107,16 @@ static const struct nvt_ts_mem_map NT36672A_memory_map = {
 	/* Phase 2 Host Download */
 	.BOOT_RDY_ADDR            = 0x3F10D,
 	/* BLD CRC */
-	.BLD_LENGTH_ADDR          = 0x3F10E,
-	.ILM_LENGTH_ADDR          = 0x3F118,
-	.DLM_LENGTH_ADDR          = 0x3F130,
-	.BLD_DES_ADDR             = 0x3F114,
-	.ILM_DES_ADDR             = 0x3F128,
-	.DLM_DES_ADDR             = 0x3F12C,
-	.G_ILM_CHECKSUM_ADDR      = 0x3F100,
-	.G_DLM_CHECKSUM_ADDR      = 0x3F104,
-	.R_ILM_CHECKSUM_ADDR      = 0x3F120,
-	.R_DLM_CHECKSUM_ADDR      = 0x3F124,
+	.BLD_LENGTH_ADDR          = 0x3F10E,	//0x3F10E ~ 0x3F10F	(2 bytes)
+	.ILM_LENGTH_ADDR          = 0x3F118,	//0x3F118 ~ 0x3F119	(2 bytes)
+	.DLM_LENGTH_ADDR          = 0x3F130,	//0x3F130 ~ 0x3F131	(2 bytes)
+	.BLD_DES_ADDR             = 0x3F114,	//0x3F114 ~ 0x3F116	(3 bytes)
+	.ILM_DES_ADDR             = 0x3F128,	//0x3F128 ~ 0x3F12A	(3 bytes)
+	.DLM_DES_ADDR             = 0x3F12C,	//0x3F12C ~ 0x3F12E	(3 bytes)
+	.G_ILM_CHECKSUM_ADDR      = 0x3F100,	//0x3F100 ~ 0x3F103	(4 bytes)
+	.G_DLM_CHECKSUM_ADDR      = 0x3F104,	//0x3F104 ~ 0x3F107	(4 bytes)
+	.R_ILM_CHECKSUM_ADDR      = 0x3F120,	//0x3F120 ~ 0x3F123 (4 bytes)
+	.R_DLM_CHECKSUM_ADDR      = 0x3F124,	//0x3F124 ~ 0x3F127 (4 bytes)
 	.BLD_CRC_EN_ADDR          = 0x3F30E,
 	.DMA_CRC_EN_ADDR          = 0x3F132,
 	.BLD_ILM_DLM_CRC_ADDR     = 0x3F133,
