@@ -12,40 +12,54 @@
  */
 
 #include <linux/interrupt.h>
+#include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
 #include <linux/regmap.h>
-#include <linux/mfd/core.h>
-#include <linux/mfd/mt6358/core.h>
-#if defined(CONFIG_MTK_PMIC_CHIP_MT6358)
-#include <linux/mfd/mt6358/registers.h>
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6357)
+#include <linux/mfd/mt6357/irq.h>
+#include <linux/mfd/mt6357/registers.h>
+#elif defined(CONFIG_MTK_PMIC_CHIP_MT6358)
 #include <linux/mfd/mt6358/irq.h>
+#include <linux/mfd/mt6358/registers.h>
 #elif defined(CONFIG_MTK_PMIC_CHIP_MT6359)
+#include <linux/mfd/mt6359/irq.h>
 #include <linux/mfd/mt6359/registers.h>
+#elif defined(CONFIG_MTK_PMIC_CHIP_MT6359P)
+#include <linux/mfd/mt6359p/irq.h>
+#include <linux/mfd/mt6359p/registers.h>
 #endif
+#include <linux/mfd/mt6358/core.h>
 
+#define MT6357_CID_CODE		0x5700
 #define MT6358_CID_CODE		0x5800
 #define MT6359_CID_CODE		0x5900
+
+static const struct mfd_cell mt6357_devs[] = {
+	{
+		.name = "mt-pmic",
+		.of_compatible = "mediatek,mt-pmic",
+	}, {
+		.name = "mt635x-auxadc",
+		.of_compatible = "mediatek,mt6357-auxadc",
+	},
+};
 
 static const struct mfd_cell mt6358_devs[] = {
 	{
 		.name = "mt-pmic",
 		.of_compatible = "mediatek,mt-pmic",
-	},
-	{
+	}, {
 		.name = "mt635x-auxadc",
 		.of_compatible = "mediatek,mt6358-auxadc",
-	},
-	{
+	}, {
 		.name = "mt6358-regulator",
 		.of_compatible = "mediatek,mt6358-regulator",
-	},
-	{
+	}, {
 		.name = "mt6358-rtc",
 		.of_compatible = "mediatek,mt6358-rtc",
-	},
-	{
+	}, {
 		.name = "mt6358-misc",
 		.of_compatible = "mediatek,mt6358-misc",
 	},
@@ -55,26 +69,28 @@ static const struct mfd_cell mt6359_devs[] = {
 	{
 		.name = "mt-pmic",
 		.of_compatible = "mediatek,mt-pmic",
-	},
-	{
+	}, {
 		.name = "mt635x-auxadc",
 		.of_compatible = "mediatek,mt6359-auxadc",
-	},
-	{
+	}, {
 		.name = "mt6359-regulator",
 		.of_compatible = "mediatek,mt6359-regulator",
-	},
-	{
+	}, {
+		.name = "mt6359p-regulator",
+		.of_compatible = "mediatek,mt6359p-regulator",
+	}, {
 		.name = "mt6359-rtc",
 		.of_compatible = "mediatek,mt6359-rtc",
-	},
-	{
+	}, {
 		.name = "mt6359-misc",
 		.of_compatible = "mediatek,mt6359-misc",
 	},
+	{
+		.name = "mt6359p-misc",
+		.of_compatible = "mediatek,mt6359p-misc",
+	},
 };
 
-#if defined(CONFIG_MTK_PMIC_CHIP_MT6359)
 struct sp_top_t {
 	int hwirq_base;
 	unsigned int num_int_regs;
@@ -90,18 +106,6 @@ struct pmic_irq_t {
 	int hwirq;
 	struct sp_top_t *sp_top;
 };
-
-#define SP_TOP_GEN(sp)	\
-	{	\
-		.hwirq_base = -1,	\
-		.num_int_regs = 1,	\
-		.en_reg = MT6359_##sp##_TOP_INT_CON0,		\
-		.mask_reg = MT6359_##sp##_TOP_INT_MASK_CON0,	\
-		.sta_reg = MT6359_##sp##_TOP_INT_STATUS0,		\
-		.raw_sta_reg = MT6359_##sp##_TOP_INT_RAW_STATUS0,	\
-		.top_offset = PMIC_INT_STATUS_##sp##_TOP_SHIFT,		\
-	}
-#endif
 
 static struct sp_top_t sp_top_ints[] = {
 	SP_TOP_GEN(BUCK),
@@ -266,6 +270,11 @@ static int mt6358_irq_init(struct mt6358_chip *chip)
 {
 	int i, ret = 0;
 
+	if (chip->irq <= 0) {
+		dev_notice(chip->dev,
+			   "failed to get platform irq, ret=%d", chip->irq);
+		return 0;
+	}
 	mutex_init(&chip->irqlock);
 	ret = of_property_read_u32(chip->dev->of_node,
 				   "mediatek,num-pmic-irqs",
@@ -279,7 +288,7 @@ static int mt6358_irq_init(struct mt6358_chip *chip)
 				 sizeof(struct pmic_irq_t), GFP_KERNEL);
 	for (i = 0; i < chip->num_pmic_irqs; i++) {
 		const char *name = NULL;
-		unsigned int hwirq, sp, num_int_bits;
+		unsigned int hwirq = 0, sp = 0, num_int_bits;
 		struct pmic_irq_t *pmic_irq;
 
 		ret = of_property_read_string_index(chip->dev->of_node,
@@ -296,6 +305,10 @@ static int mt6358_irq_init(struct mt6358_chip *chip)
 		if (ret < 0) {
 			dev_notice(chip->dev, "%s missing pmic-irqs\n", name);
 			break;
+		} else if (sp >= chip->num_sps) {
+			dev_notice(chip->dev, "%s has invalid sp %d\n",
+				   name, sp);
+			break;
 		}
 		pmic_irq = pmic_irqs + hwirq;
 		pmic_irq->name = name;
@@ -303,7 +316,7 @@ static int mt6358_irq_init(struct mt6358_chip *chip)
 		pmic_irq->sp_top = &sp_top_ints[sp];
 		num_int_bits = sp_top_ints[sp].num_int_regs * 16;
 		if (pmic_irq->sp_top->hwirq_base == -1)
-			pmic_irq->sp_top->hwirq_base = hwirq;
+			pmic_irq->sp_top->hwirq_base = round_down(hwirq, 16);
 		else if (hwirq - pmic_irq->sp_top->hwirq_base >= num_int_bits)
 			pmic_irq->sp_top->num_int_regs++;
 #if 0
@@ -338,7 +351,7 @@ static int mt6358_irq_init(struct mt6358_chip *chip)
 	if (ret) {
 		dev_notice(chip->dev, "failed to register irq=%d; err: %d\n",
 			chip->irq, ret);
-		return ret;
+		return 0;
 	}
 	enable_irq_wake(chip->irq);
 
@@ -359,7 +372,7 @@ static void mt6358_power_off(void)
 static int mt6358_probe(struct platform_device *pdev)
 {
 	int ret;
-	unsigned int id;
+	unsigned int id = 0;
 	struct mt6358_chip *chip;
 
 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
@@ -372,8 +385,10 @@ static int mt6358_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	chip->irq = platform_get_irq(pdev, 0);
-	if (chip->irq < 0)
-		return chip->irq;
+	if (chip->irq <= 0) {
+		dev_notice(&pdev->dev,
+			"failed to get platform irq, ret=%d", chip->irq);
+	}
 
 	platform_set_drvdata(pdev, chip);
 
@@ -389,6 +404,15 @@ static int mt6358_probe(struct platform_device *pdev)
 	pm_power_off = mt6358_power_off;
 
 	switch (id & 0xFF00) {
+	case MT6357_CID_CODE:
+		chip->top_int_status_reg = PMIC_INT_STATUS_TOP_RSV_ADDR;
+		ret = mt6358_irq_init(chip);
+		if (ret)
+			return ret;
+		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6357_devs,
+					   ARRAY_SIZE(mt6357_devs), NULL,
+					   0, chip->irq_domain);
+		break;
 	case MT6358_CID_CODE:
 		chip->top_int_status_reg = PMIC_INT_STATUS_TOP_RSV_ADDR;
 		ret = mt6358_irq_init(chip);
@@ -396,7 +420,7 @@ static int mt6358_probe(struct platform_device *pdev)
 			return ret;
 		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6358_devs,
 					   ARRAY_SIZE(mt6358_devs), NULL,
-					   0, NULL);
+					   0, chip->irq_domain);
 		break;
 	case MT6359_CID_CODE:
 		chip->top_int_status_reg = PMIC_INT_STATUS_TOP_RSV_ADDR;
@@ -424,9 +448,11 @@ static int mt6358_probe(struct platform_device *pdev)
 
 static const struct of_device_id mt6358_of_match[] = {
 	{
-		.compatible = "mediatek,mt6358-pmic"
+		.compatible = "mediatek,mt6357-pmic",
 	}, {
-		.compatible = "mediatek,mt6359-pmic"
+		.compatible = "mediatek,mt6358-pmic",
+	}, {
+		.compatible = "mediatek,mt6359-pmic",
 	}, {
 		/* sentinel */
 	}

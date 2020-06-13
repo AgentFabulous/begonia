@@ -21,6 +21,7 @@
 #include <linux/irqdomain.h>
 #include <linux/platform_device.h>
 #include <linux/of_address.h>
+#include <linux/of_device.h>
 #include <linux/of_irq.h>
 #include <linux/io.h>
 #include <linux/mfd/mt6358/core.h>
@@ -29,6 +30,8 @@
 #include <linux/mfd/mt6358/registers.h>
 #elif defined(CONFIG_MTK_PMIC_CHIP_MT6359)
 #include <linux/mfd/mt6359/registers.h>
+#elif defined(CONFIG_MTK_PMIC_CHIP_MT6359P)
+#include <linux/mfd/mt6359p/registers.h>
 #endif
 
 
@@ -136,6 +139,8 @@
 #define RTC_BBPU_2SEC_EN		BIT(8)
 #define RTC_BBPU_AUTO_PDN_SEL	BIT(6)
 
+#define RTC_RG_EOSC_CALI_TD_MASK	7
+#define RTC_RG_EOSC_CALI_TD_SHIFT	5
 
 #define IPIMB
 
@@ -266,11 +271,16 @@ static u16 rtc_pwron_reg[RTC_OFFSET_COUNT][3] = {
 	{RTC_PDN2, RTC_PWRON_YEA_MASK, RTC_PWRON_YEA_SHIFT},
 };
 
+struct mtk_rtc_compat_data {
+	void (*enable_eosc_cali)(void);
+};
+
 struct mt6358_misc {
 	struct device		*dev;
 	spinlock_t	lock;
 	struct regmap		*regmap;
 	u32			addr_base;
+	const struct mtk_rtc_compat_data	*variant;
 };
 
 static struct mt6358_misc *rtc_misc;
@@ -278,7 +288,13 @@ static struct mt6358_misc *rtc_misc;
 struct regmap *pmic_regmap;
 #endif
 
-static int rtc_eosc_cali_td = 8;
+static void mtk_rtc_enable_k_eosc_revised(void);
+
+static const struct mtk_rtc_compat_data mt6359p_cdata = {
+	.enable_eosc_cali = mtk_rtc_enable_k_eosc_revised,
+};
+
+static int rtc_eosc_cali_td;
 static int dcxo_switch;
 module_param(rtc_eosc_cali_td, int, 0664);
 
@@ -304,7 +320,7 @@ static int rtc_field_read(unsigned int reg,
 		       unsigned int mask, unsigned int shift, unsigned int *val)
 {
 	int ret;
-	unsigned int reg_val;
+	unsigned int reg_val = 0;
 
 	ret = rtc_read(reg, &reg_val);
 	if (ret != 0)
@@ -321,8 +337,8 @@ static int rtc_busy_wait(void)
 {
 	unsigned long long timeout = sched_clock() + 500000000;
 	int ret;
-	unsigned int bbpu;
-	u32 pwrkey1, pwrkey2, sec;
+	unsigned int bbpu = 0;
+	u32 pwrkey1 = 0, pwrkey2 = 0, sec = 0;
 
 	do {
 		ret = rtc_read(RTC_BBPU, &bbpu);
@@ -697,6 +713,52 @@ static int pmic_config_interface(unsigned int RegNum, unsigned int val,
 	return ret;
 }
 
+static void mtk_rtc_enable_k_eosc_revised(void)
+{
+	u32 td;
+	int ret;
+
+	pr_notice("%s\n", __func__);
+
+	/* Truning on eosc cali mode clock */
+	pmic_config_interface(PMIC_SCK_TOP_CKPDN_CON0_CLR_ADDR, 1,
+					PMIC_RG_RTC_EOSC32_CK_PDN_MASK,
+					PMIC_RG_RTC_EOSC32_CK_PDN_SHIFT);
+
+	if (rtc_eosc_cali_td) {
+		pr_notice("%s: rtc_eosc_cali_td = %d\n",
+						__func__, rtc_eosc_cali_td);
+		switch (rtc_eosc_cali_td) {
+		case 1:
+			td = 0x3;
+			break;
+		case 2:
+			td = 0x4;
+			break;
+		case 4:
+			td = 0x5;
+			break;
+		case 16:
+			td = 0x7;
+			break;
+		default:
+			td = 0x6;
+			break;
+		}
+		ret = rtc_update_bits(RTC_AL_DOW,
+			(RTC_RG_EOSC_CALI_TD_MASK << RTC_RG_EOSC_CALI_TD_SHIFT),
+			(td << RTC_RG_EOSC_CALI_TD_SHIFT));
+		if (ret < 0)
+			goto exit;
+		ret = rtc_write_trigger();
+		if (ret < 0)
+			goto exit;
+	}
+	return;
+exit:
+	pr_err("%s error\n", __func__);
+}
+
 static void mtk_rtc_enable_k_eosc(void)
 {
 	pr_notice("%s\n", __func__);
@@ -706,7 +768,7 @@ static void mtk_rtc_enable_k_eosc(void)
 					PMIC_RG_RTC_EOSC32_CK_PDN_MASK,
 					PMIC_RG_RTC_EOSC32_CK_PDN_SHIFT);
 
-	if (rtc_eosc_cali_td != 8) {
+	if (rtc_eosc_cali_td) {
 		pr_notice("%s: rtc_eosc_cali_td = %d\n",
 						__func__, rtc_eosc_cali_td);
 		switch (rtc_eosc_cali_td) {
@@ -753,7 +815,7 @@ static void mtk_rtc_enable_k_eosc(void)
 static void mtk_rtc_spar_alarm_clear_wait(void)
 {
 	unsigned long long timeout = sched_clock() + 500000000;
-	u32 bbpu;
+	u32 bbpu = 0;
 	int ret;
 
 	do {
@@ -850,7 +912,7 @@ exit:
 static void mtk_rtc_lpsd_restore_al_mask(void)
 {
 	int ret;
-	u32 val;
+	u32 val = 0;
 
 	ret = rtc_update_bits(RTC_BBPU,
 					(RTC_BBPU_KEY | RTC_BBPU_RELOAD),
@@ -886,7 +948,10 @@ exit:
 
 static void mt6358_misc_shutdown(struct platform_device *pdev)
 {
-	mtk_rtc_enable_k_eosc();
+	if (rtc_misc->variant && rtc_misc->variant->enable_eosc_cali)
+		rtc_misc->variant->enable_eosc_cali();
+	else
+		mtk_rtc_enable_k_eosc();
 }
 
 static int mt6358_misc_probe(struct platform_device *pdev)
@@ -915,6 +980,11 @@ static int mt6358_misc_probe(struct platform_device *pdev)
 	rtc_misc = misc;
 	platform_set_drvdata(pdev, misc);
 
+	misc->variant =
+	(struct mtk_rtc_compat_data *)of_device_get_match_data(misc->dev);
+	if (misc->variant)
+		dev_err(misc->dev, "no match data\n");
+
 	if (of_property_read_u32(pdev->dev.of_node, "base",
 							&rtc_misc->addr_base))
 		rtc_misc->addr_base = RTC_DSN_ID;
@@ -940,6 +1010,7 @@ static int mt6358_misc_probe(struct platform_device *pdev)
 static const struct of_device_id mt6358_misc_of_match[] = {
 	{ .compatible = "mediatek,mt6358-misc", },
 	{ .compatible = "mediatek,mt6359-misc", },
+	{ .compatible = "mediatek,mt6359p-misc", .data = &mt6359p_cdata},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, mt6358_misc_of_match);
