@@ -22,7 +22,6 @@
 
 #define DRIVER_NAME "mtk_phy"
 
-
 u32 phy_debug_level = K_ERR | K_ALET;
 
 module_param(phy_debug_level, int, 0644);
