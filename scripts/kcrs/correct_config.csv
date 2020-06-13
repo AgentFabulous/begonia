@@ -993,7 +993,7 @@ CONFIG_USB_C_SWITCH_U3_MUX,PLATFORM,eddie.hung,,X,X,y,y,y,y,y,y
 CONFIG_USB_GADGET_VBUS_DRAW,PLATFORM,yu-chang.wang,,y,y,500,500,500,500,500,500
 CONFIG_USB_G_ANDROID,PLATFORM,,,y,y,y,y,y,y,y,y
 CONFIG_USB_MTK_DUALMODE,PROJECT,Arvin.Wang,,,,,,,,,
-CONFIG_USB_MTK_EXTCON,PLATFORM,chihhao.chen,,,,,,,,y,y
+CONFIG_EXTCON_MTK_USB,PLATFORM,jeter.chen,,y,X,X,X,X,X,X,y,y,X,X,X,X
 CONFIG_USB_MTK_HDRC,PLATFORM,jeremy.chou,,y,y,X,X,y,y,y,y
 CONFIG_USB_MTK_IDDIG,PROJECT,Arvin.Wang,new config in this commit Id7f09fd3b9edf96f17d0c792d3fbe0c8239ee721,,,,,,,,
 CONFIG_USB_MTK_OTG,PROJECT,Arvin.Wang,,,,,,,,,

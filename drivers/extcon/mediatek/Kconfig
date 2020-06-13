@@ -1,5 +1,6 @@
-config USB_MTK_EXTCON
+config EXTCON_MTK_USB
 	bool "MediaTek USB EXTCON Support"
+	select MTK_USB_IDDIG if !MTK_USB_TYPEC
 	default n
 	---help---
 	  Enable Mediatek USB extcon class support.
@@ -7,7 +8,7 @@ config USB_MTK_EXTCON
 	  and can notify information to register user.
 	  If unsure, say N.
 
-config USB_MTK_IDDIG
+config MTK_USB_IDDIG
 	bool "MediaTek OTG IDDIG Support"
 	default n
 	---help---
@@ -15,4 +16,3 @@ config USB_MTK_IDDIG
 	  IDDIG - OTG micro-B cable attachment detection.
 	  Say Y here if your system support OTG IDDIG detection.
 	  If unsure, say N.
-

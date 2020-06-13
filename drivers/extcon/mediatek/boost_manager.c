@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -42,6 +42,10 @@ struct usbotg_boost {
 };
 static struct usbotg_boost *g_info;
 
+static struct pinctrl *drvvbus;
+static struct pinctrl_state *drvvbus_high;
+static struct pinctrl_state *drvvbus_low;
+
 #if CONFIG_MTK_GAUGE_VERSION == 30
 static void usbotg_alarm_start_timer(struct usbotg_boost *info)
 {
@@ -81,9 +85,8 @@ static void usbotg_boost_kick_work(struct work_struct *work)
 
 	charger_dev_kick_wdt(usb_boost_manager->primary_charger);
 
-	if (usb_boost_manager->polling_enabled == true) {
+	if (usb_boost_manager->polling_enabled == true)
 		usbotg_alarm_start_timer(usb_boost_manager);
-	}
 }
 
 static enum alarmtimer_restart
@@ -101,6 +104,15 @@ static enum alarmtimer_restart
 
 int usb_otg_set_vbus(int is_on)
 {
+	if (!IS_ERR(drvvbus)) {
+		if (is_on)
+			pinctrl_select_state(drvvbus, drvvbus_high);
+		else
+			pinctrl_select_state(drvvbus, drvvbus_low);
+
+		return 0;
+	}
+
 	if (!g_info)
 		return -1;
 
@@ -134,6 +146,23 @@ static int usbotg_boost_probe(struct platform_device *pdev)
 	struct usbotg_boost *info = NULL;
 	struct device *dev = &pdev->dev;
 	struct device_node *node = dev->of_node;
+
+	drvvbus = devm_pinctrl_get(dev);
+	if (IS_ERR(drvvbus)) {
+		pr_notice("Cannot find usb pinctrl!\n");
+	} else {
+		drvvbus_high = pinctrl_lookup_state(drvvbus, "drvvbus_high");
+		if (IS_ERR(drvvbus_high)) {
+			pr_notice("Cannot find usb pinctrl drvvbus_high\n");
+			return -EINVAL;
+		}
+		drvvbus_low = pinctrl_lookup_state(drvvbus, "drvvbus_low");
+		if (IS_ERR(drvvbus_low)) {
+			pr_notice("Cannot find usb pinctrl drvvbus_low\n");
+			return -EINVAL;
+		}
+		return 0;
+	}
 
 	info = devm_kzalloc(&pdev->dev, sizeof(struct usbotg_boost),
 		GFP_KERNEL);
