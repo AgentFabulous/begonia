@@ -22,6 +22,7 @@
 #include <linux/mmc/host.h>
 #include <linux/sched/rt.h>
 #include <uapi/linux/sched/types.h>
+#include <mt-plat/mtk_io_boost.h>
 
 #include "mtk_mmc_block.h"
 #include "queue.h"
@@ -87,14 +88,6 @@ static struct request *mmc_peek_request(struct mmc_queue *mq)
 	return mq->cmdq_req_peeked;
 }
 
-static void mmc_cmdq_set_active(struct mmc_cmdq_context_info *ctx, bool en)
-{
-	if (en)
-		set_bit(CMDQ_STATE_FETCH_QUEUE, &ctx->curr_state);
-	else
-		clear_bit(CMDQ_STATE_FETCH_QUEUE, &ctx->curr_state);
-}
-
 static bool mmc_check_blk_queue_start_tag(struct request_queue *q,
 	struct request *req)
 {
@@ -112,18 +105,9 @@ static bool mmc_check_blk_queue_start(struct mmc_cmdq_context_info *ctx,
 {
 	struct request_queue *q = mq->queue;
 
-	/*
-	 * Set fetch queue flag before check error state.
-	 * This is to prevent when error occurs after error check
-	 * and the request is not issue at LLD.
-	 */
-	mmc_cmdq_set_active(ctx, true);
-
 	if (!test_bit(CMDQ_STATE_ERR, &ctx->curr_state)
 		&& !mmc_check_blk_queue_start_tag(q, mq->cmdq_req_peeked))
 		return true;
-
-	mmc_cmdq_set_active(ctx, false);
 
 	return false;
 }
@@ -159,7 +143,6 @@ static int mmc_cmdq_thread(void *d)
 	struct mmc_queue *mq = d;
 	struct mmc_card *card = mq->card;
 	struct mmc_host *host = card->host;
-	struct mmc_cmdq_context_info *ctx = &host->cmdq_ctx;
 	struct sched_param scheduler_params = {0};
 
 	scheduler_params.sched_priority = 1;
@@ -178,8 +161,14 @@ static int mmc_cmdq_thread(void *d)
 
 		mt_biolog_cqhci_check();
 
+		ret = mmc_cmdq_down_rwsem(host, mq->cmdq_req_peeked);
+		if (ret) {
+			mmc_cmdq_up_rwsem(host);
+			continue;
+		}
+
 		ret = mq->cmdq_issue_fn(mq, mq->cmdq_req_peeked);
-		mmc_cmdq_set_active(ctx, false);
+		mmc_cmdq_up_rwsem(host);
 		/*
 		 * Don't requeue if issue_fn fails, just bug on.
 		 * We don't expect failure here and there is no recovery other
@@ -224,6 +213,8 @@ static int mmc_queue_thread(void *d)
 	down(&mq->thread_sem);
 	mt_bio_queue_alloc(current, q);
 
+	mtk_iobst_register_tid(current->pid);
+
 	do {
 		struct request *req;
 
@@ -256,7 +247,7 @@ fetch_done:
 			 * Dispatch queue is empty so set flags for
 			 * mmc_request_fn() to wake us up.
 			 */
-			if (mq->qcnt)
+			if (atomic_read(&mq->qcnt))
 				cntx->is_waiting_last_req = true;
 			else
 				mq->asleep = true;
@@ -264,7 +255,7 @@ fetch_done:
 
 		spin_unlock_irq(q->queue_lock);
 
-		if (req || (!part_cmdq_en && mq->qcnt)) {
+		if (req || (!part_cmdq_en && atomic_read(&mq->qcnt))) {
 			set_current_state(TASK_RUNNING);
 			mmc_blk_issue_rq(mq, req);
 			cond_resched();
@@ -403,6 +394,12 @@ static int mmc_init_request(struct request_queue *q, struct request *req,
 	card = mq->card;
 	host = card->host;
 
+#ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
+	/* cmdq use preallocate sg buffer */
+	if (mmc_blk_part_cmdq_en(mq))
+		return 0;
+#endif
+
 	mq_rq->sg = mmc_alloc_sg(host->max_segs, gfp);
 	if (!mq_rq->sg)
 		return -ENOMEM;
@@ -413,6 +410,13 @@ static int mmc_init_request(struct request_queue *q, struct request *req,
 static void mmc_exit_request(struct request_queue *q, struct request *req)
 {
 	struct mmc_queue_req *mq_rq = req_to_mmc_queue_req(req);
+
+#ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
+	/* cmdq use preallocate sg buffer */
+	if (q->queuedata &&
+		mmc_blk_part_cmdq_en(q->queuedata))
+		return;
+#endif
 
 	kfree(mq_rq->sg);
 	mq_rq->sg = NULL;
@@ -539,8 +543,8 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 				host,
 				"exe_cq/%d", host->index);
 			if (IS_ERR(host->cmdq_thread)) {
-				pr_notice("%s: %d: cmdq: failed to start exe_cq thread\n",
-					mmc_hostname(host), ret);
+				pr_notice("%s: cmdq: failed to start exe_cq thread\n",
+					mmc_hostname(host));
 			}
 		}
 #endif
@@ -557,7 +561,8 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 
 	mq->queue->cmd_size = sizeof(struct mmc_queue_req);
 	mq->queue->queuedata = mq;
-	mq->qcnt = 0;
+	mq->queue->backing_dev_info->ra_pages = 128;
+	atomic_set(&mq->qcnt, 0);
 	ret = blk_init_allocated_queue(mq->queue);
 	if (ret) {
 		blk_cleanup_queue(mq->queue);
@@ -690,6 +695,7 @@ int mmc_cmdq_init(struct mmc_queue *mq, struct mmc_card *card)
 
 	init_waitqueue_head(&card->host->cmdq_ctx.queue_empty_wq);
 	init_waitqueue_head(&card->host->cmdq_ctx.wait);
+	init_rwsem(&card->host->cmdq_ctx.err_rwsem);
 
 	mq->mqrq_cmdq = kcalloc(q_depth,
 			sizeof(struct mmc_queue_req), GFP_KERNEL);

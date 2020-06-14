@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -889,7 +888,7 @@ int msdc_get_card_status(struct mmc_host *mmc, struct msdc_host *host,
 	if (!lock)
 		spin_lock(&host->lock);
 
-	err = msdc_do_command(host, &cmd, CMD_TIMEOUT);
+	err = msdc_do_command(host, &cmd, CMD_CQ_TIMEOUT);
 
 	if (!lock)
 		spin_unlock(&host->lock);
@@ -2176,7 +2175,6 @@ int msdc_pio_read(struct msdc_host *host, struct mmc_data *data)
 		tmo = jiffies + 1 + host->timeout_ns / (1000000000UL/HZ) * 2;
 
 	WARN_ON(!kaddr);
-	WARN_ON(sg == NULL);
 	/* MSDC_CLR_BIT32(MSDC_INTEN, wints); */
 	while (1) {
 		if (!get_xfer_done) {
@@ -3401,8 +3399,6 @@ static int msdc_do_request_cq(struct mmc_host *mmc,
 	u32 l_force_prg = 0;
 #endif
 
-	WARN_ON(!mmc || !mrq);
-
 	host->error = 0;
 	atomic_set(&host->abort, 0);
 
@@ -3423,7 +3419,7 @@ static int msdc_do_request_cq(struct mmc_host *mmc,
 	}
 #endif
 
-	(void)msdc_do_cmdq_command(host, cmd, CMD_TIMEOUT);
+	(void)msdc_do_cmdq_command(host, cmd, CMD_CQ_TIMEOUT);
 
 	if (cmd->error == (unsigned int)-EILSEQ)
 		host->error |= REQ_CMD_EIO;
@@ -3432,7 +3428,7 @@ static int msdc_do_request_cq(struct mmc_host *mmc,
 
 	cmd  = mrq->cmd;
 
-	(void)msdc_do_cmdq_command(host, cmd, CMD_TIMEOUT);
+	(void)msdc_do_cmdq_command(host, cmd, CMD_CQ_TIMEOUT);
 
 	if (cmd->error == (unsigned int)-EILSEQ)
 		host->error |= REQ_CMD_EIO;
@@ -3569,7 +3565,7 @@ int msdc_error_tuning(struct mmc_host *mmc,  struct mmc_request *mrq)
 	u32 status;
 
 #ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
-	if (mmc_card_cmdq(mmc->card)) {
+	if (mmc->card && mmc_card_cmdq(mmc->card)) {
 		pr_notice("msdc%d waiting data transfer done3\n", host->id);
 		if (msdc_cq_cmd_wait_xfr_done(host)) {
 			pr_notice("msdc%d waiting data transfer done3 TMO\n",
@@ -3635,7 +3631,7 @@ int msdc_error_tuning(struct mmc_host *mmc,  struct mmc_request *mrq)
 	}
 
 	if (host->hw->host_function == MSDC_SD) {
-		if  (autok_err_type == CRC_STATUS_ERROR) {
+		if (autok_err_type == CRC_STATUS_ERROR) {
 			pr_notice("%s: reset sdcard\n",
 				__func__);
 			(void)sdcard_hw_reset(mmc);
@@ -3666,7 +3662,7 @@ start_tune:
 				host->id, ++host->reautok_times);
 #if defined(CONFIG_MTK_EMMC_CQ_SUPPORT) || defined(CONFIG_MTK_EMMC_HW_CQ)
 			/* CQ DAT tune in MMC layer, here tune CMD13 CRC */
-			if (mmc_card_cmdq(mmc->card))
+			if (mmc->card && mmc_card_cmdq(mmc->card))
 				emmc_execute_dvfs_autok(host, MMC_SEND_STATUS);
 			else
 #endif
@@ -3824,7 +3820,7 @@ static void msdc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
 	data = mrq->data;
 	if (data && (msdc_use_async_dma(data->host_cookie))) {
 #ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
-		if (!mmc_card_cmdq(mmc->card))
+		if (!mmc->card || !mmc_card_cmdq(mmc->card))
 #endif
 			host->xfer_size = data->blocks * data->blksz;
 		dir = data->flags & MMC_DATA_READ ?
@@ -4042,7 +4038,7 @@ static void msdc_ops_request_legacy(struct mmc_host *mmc,
 	}
 
 	/* only CMD0/12/13 can be send when non-empty queue @ CMDQ on */
-	if (mmc_card_cmdq(mmc->card)
+	if (mmc->card && mmc_card_cmdq(mmc->card)
 		&& atomic_read(&mmc->areq_cnt)
 		&& !check_mmc_cmd001213(cmd->opcode)
 		&& !check_mmc_cmd48(cmd->opcode)) {
@@ -4142,7 +4138,7 @@ int msdc_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	autok_msdc_tx_setting(host, &mmc->ios);
 
 #ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
-	if (mmc_card_cmdq(mmc->card)) {
+	if (mmc->card && mmc_card_cmdq(mmc->card)) {
 		if (msdc_cq_cmd_wait_xfr_done(host)) {
 			pr_notice("msdc%d waiting data transfer done4 TMO\n",
 				host->id);
@@ -4607,10 +4603,10 @@ static void msdc_check_data_timeout(struct work_struct *work)
 		msdc_dma_stop(host);
 		msdc_dma_clear(host);
 		msdc_reset_hw(host->id);
-		if(host->id == 1) {
+		if (host->id == 1) {
+			pr_info("msdc1 err, reset sdcard\n");
 			(void)sdcard_hw_reset(host->mmc);
 		}
-
 		tmo = jiffies + POLLING_BUSY;
 
 		/* check card state, try to bring back to trans state */
@@ -4729,7 +4725,8 @@ skip_non_FDE_ERROR_HANDLING:
 			atomic_set(&host->mmc->is_data_dma, 0);
 
 			/* CQ mode:just set data->error & let mmc layer tune */
-			if (mmc_card_cmdq(host->mmc->card)) {
+			if (host->mmc->card
+				&& mmc_card_cmdq(host->mmc->card)) {
 				if (mrq->data->flags & MMC_DATA_WRITE)
 					atomic_set(&host->cq_error_need_stop,
 						1);
@@ -4835,8 +4832,9 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
 		intsts &= inten;
 
 #ifdef CONFIG_MTK_EMMC_HW_CQ
-	if (mmc_card_cmdq(host->mmc->card) &&
-		(intsts & MSDC_INT_CMDQ)) {
+	if (host->mmc->card
+		&& mmc_card_cmdq(host->mmc->card)
+		&& (intsts & MSDC_INT_CMDQ)) {
 		msdc_cmdq_irq(host, intsts);
 		MSDC_WRITE32(MSDC_INT, intsts); /* clear interrupts */
 
@@ -5180,11 +5178,6 @@ static const struct cmdq_host_ops msdc_cmdq_ops = {
 };
 #endif
 
-/* use for SPM spm_resource_req */
-unsigned int msdc_cg_lock_init;
-unsigned int msdc_cg_cnt;
-spinlock_t msdc_cg_lock;
-
 static int msdc_drv_probe(struct platform_device *pdev)
 {
 	struct mmc_host *mmc = NULL;
@@ -5210,9 +5203,12 @@ static int msdc_drv_probe(struct platform_device *pdev)
 
 	/* Set host parameters to mmc */
 	mmc->ops        = &mt_msdc_ops;
-	mmc->f_min      = HOST_MIN_MCLK;
-	mmc->f_max      = HOST_MAX_MCLK;
 	mmc->ocr_avail  = MSDC_OCR_AVAIL;
+	/* set clock when dts is not defined */
+	if (!mmc->f_min)
+		mmc->f_min = HOST_MIN_MCLK;
+	if (!mmc->f_max)
+		mmc->f_max = HOST_MAX_MCLK;
 
 	if ((hw->flags & MSDC_SDIO_IRQ) || (hw->flags & MSDC_EXT_SDIO_IRQ))
 		mmc->caps |= MMC_CAP_SDIO_IRQ;  /* yes for sdio */
@@ -5315,13 +5311,16 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	host->dma.gpd = dma_alloc_coherent(&pdev->dev,
 			MAX_GPD_NUM * sizeof(struct gpd_t),
 			&host->dma.gpd_addr, GFP_KERNEL);
+	if (!host->dma.gpd)
+		return -ENOMEM;
 	host->dma.bd = dma_alloc_coherent(&pdev->dev,
 			MAX_BD_NUM * sizeof(struct bd_t),
 			&host->dma.bd_addr, GFP_KERNEL);
+	if (!host->dma.bd)
+		return -ENOMEM;
 	host->pio_kaddr = kmalloc_array(DIV_ROUND_UP(MAX_SGMT_SZ, PAGE_SIZE),
 		sizeof(ulong), GFP_KERNEL);
 	WARN_ON(!host->pio_kaddr);
-	WARN_ON((!host->dma.gpd) || (!host->dma.bd));
 	msdc_init_gpd_bd(host, &host->dma);
 	mtk_msdc_host[host->id] = host;
 
@@ -5399,12 +5398,8 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		}
 	}
 
-	/* init spinlock for SPM */
-	if (msdc_cg_lock_init == 0) {
-		msdc_cg_lock_init = 1;
-		spin_lock_init(&msdc_cg_lock);
-		msdc_cg_cnt = 2;
-	}
+	pm_qos_add_request(&host->msdc_pm_qos_req,
+		PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
 
 	pm_runtime_set_active(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
@@ -5447,12 +5442,12 @@ static int msdc_drv_remove(struct platform_device *pdev)
 		clk_unprepare(host->clk_ctl);
 	if (host->hclk_ctl)
 		clk_unprepare(host->hclk_ctl);
-#ifdef CONFIG_MTK_HW_FDE
+#if defined(CONFIG_MTK_HW_FDE) || defined(CONFIG_HIE)
 	if (host->aes_clk_ctl)
 		clk_unprepare(host->aes_clk_ctl);
 #endif
 #endif
-
+	pm_qos_remove_request(&host->msdc_pm_qos_req);
 	pm_runtime_disable(&pdev->dev);
 	mmc_remove_host(host->mmc);
 
@@ -5484,13 +5479,14 @@ static int msdc_runtime_suspend(struct device *dev)
 	if (host->mclk)
 		msdc_clk_disable(host);
 
-#ifndef CONFIG_MTK_MSDC_BRING_UP_BYPASS
-	spin_lock_irqsave(&msdc_cg_lock, flags);
-	msdc_cg_cnt--;
-	if (msdc_cg_cnt == 0)
-		spm_resource_req(SPM_RESOURCE_USER_MSDC, SPM_RESOURCE_RELEASE);
-	spin_unlock_irqrestore(&msdc_cg_lock, flags);
-#endif
+	clk_unprepare(host->clk_ctl);
+	if (host->aes_clk_ctl)
+		clk_unprepare(host->aes_clk_ctl);
+	if (host->hclk_ctl)
+		clk_unprepare(host->hclk_ctl);
+
+	pm_qos_update_request(&host->msdc_pm_qos_req,
+		PM_QOS_DEFAULT_VALUE);
 
 	return 0;
 }
@@ -5499,15 +5495,13 @@ static int msdc_runtime_resume(struct device *dev)
 {
 	struct msdc_host *host = dev_get_drvdata(dev);
 
-#ifndef CONFIG_MTK_MSDC_BRING_UP_BYPASS
-	unsigned long flags;
+	pm_qos_update_request(&host->msdc_pm_qos_req, 0);
 
-	spin_lock_irqsave(&msdc_cg_lock, flags);
-	msdc_cg_cnt++;
-	if (msdc_cg_cnt == 1)
-		spm_resource_req(SPM_RESOURCE_USER_MSDC, SPM_RESOURCE_ALL);
-	spin_unlock_irqrestore(&msdc_cg_lock, flags);
-#endif
+	(void)clk_prepare(host->clk_ctl);
+	if (host->aes_clk_ctl)
+		(void)clk_prepare(host->aes_clk_ctl);
+	if (host->hclk_ctl)
+		(void)clk_prepare(host->hclk_ctl);
 
 	/* mclk = 0 means core layer resume will enable clk later. */
 	if (host->mclk)

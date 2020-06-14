@@ -26,6 +26,7 @@
 #include <linux/bitops.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
+#include <linux/pm_qos.h>
 
 #include "msdc_cust.h"
 
@@ -67,11 +68,12 @@
 
 #ifdef CONFIG_MTK_MMC_DEBUG
 #define MSDC_DMA_ADDR_DEBUG
-#define MTK_MSDC_LOW_IO_DEBUG
+/* #define MTK_MSDC_LOW_IO_DEBUG */
 #ifdef CONFIG_MTK_EMMC_HW_CQ
 #undef MTK_MSDC_LOW_IO_DEBUG
 #endif
 #endif
+/* #define MTK_MMC_SDIO_DEBUG */
 
 #define MTK_MSDC_USE_CMD23
 #if !defined(CONFIG_PWR_LOSS_MTK_TEST) && defined(MTK_MSDC_USE_CMD23) \
@@ -86,7 +88,7 @@
 /* ================================= */
 
 #define MAX_GPD_NUM                     (1 + 1) /* one null gpd */
-#define MAX_BD_NUM                      (1024)
+#define MAX_BD_NUM                      (128)
 #define MAX_BD_PER_GPD                  (MAX_BD_NUM)
 #define CLK_SRC_MAX_NUM                 (1)
 
@@ -420,6 +422,8 @@ struct msdc_host {
 	u32                     power_io;
 	u32                     power_flash;
 
+	struct pm_qos_request   msdc_pm_qos_req; /* use for pm qos */
+
 	struct clk              *clk_ctl;
 	struct clk              *aes_clk_ctl;
 	struct clk              *hclk_ctl;
@@ -613,6 +617,7 @@ static inline unsigned int uffs(unsigned int x)
 #define is_card_sdio(h)         (((struct msdc_host *)(h))->hw->register_pm)
 
 #define CMD_TIMEOUT             (HZ/10 * 5)     /* 100ms x5 */
+#define CMD_CQ_TIMEOUT          (HZ    * 3)
 #define DAT_TIMEOUT             (HZ    * 5)     /* 1000ms x5 */
 #define POLLING_BUSY            (HZ    * 3)
 #define POLLING_PINS            (HZ*20 / 1000)	/* 20ms */
@@ -687,13 +692,6 @@ void msdc_set_smpl_all(struct msdc_host *host, u32 clock_mode);
 void msdc_set_check_endbit(struct msdc_host *host, bool enable);
 int msdc_switch_part(struct msdc_host *host, char part_id);
 
-/* Function provided by msdc_tune.c */
-int sdcard_hw_reset(struct mmc_host *mmc);
-int sdcard_reset_tuning(struct mmc_host *mmc);
-int emmc_reinit_tuning(struct mmc_host *mmc);
-void msdc_restore_timing_setting(struct msdc_host *host);
-void msdc_save_timing_setting(struct msdc_host *host);
-
 #ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
 unsigned int msdc_do_cmdq_command(struct msdc_host *host,
 	struct mmc_command *cmd,
@@ -710,10 +708,15 @@ u64 msdc_get_user_capacity(struct msdc_host *host);
 u32 msdc_get_other_capacity(struct msdc_host *host, char *name);
 
 /* Function provided by msdc_tune.c */
+int sdcard_hw_reset(struct mmc_host *mmc);
+int sdcard_reset_tuning(struct mmc_host *mmc);
+int emmc_reinit_tuning(struct mmc_host *mmc);
 void msdc_init_tune_setting(struct msdc_host *host);
 void msdc_ios_tune_setting(struct msdc_host *host, struct mmc_ios *ios);
 void msdc_init_tune_path(struct msdc_host *host, unsigned char timing);
 void msdc_sdio_restore_after_resume(struct msdc_host *host);
+void msdc_restore_timing_setting(struct msdc_host *host);
+void msdc_save_timing_setting(struct msdc_host *host);
 void msdc_set_bad_card_and_remove(struct msdc_host *host);
 void msdc_remove_card(struct work_struct *work);
 #ifdef CONFIG_HIE

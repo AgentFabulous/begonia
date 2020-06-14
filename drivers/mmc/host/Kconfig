@@ -492,7 +492,6 @@ config MMC_SDHCI_MSM
 	tristate "Qualcomm SDHCI Controller Support"
 	depends on ARCH_QCOM || (ARM && COMPILE_TEST)
 	depends on MMC_SDHCI_PLTFM
-	select MMC_SDHCI_IO_ACCESSORS
 	help
 	  This selects the Secure Digital Host Controller Interface (SDHCI)
 	  support present in Qualcomm SOCs. The controller supports
@@ -958,6 +957,15 @@ config MMC_SDHCI_BRCMSTB
 
 config MMC_MTK_SDIO
 	tristate "MediaTek SDIO Card Interface support"
+	depends on HAS_DMA
+	help
+	  This selects the MediaTek(R) MT6630 SDIO Interface.
+	  If you have a machine with a integrated SDIO card reader, say Y or M here.
+	  This is needed if support for any SDIO devices is required.
+	  If unsure, say N.
+
+config MMC_MTK_COMM_SDIO
+	tristate "MediaTek SDIO driver support"
 	depends on HAS_DMA
 	help
 	  This selects the MediaTek(R) SDIO Interface.
