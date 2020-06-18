@@ -641,12 +641,6 @@ el1_dbg:
 	/*
 	 * Debug exception handling
 	 */
-#ifdef CONFIG_ARM64_ERRATUM_1406411
-	alternative_insn						\
-	"nop; nop; nop",						\
-	"mrs x2, S3_0_C15_C1_0;orr x2, x2 ,#(1 << 10);msr S3_0_C15_C1_0, x2",\
-	ARM64_WORKAROUND_1406411
-#endif
 	cmp	x24, #ESR_ELx_EC_BRK64		// if BRK64
 	cinc	x24, x24, eq			// set bit '0'
 	tbz	x24, #0, el1_inv		// EL1 only
@@ -867,12 +861,6 @@ el0_dbg:
 	/*
 	 * Debug exception handling
 	 */
-#ifdef CONFIG_ARM64_ERRATUM_1406411
-	alternative_insn						\
-	"nop; nop; nop",						\
-	"mrs x2, S3_0_C15_C1_0;orr x2, x2 ,#(1 << 10);msr S3_0_C15_C1_0, x2",\
-	ARM64_WORKAROUND_1406411
-#endif
 	tbnz	x24, #0, el0_inv		// EL0 only
 	mrs	x0, far_el1
 	mov	x1, x25
