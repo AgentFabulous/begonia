@@ -32,6 +32,7 @@ static void __iomem *EMI_DBG_BASE[MAX_DBG_NR];
 static void __iomem *EMI_MPU_BASE;
 
 static struct emi_info_t emi_info;
+static unsigned int emi_dcm;
 
 static int emi_probe(struct platform_device *pdev);
 
@@ -179,6 +180,8 @@ static int emi_probe(struct platform_device *pdev)
 		}
 	}
 
+	of_property_read_u32(pdev->dev.of_node,
+				"emi_dcm", &emi_dcm);
 	plat_debug_api_init();
 #endif
 	pr_info("[EMI] get CEN_EMI_BASE @ %p\n", mt_cen_emi_base_get());
@@ -334,3 +337,9 @@ void __iomem *mt_emi_mpu_base_get(void)
 	return EMI_MPU_BASE;
 }
 EXPORT_SYMBOL(mt_emi_mpu_base_get);
+
+unsigned int mt_emi_dcm_config(void)
+{
+	return emi_dcm;
+}
+EXPORT_SYMBOL(mt_emi_dcm_config);

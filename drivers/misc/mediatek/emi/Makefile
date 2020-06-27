@@ -14,3 +14,4 @@
 MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 
 obj-$(CONFIG_MTK_EMI) += $(MTK_PLATFORM)/
+

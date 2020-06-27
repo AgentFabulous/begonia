@@ -23,7 +23,9 @@
 #include <mt_emi.h>
 #include <bwl_platform.h>
 #include "bwl_v1.h"
-
+#if DBG_INFO_READY
+#include <plat_dbg_info.h>
+#endif
 #ifdef DECS_ON_SSPM
 #include <dramc.h>
 #endif
@@ -349,8 +351,5 @@ void bwl_init(struct platform_driver *emi_ctrl)
 	ret = driver_create_file(&emi_ctrl->driver, &driver_attr_bwl_config);
 	if (ret)
 		pr_err("[BWL] fail to bwl_config\n");
-#endif
-#ifdef ENABLE_BW_MON_PLAT_INIT
-	bw_monitor_init();
 #endif
 }

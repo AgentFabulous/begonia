@@ -25,13 +25,13 @@
 
 #include <mt-plat/mtk_io.h>
 #include <mt-plat/sync_write.h>
-
-#include <dramc.h>
 #include <mt_emi.h>
+#if DBG_INFO_READY
+#include <plat_dbg_info.h>
+#endif
 
 static struct dentry *emi_mbw_dir;
 static struct dentry *dump_buf;
-static void __iomem *LAST_EMI_BASE;
 static void __iomem *mbw_dram_buf;
 static bool elm_enabled;
 
@@ -40,24 +40,9 @@ static ssize_t dump_buf_read
 {
 	ssize_t bytes = len < (MBW_BUF_LEN - *ppos) ?
 		len : (MBW_BUF_LEN - *ppos);
-#ifdef ISU_VER_CTRL
-	ssize_t header_bytes = 0;
-#endif
 
 	if (!mbw_dram_buf)
 		return 0;
-
-#ifdef ISU_VER_CTRL
-	if (*ppos == 0) {
-		if (copy_to_user(data, (char *)LAST_EMI_ISU_VER, 4)
-			|| (bytes < 4))
-			return -EFAULT;
-
-		data += 4;
-		header_bytes += 4;
-		bytes -= 4;
-	}
-#endif
 
 	if (bytes) {
 		if (copy_to_user(data, (char *)mbw_dram_buf + *ppos, bytes))
@@ -66,11 +51,7 @@ static ssize_t dump_buf_read
 
 	*ppos += bytes;
 
-#ifdef ISU_VER_CTRL
-	return (bytes + header_bytes);
-#else
 	return bytes;
-#endif
 }
 
 static int dump_buf_open(struct inode *inode, struct file *file)
@@ -86,6 +67,7 @@ static const struct file_operations dump_buf_fops = {
 
 void elm_init(struct platform_driver *emi_ctrl, struct platform_device *pdev)
 {
+	void __iomem *LAST_EMI_BASE;
 	unsigned int mbw_buf_h, mbw_buf_l;
 	phys_addr_t mbw_buf_start;
 
