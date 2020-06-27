@@ -41,16 +41,15 @@
 #include "../workqueue_internal.h"
 #include "../smpboot.h"
 
-#include "mtk_perf.h"
+#include <mt-plat/perf_tracker.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 #include "walt.h"
 #include "mtk_mcdi_api.h"
+#if defined(CONFIG_MTK_GIC_V3_EXT)
 #include <linux/irqchip/mtk-gic-extend.h>
-
-#include <mt-plat/l3cc_common.h>
-
+#endif
 #ifdef CONFIG_MTK_SCHED_MONITOR
 #include "mtk_sched_mon.h"
 enum ipi_msg_type {
@@ -3854,7 +3853,6 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
 {
 	sched_info_switch(rq, prev, next);
 	perf_event_task_sched_out(prev, next);
-	hook_ca_context_switch(rq, prev, next);
 	fire_sched_out_preempt_notifiers(prev, next);
 	prepare_lock_switch(rq, next);
 	prepare_arch_switch(next);
@@ -4304,10 +4302,7 @@ void scheduler_tick(void)
 #ifdef CONFIG_MTK_SCHED_MONITOR
 	mt_save_irq_counts(SCHED_TICK);
 #endif
-
-#ifdef CONFIG_MTK_PERF_TRACKER
 	perf_tracker(sched_ktime_clock());
-#endif
 
 #ifdef CONFIG_SMP
 	rq->idle_balance = idle_cpu(cpu);
@@ -4370,6 +4365,7 @@ static inline void preempt_latency_start(int val)
 		unsigned long ip = get_lock_parent_ip();
 #ifdef CONFIG_DEBUG_PREEMPT
 		current->preempt_disable_ip = ip;
+		record_preempt_disable_ips(current);
 #endif
 		trace_preempt_off(CALLER_ADDR0, ip);
 #ifdef CONFIG_PREEMPT_MONITOR
@@ -4460,7 +4456,7 @@ static noinline void __schedule_bug(struct task_struct *prev)
 {
 	/* Save this before calling printk(), since that will clobber it */
 	unsigned long preempt_disable_ip = get_preempt_disable_ip(current);
-
+	int i = 0;
 	if (oops_in_progress)
 		return;
 
@@ -4475,6 +4471,7 @@ static noinline void __schedule_bug(struct task_struct *prev)
 	    && in_atomic_preempt_off()) {
 		pr_err("Preemption disabled at:");
 		print_ip_sym(preempt_disable_ip);
+		dump_preempt_disable_ips(current);
 		pr_cont("\n");
 	}
 	if (panic_on_warn)
@@ -7025,10 +7022,9 @@ int _sched_isolate_cpu(int cpu)
 	mcdi_cpu_iso_mask(cpu_isolated_mask->bits[0]);
 	cpumask_clear_cpu(cpu, &avail_cpus);
 	/* Migrate timers */
-#if 0
+
 	smp_call_function_any(&avail_cpus, hrtimer_quiesce_cpu, &cpu, 1);
 	smp_call_function_any(&avail_cpus, timer_quiesce_cpu, &cpu, 1);
-#endif
 	stop_cpus(cpumask_of(cpu), do_isolation_work_cpu_stop, 0);
 
 	calc_load_migrate(rq);
@@ -7039,7 +7035,7 @@ out:
 	cpu_maps_update_done();
 	trace_sched_isolate(cpu, cpumask_bits(cpu_isolated_mask)[0],
 			    start_time, 1);
-	printk_deferred("[name:isolation&]%s: prio=%d, cpu=%d, isolation_cpus=0x%lx\n",
+	printk_deferred("%s: prio=%d, cpu=%d, isolation_cpus=0x%lx\n",
 			__func__, iso_prio, cpu, cpu_isolated_mask->bits[0]);
 	return ret_code;
 }
@@ -7090,7 +7086,7 @@ int __sched_deisolate_cpu_unlocked(int cpu)
 out:
 	trace_sched_isolate(cpu, cpumask_bits(cpu_isolated_mask)[0],
 			    start_time, 0);
-	printk_deferred("[name:isolation&]%s: prio=%d, cpu=%d, isolation_cpus=0x%lx\n",
+	printk_deferred("%s: prio=%d, cpu=%d, isolation_cpus=0x%lx\n",
 			__func__, iso_prio, cpu, cpu_isolated_mask->bits[0]);
 	return ret_code;
 }
@@ -7178,7 +7174,10 @@ int sched_isolate_cpu(int cpu)
 	if (cpu >= nr_cpu_ids)
 		return err;
 
+
+	#if defined(CONFIG_MTK_GIC_V3_EXT)
 	remove_cpu_from_prefer_schedule_domain(cpu);
+	#endif
 	cpumask_clear_cpu(cpu, &available_cpus);
 	err = set_cpu_isolation(ISO_CUSTOMIZE, &available_cpus);
 
@@ -7199,8 +7198,10 @@ int sched_deisolate_cpu(int cpu)
 
 	cpumask_set_cpu(cpu, &available_cpus);
 	err = set_cpu_isolation(ISO_CUSTOMIZE, &available_cpus);
-	add_cpu_to_prefer_schedule_domain(cpu);
 
+	#if defined(CONFIG_MTK_GIC_V3_EXT)
+	add_cpu_to_prefer_schedule_domain(cpu);
+	#endif
 	return err;
 }
 EXPORT_SYMBOL(sched_deisolate_cpu);
@@ -7736,6 +7737,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 	    && !preempt_count_equals(preempt_offset)) {
 		pr_err("Preemption disabled at:");
 		print_ip_sym(preempt_disable_ip);
+		dump_preempt_disable_ips(current);
 		pr_cont("\n");
 	}
 	dump_stack();

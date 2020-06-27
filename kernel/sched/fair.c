@@ -117,7 +117,7 @@ unsigned int sysctl_sched_child_runs_first __read_mostly;
 unsigned int sysctl_sched_wakeup_granularity		= 1000000UL;
 unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
 
-const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
+const_debug unsigned int sysctl_sched_migration_cost	= 33000UL;
 
 #ifdef CONFIG_SCHED_WALT
 unsigned int sysctl_sched_use_walt_cpu_util = 1;
@@ -6321,8 +6321,8 @@ static void calc_sg_energy(struct energy_env *eenv, struct sched_domain *sd)
 		mt_sched_printf(sched_eas_energy_calc,
 			"sg_util=%lu busy_egy=%d idle_egy=%d (cost=%d total_egy=%d) mask=0x%lx child=%d",
 			sg_util,
-			busy_energy, idle_energy, total_energy,
-			eenv->cpu[cpu_idx].energy,
+			(int)busy_energy, (int)idle_energy, (int)total_energy,
+			(int)eenv->cpu[cpu_idx].energy,
 			sched_group_span(sg)->bits[0],
 			(sd->child) ? 1 : 0);
 
@@ -7487,7 +7487,10 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	unsigned long target_max_spare_cap = 0;
 	unsigned long target_util = ULONG_MAX;
 	unsigned long best_active_util = ULONG_MAX;
-	unsigned long task_clamped_util = task_uclamped_min_w_ceiling(p);
+	unsigned long max_capacity = cluster_max_capacity();
+	unsigned long min_cpu_util = ULONG_MAX;
+	unsigned long backup_min_cpu_util = ULONG_MAX;
+	unsigned long min_target_capacity = ULONG_MAX;
 	int best_idle_cstate = INT_MAX;
 	struct sched_domain *sd;
 	struct sched_group *sg;
@@ -7495,6 +7498,8 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	int best_idle_cpu = -1;
 	int target_cpu = -1;
 	int cpu, i;
+	int min_cpu = -1;
+	int backup_min_cpu = -1;
 	bool turning = false;
 
 	*backup_cpu = -1;
@@ -7557,6 +7562,7 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 			 * The target CPU can be already at a capacity level higher
 			 * than the one required to boost the task.
 			 */
+			max_util = min(max_capacity, max_util);
 			new_util = clamp(new_util, min_util, max_util);
 			if (new_util > capacity)
 				continue;
@@ -7611,16 +7617,41 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 				 * efficient CPU (i.e. smallest capacity_orig)
 				 */
 				if (idle_cpu(i)) {
-					if ((boosted || turning) &&
-					    capacity_orig < target_capacity)
-						continue;
-					if (!boosted  && !turning &&
-					    capacity_orig > target_capacity)
-						continue;
 					if (capacity_orig == target_capacity &&
 					    sysctl_sched_cstate_aware &&
 					    best_idle_cstate <= idle_idx)
 						continue;
+
+					/*
+					 * If little core will use frequency
+					 * higher than truning point, store it
+					 * as backup cpu.
+					 */
+					if (hmp_cpu_is_slowest(i) &&
+						freq_util(new_util) >
+							cpu_eff_tp &&
+						new_util <
+							backup_min_cpu_util) {
+						backup_min_cpu_util =
+							new_util;
+						backup_min_cpu = i;
+						continue;
+					}
+
+					/*
+					 * if we found an effcient cpu in L cpu,
+					 * it's no need to search B cpu.
+					 */
+					if (capacity_orig > min_target_capacity)
+						continue;
+
+					/* find the max spare capacity cpu */
+					if (new_util < min_cpu_util) {
+						min_target_capacity =
+							capacity_orig;
+						min_cpu_util = new_util;
+						min_cpu = i;
+					}
 
 					target_capacity = capacity_orig;
 					best_idle_cstate = idle_idx;
@@ -7659,10 +7690,6 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 				best_active_cpu = i;
 				continue;
 			}
-
-			new_util = max(task_clamped_util, new_util);
-			if (new_util > capacity)
-				continue;
 
 			/*
 			 * Enforce EAS mode
@@ -7782,15 +7809,16 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 
 	} while (sg = sg->next, sg != sd->groups);
 
-	if (turning) {
-		/* Turning enable, Prefer Select CPU with higher cap_orig */
-		if (target_capacity <= best_idle_min_cap_orig)
-			target_cpu = best_idle_cpu;
-	} else {
-		/* Turning disable, Perfer Select CPU with lower cap_orig */
-		if (target_capacity >= best_idle_min_cap_orig)
-			target_cpu = best_idle_cpu;
+	/* Prefer Select CPU with higher cap_orig */
+	if (turning &&
+		target_capacity <= best_idle_min_cap_orig) {
+		target_cpu = best_idle_cpu;
 	}
+
+	/* Perfer Select CPU with lower cap_orig */
+	if (!turning &&
+		target_capacity >= best_idle_min_cap_orig)
+		target_cpu = best_idle_cpu;
 
 	/*
 	 * For non latency sensitive tasks, cases B and C in the previous loop,
@@ -7812,6 +7840,13 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	 *   a) ACTIVE CPU: target_cpu
 	 *   b) IDLE CPU: best_idle_cpu
 	 */
+
+	if (prefer_idle) {
+		if (backup_min_cpu != -1)
+			best_idle_cpu = backup_min_cpu;
+		if (min_cpu != -1)
+			best_idle_cpu = min_cpu;
+	}
 
 	if (prefer_idle && (best_idle_cpu != -1)) {
 		trace_sched_find_best_target(p, prefer_idle, min_util, cpu,
@@ -8087,7 +8122,7 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 		/* sched: no need energy calculation if the same domain */
 		if (target_cpu >= 0 &&
 			is_intra_domain(task_cpu(p), target_cpu) &&
-			target_cpu != l_plus_cpu) {
+			target_cpu != l_plus_cpu && !cpu_isolated(target_cpu)) {
 
 			if (idle_cpu(prev_cpu) && idle_cpu(target_cpu)) {
 				struct rq *prev_rq, *target_rq;

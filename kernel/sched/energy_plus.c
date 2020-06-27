@@ -29,7 +29,7 @@ static struct idle_state default_idle_states[] = {
 	{ .power = 0 }, /* 6: WFI/SPARK */
 };
 
-void init_cpu_capacity(unsigned int cpu)
+static void update_cpu_capacity(unsigned int cpu)
 {
 	unsigned long capacity = SCHED_CAPACITY_SCALE;
 
@@ -64,31 +64,12 @@ void init_sched_energy_costs(void)
 			sge->idle_states = default_idle_states;
 			sge_array[cpu][sd_level] = sge;
 		}
-		init_cpu_capacity(cpu);
+		update_cpu_capacity(cpu);
 	}
 
 
 	return;
 }
 
-struct sched_group_energy cci_tbl;
-const struct sched_group_energy * const cci_energy(void)
-{
-	struct sched_group_energy *sge = &cci_tbl;
-	struct upower_tbl_info **addr_ptr_tbl_info;
-	struct upower_tbl_info *ptr_tbl_info;
-	struct upower_tbl *ptr_tbl;
-
-	addr_ptr_tbl_info = upower_get_tbl();
-	ptr_tbl_info = *addr_ptr_tbl_info;
-
-	ptr_tbl = ptr_tbl_info[UPOWER_BANK_CCI].p_upower_tbl;
-
-	sge->nr_cap_states = ptr_tbl->row_num;
-	sge->cap_states = ptr_tbl->row;
-	sge->lkg_idx = ptr_tbl->lkg_idx;
-
-	return sge;
-}
 #endif
 

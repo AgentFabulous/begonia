@@ -42,6 +42,7 @@ int l_plus_cpu = -1;
 #elif defined(CONFIG_MACH_MT6779)
  #ifdef CONFIG_MTK_SCHED_EAS_POWER_SUPPORT
 static int share_buck[2] = {2, 1};
+#define ARM_V8_2
  #endif
 int l_plus_cpu = -1;
 #else
@@ -63,6 +64,7 @@ update_system_overutilized(struct lb_env *env)
 	unsigned long max_capacity;
 	struct sched_group *group = env->sd->groups;
 	int this_cpu;
+	int max_cap_orig_cpu;
 	bool overutilized =  sd_overutilized(env->sd);
 	int i;
 
@@ -70,7 +72,11 @@ update_system_overutilized(struct lb_env *env)
 		return;
 
 	this_cpu = smp_processor_id();
-	max_capacity = cpu_rq(this_cpu)->rd->max_cpu_capacity.val;
+	max_cap_orig_cpu = cpu_rq(this_cpu)->rd->max_cap_orig_cpu;
+	if (max_cap_orig_cpu > -1)
+		max_capacity = capacity_orig_of(max_cap_orig_cpu);
+	else
+		max_capacity = cpu_rq(this_cpu)->rd->max_cpu_capacity.val;
 
 	do {
 
@@ -360,7 +366,7 @@ migrate_running_task(int this_cpu, struct task_struct *p, struct rq *target)
 }
 #endif
 
-inline unsigned long task_uclamped_min_w_ceiling(struct task_struct *p)
+inline unsigned long cluster_max_capacity(void)
 {
 	struct hmp_domain *domain;
 	unsigned int max_capacity = 0;
@@ -376,7 +382,21 @@ inline unsigned long task_uclamped_min_w_ceiling(struct task_struct *p)
 			max_capacity = capacity;
 	}
 
-	return min(uclamp_task_effective_util(p, UCLAMP_MIN), max_capacity);
+	return max_capacity;
+}
+
+inline unsigned long task_uclamped_min_w_ceiling(struct task_struct *p)
+{
+	unsigned long max_capacity = cluster_max_capacity();
+
+	return min_t(unsigned int, uclamp_task_effective_util(p, UCLAMP_MIN),
+			max_capacity);
+}
+
+/* Calculte util with DVFS margin */
+inline unsigned int freq_util(unsigned long util)
+{
+	return util * 10 >> 3;
 }
 
 #ifdef CONFIG_MTK_IDLE_BALANCE_ENHANCEMENT
@@ -972,6 +992,24 @@ bool is_share_buck(int cid, int *co_buck_cid)
 	return ret;
 }
 
+#ifdef ARM_V8_2
+const struct sched_group_energy * const cci_energy(void)
+{
+	struct sched_group_energy *sge = &cci_tbl;
+	struct upower_tbl_info **addr_ptr_tbl_info;
+	struct upower_tbl_info *ptr_tbl_info;
+	struct upower_tbl *ptr_tbl;
+
+	addr_ptr_tbl_info = upower_get_tbl();
+	ptr_tbl_info = *addr_ptr_tbl_info;
+	ptr_tbl = ptr_tbl_info[UPOWER_BANK_CCI].p_upower_tbl;
+
+	sge->nr_cap_states = ptr_tbl->row_num;
+	sge->cap_states = ptr_tbl->row;
+	sge->lkg_idx = ptr_tbl->lkg_idx;
+	return sge;
+}
+
 extern unsigned int mt_cpufreq_get_cur_cci_freq_idx(void);
 int get_cci_cap_idx(void)
 {
@@ -987,6 +1025,7 @@ int get_cci_cap_idx(void)
 
 	return CCI_nr_cap_stats - mt_cpufreq_get_cur_cci_freq_idx();
 }
+#endif
 
 int share_buck_cap_idx(struct energy_env *eenv, int cpu_idx,
 			int cid, int *co_buck_cid)
@@ -1000,9 +1039,10 @@ int share_buck_cap_idx(struct energy_env *eenv, int cpu_idx,
 		if (*co_buck_cid < num_cluster)
 			co_buck_cap_idx =
 				eenv->cpu[cpu_idx].cap_idx[*co_buck_cid];
+#ifdef ARM_V8_2
 		else if (*co_buck_cid ==  CCI_ID)    /* CCI + DSU */
 			co_buck_cap_idx = get_cci_cap_idx();
-
+#endif
 		trace_sched_share_buck(cpu_idx, cid, cap_idx, *co_buck_cid,
 					co_buck_cap_idx);
 	}
@@ -1087,6 +1127,7 @@ mtk_idle_power(int cpu_idx, int idle_state, int cpu, void *argu, int sd_level)
 		trace_sched_idle_power(sd_level, cap_idx, lkg_pwr, energy_cost);
 	}
 
+#ifdef ARM_V8_2
 	if ((sd_level != 0) && (co_buck_cid == CCI_ID)) {
 		struct upower_tbl_row *CCI_pwr_tbl;
 		unsigned long lkg_pwr;
@@ -1099,6 +1140,7 @@ mtk_idle_power(int cpu_idx, int idle_state, int cpu, void *argu, int sd_level)
 
 		trace_sched_idle_power(sd_level, cap_idx, lkg_pwr, energy_cost);
 	}
+#endif
 
 	return energy_cost;
 }
@@ -1274,6 +1316,7 @@ int mtk_busy_power(int cpu_idx, int cpu, void *argu, int sd_level)
 
 	}
 
+#ifdef ARM_V8_2
 	if ((sd_level != 0) && (co_buck_cid == CCI_ID)) {
 		/* CCI + DSU */
 		const struct sched_group_energy *_sge;
@@ -1282,6 +1325,7 @@ int mtk_busy_power(int cpu_idx, int cpu, void *argu, int sd_level)
 		energy_cost += calc_busy_power(_sge, co_cap_idx, cap_idx,
 							sd_level);
 	}
+#endif
 
 	return energy_cost;
 }
