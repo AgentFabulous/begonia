@@ -80,8 +80,9 @@ static struct i2c_board_info _lcm_i2c_board_info __initdata = {
 };
 #else
 static const struct of_device_id _lcm_i2c_of_match[] = {
-	{ .compatible = "mediatek,I2C_LCD_BIAS", },
-	{},
+	{
+	 .compatible = "mediatek,I2C_LCD_BIAS",
+	 },
 };
 #endif
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -70,7 +70,6 @@ static struct LCM_UTIL_FUNCS lcm_util;
 		lcm_util.dsi_dcs_read_lcm_reg(cmd)
 #define read_reg_v2(cmd, buffer, buffer_size) \
 		lcm_util.dsi_dcs_read_lcm_reg_v2(cmd, buffer, buffer_size)
-
 /*ARR*/
 #define dfps_dsi_send_cmd(dfps_send_cmd_way, dfps_send_cmd_speed, \
 		cmdq, cmd, count, para_list, force_update) \
@@ -373,7 +372,7 @@ static int lcm_get_lockdowninfo_for_tp(unsigned char *plockdowninfo)
 	struct dsi_cmd_desc read_tab;
 	struct dsi_cmd_desc write_tab;
 
-
+	//switch to cmd2 page 1
 	write_tab.dtype = 0xFF;
 	write_tab.dlen = 1;
 	write_tab.payload = vmalloc(1 * sizeof(unsigned char));
@@ -391,7 +390,7 @@ static int lcm_get_lockdowninfo_for_tp(unsigned char *plockdowninfo)
 	do_lcm_vdo_lp_write(&write_tab, 1);
 	do_lcm_vdo_lp_read(&read_tab, 1);
 
-
+	//switch to cmd1
 	write_tab.dtype = 0xFF;
 	write_tab.dlen = 1;
 	write_tab.payload[0] = 0x10;
@@ -444,7 +443,7 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 
 	params->dsi.vertical_sync_active = 2;
 	params->dsi.vertical_backporch = 10;
-	params->dsi.vertical_frontporch = 12;
+	params->dsi.vertical_frontporch = 14;
 	params->dsi.vertical_frontporch_for_low_power = 620;
 	params->dsi.vertical_active_line = FRAME_HEIGHT;
 
@@ -468,6 +467,9 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 	params->dsi.lcm_esd_check_table[0].cmd = 0x53;
 	params->dsi.lcm_esd_check_table[0].count = 1;
 	params->dsi.lcm_esd_check_table[0].para_list[0] = 0x24;
+	/* for ARR 2.0 */
+//	params->max_refresh_rate = 60;
+//	params->min_refresh_rate = 45;
 
 #ifdef CONFIG_MTK_ROUND_CORNER_SUPPORT
 	params->round_corner_en = 1;
@@ -494,6 +496,15 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 	params->dsi.dfps_send_cmd_way = LCM_DFPS_SEND_CMD_STOP_VDO;
 	params->dsi.dfps_send_cmd_speed = LCM_DFPS_SEND_CMD_LP;
 
+#if 0
+	/*vertical_frontporch should be related to the max fps*/
+	params->dsi.vertical_frontporch = 20;
+	/*vertical_frontporch_for_low_power
+	 *should be related to the min fps
+	 */
+	params->dsi.vertical_frontporch_for_low_power = 750;
+#endif
+
 	dynamic_fps_levels =
 		sizeof(lcm_dynamic_fps_setting)/sizeof(struct dynamic_fps_info);
 
@@ -509,6 +520,9 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 			lcm_dynamic_fps_setting[i].fps;
 		params->dsi.dynamic_fps_table[i].vfp =
 			lcm_dynamic_fps_setting[i].vfp;
+		/* params->dsi.dynamic_fps_table[i].idle_check_interval =
+		 * lcm_dynamic_fps_setting[i].idle_check_interval;
+		 */
 	}
 }
 
@@ -516,7 +530,6 @@ static void lcm_init_power(void)
 {
 	bool double_click;
 
-	SET_RESET_PIN(0);
 	if (lcm_util.set_gpio_lcd_enp_bias) {
 		lcm_util.set_gpio_lcd_enp_bias(1);
 		MDELAY(1);
@@ -529,9 +542,15 @@ static void lcm_init_power(void)
 	if (!double_click)
 		lm36273_bias_enable(1, 1);
 
-	MDELAY(10);
+	MDELAY(2);
+	SET_RESET_PIN(0);
+	MDELAY(5);
 	SET_RESET_PIN(1);
-	MDELAY(10);
+	MDELAY(5);
+	SET_RESET_PIN(0);
+	MDELAY(1);
+	SET_RESET_PIN(1);
+	MDELAY(11);
 }
 
 static void lcm_suspend_power(void)

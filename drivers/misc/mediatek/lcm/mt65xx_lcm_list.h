@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -131,6 +131,9 @@ extern struct LCM_DRIVER nt35516_qhd_rav4_lcm_drv;
 extern struct LCM_DRIVER r63311_fhd_dsi_vdo_sharp_lcm_drv;
 extern struct LCM_DRIVER r81592_hvga_dsi_cmd_drv;
 extern struct LCM_DRIVER rm68190_dsi_vdo_lcm_drv;
+extern struct LCM_DRIVER nt35521_hd_dsi_vdo_truly_nt50358_lcm_drv;
+extern struct LCM_DRIVER nt35521_hd_dsi_vdo_truly_nt50358_fwvga_lcm_drv;
+extern struct LCM_DRIVER nt35521_hd_dsi_vdo_truly_nt50358_qhd_lcm_drv;
 extern struct LCM_DRIVER nt35596_fhd_dsi_vdo_truly_lcm_drv;
 extern struct LCM_DRIVER nt35595_fhd_dsi_vdo_truly_lcm_drv;
 extern struct LCM_DRIVER nt35595_fhd_dsi_cmd_truly_lcm_drv;
@@ -225,6 +228,7 @@ extern struct LCM_DRIVER otm9605a_qhd_dsi_vdo_drv;
 extern struct LCM_DRIVER ili9806e_dsi_vdo_fwvga_drv;
 extern struct LCM_DRIVER otm1906a_fhd_dsi_cmd_auto_lcm_drv;
 extern struct LCM_DRIVER clap070wp03xg_lvds_lcm_drv;
+extern struct LCM_DRIVER jd9366_wxga_dsi_vdo_fiti_kd_lcm_drv;
 extern struct LCM_DRIVER nt35523_wxga_dsi_vdo_boe_lcm_drv;
 extern struct LCM_DRIVER otm1906b_fhd_dsi_cmd_jdi_tps65132_lcm_drv;
 extern struct LCM_DRIVER otm1906b_fhd_dsi_cmd_jdi_tps65132_mt6797_lcm_drv;
@@ -248,6 +252,7 @@ extern struct LCM_DRIVER nt35695_fhd_dsi_vdo_truly_rt5081_lcm_drv;
 extern struct LCM_DRIVER nt35695_fhd_dsi_vdo_truly_rt5081_hdp_lcm_drv;
 extern struct LCM_DRIVER nt35695_fhd_dsi_vdo_truly_rt5081_hdp_19_9_lcm_drv;
 extern struct LCM_DRIVER nt35695_fhd_dsi_vdo_truly_rt5081_hdp_1560_lcm_drv;
+extern struct LCM_DRIVER nt35695_fhd_dsi_vdo_truly_rt5081_hdp_20_9_lcm_drv;
 extern struct LCM_DRIVER nt35695_fhd_dsi_vdo_truly_rt5081_720p_lcm_drv;
 extern struct LCM_DRIVER nt35695_fhd_dsi_vdo_truly_rt5081_qhd_lcm_drv;
 extern struct LCM_DRIVER nt35695B_fhd_dsi_cmd_truly_rt5081_lcm_drv;
@@ -281,6 +286,7 @@ extern struct LCM_DRIVER nt35695B_fhd_dsi_vdo_auo_rt5081_qhd_lcm_drv;
 extern struct LCM_DRIVER nt35695B_fhd_dsi_vdo_auo_rt5081_hdp_lcm_drv;
 extern struct LCM_DRIVER nt35695B_fhd_dsi_vdo_auo_rt5081_hdp_19_9_lcm_drv;
 extern struct LCM_DRIVER nt35695B_fhd_dsi_vdo_auo_rt5081_hdp_1560_lcm_drv;
+extern struct LCM_DRIVER nt35695B_fhd_dsi_vdo_auo_rt5081_hdp_20_9_lcm_drv;
 extern struct LCM_DRIVER claa101fp01_dsi_vdo_lcm_drv;
 extern struct LCM_DRIVER r61322_fhd_dsi_vdo_sharp_lfr_lcm_drv;
 extern struct LCM_DRIVER s6e3ha3_wqhd_2k_cmd_laneswap_drv;
@@ -293,8 +299,12 @@ extern struct LCM_DRIVER ili9881c_hdp_dsi_vdo_ilitek_rt5081_lcm_drv;
 extern struct LCM_DRIVER nt51021_wuxga_dsi_vdo_mt8173_lcm_drv;
 extern struct LCM_DRIVER ili9881c_hdp_dsi_vdo_ilitek_rt5081_lcm_drv_ebbg;
 extern struct LCM_DRIVER hx8394f_hd720_dsi_vdo_tianma_lcm_drv;
+extern struct LCM_DRIVER jd9365_hd720_dsi_lcm_drv;
 extern struct LCM_DRIVER nt36672_fhdp_dsi_vdo_auo_lcm_drv;
 extern struct LCM_DRIVER nt36672_fhdp_dsi_vdo_auo_laneswap_lcm_drv;
+extern struct LCM_DRIVER nt35521_hd_dsi_vdo_truly_nt50358_lcm_drv;
+extern struct LCM_DRIVER es6311_anx6585_zigzag_wxga_lcm_drv;
+extern struct LCM_DRIVER ili9881c_hd_dsi_vdo_ilitek_nt50358_lcm_drv;
 extern struct LCM_DRIVER hx83112b_fhdp_dsi_cmd_auo_rt5081_lcm_drv;
 extern struct LCM_DRIVER hx83112b_fhdp_dsi_vdo_auo_rt5081_lcm_drv;
 extern struct LCM_DRIVER hx83112b_fhdp_dsi_cmd_auo_rt5081_fhd_lcm_drv;
@@ -310,18 +320,23 @@ extern struct LCM_DRIVER hx83112b_fhdp_dsi_vdo_fhd_auo_rt4801_lcm_drv;
 extern struct LCM_DRIVER hx83112b_fhdp_dsi_vdo_hdp_auo_rt4801_lcm_drv;
 /*6785  hx otm*/
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_truly_rt4801_lcm_drv;
-extern struct LCM_DRIVER nt36672a_fhdp_dsi_vdo_auo_lm36273_lcm_drv;
-extern struct LCM_DRIVER ft8719_fhdp_dsi_vdo_auo_lm36273_lcm_drv;
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_fhd_truly_rt4801_lcm_drv;
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_hdp_truly_rt4801_lcm_drv;
 extern struct LCM_DRIVER td4320_fhdp_dsi_vdo_auo_rt4801_lcm_drv;
-extern struct LCM_DRIVER tianma_fhd_nt36672a_dsi_vdo_lcm_drv;
-extern struct LCM_DRIVER csot_fhd_nt36672a_dsi_vdo_lcm_drv;
-extern struct LCM_DRIVER ebbg_fhd_ft8719_dsi_vdo_lcm_drv;
 extern struct LCM_DRIVER nt36672a_fhdp_dsi_vdo_auo_lm36273_lcm_drv;
 extern struct LCM_DRIVER ft8719_fhdp_dsi_vdo_auo_lm36273_lcm_drv;
 extern struct LCM_DRIVER sofeg01_fhdplus_dsi_cmd_samsung_lcm_drv;
 extern struct LCM_DRIVER nt36672a_fhdp_dsi_vdo_auo_cphy_lcm_drv;
+extern struct LCM_DRIVER otm1287_wxga_dsi_vdo_auo_guoxian_lcm_drv;
+extern struct LCM_DRIVER nt35532_fhd_dsi_vdo_sharp_lcm_drv;
+extern struct LCM_DRIVER otm1901a_fhd_dsi_vdo_tpv_lcm_drv;
+extern struct LCM_DRIVER r63350a_fhd_dsi_vdo_truly_lcm_drv;
+extern struct LCM_DRIVER td4320_fhdp_dsi_vdo_auo_rt5081_lcm_drv;
+extern struct LCM_DRIVER nt51021h_wuxga_vdo_oncell_boe_lcm_drv;
+
+extern struct LCM_DRIVER tianma_fhd_nt36672a_dsi_vdo_lcm_drv;
+extern struct LCM_DRIVER csot_fhd_nt36672a_dsi_vdo_lcm_drv;
+extern struct LCM_DRIVER ebbg_fhd_ft8719_dsi_vdo_lcm_drv;
 #ifdef BUILD_LK
 extern void mdelay(unsigned long msec);
 #endif

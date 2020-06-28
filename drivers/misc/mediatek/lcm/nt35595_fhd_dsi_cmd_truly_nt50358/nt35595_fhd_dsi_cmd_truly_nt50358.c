@@ -42,14 +42,6 @@
 #endif
 #endif
 
-#ifdef BUILD_LK
-#define LCM_LOGI(string, args...)  dprintf(0, "[LK/"LOG_TAG"]"string, ##args)
-#define LCM_LOGD(string, args...)  dprintf(1, "[LK/"LOG_TAG"]"string, ##args)
-#else
-#define LCM_LOGI(fmt, args...)  pr_info("[KERNEL/"LOG_TAG"]"fmt, ##args)
-#define LCM_LOGD(fmt, args...)  pr_info("[KERNEL/"LOG_TAG"]"fmt, ##args)
-#endif
-
 static const unsigned int BL_MIN_LEVEL = 20;
 static struct LCM_UTIL_FUNCS lcm_util;
 
@@ -142,8 +134,8 @@ static struct i2c_driver tps65132_iic_driver = {
 static int tps65132_probe(struct i2c_client *client,
 						const struct i2c_device_id *id)
 {
-	LCM_LOGI("%s\n", __func__);
-	LCM_LOGI("TPS: info==>name=%s addr=0x%x\n",
+	pr_debug("[LCM]%s\n", __func__);
+	pr_debug("[LCM]TPS: info==>name=%s addr=0x%x\n",
 		client->name, client->addr);
 	tps65132_i2c_client = client;
 	return 0;
@@ -151,8 +143,7 @@ static int tps65132_probe(struct i2c_client *client,
 
 static int tps65132_remove(struct i2c_client *client)
 {
-	LCM_LOGI("%s\n", __func__);
-
+	pr_debug("[LCM]%s\n", __func__);
 	tps65132_i2c_client = NULL;
 	i2c_unregister_device(client);
 	return 0;
@@ -168,23 +159,23 @@ static int tps65132_write_bytes(unsigned char addr, unsigned char value)
 	write_data[1] = value;
 	ret = i2c_master_send(client, write_data, 2);
 	if (ret < 0)
-		LCM_LOGI("tps65132 write data fail !!\n");
+		pr_debug("[LCM]tps65132 write data fail !!\n");
 	return ret;
 }
 
 static int __init tps65132_iic_init(void)
 {
-	LCM_LOGI("%s\n", __func__);
+	pr_debug("[LCM]%s\n", __func__);
 	i2c_register_board_info(TPS_I2C_BUSNUM, &tps65132_board_info, 1);
-	LCM_LOGI("%s2\n", __func__);
+	pr_debug("[LCM]%s 2\n", __func__);
 	i2c_add_driver(&tps65132_iic_driver);
-	LCM_LOGI("%s success\n", __func__);
+	pr_debug("[LCM]%s success\n", __func__);
 	return 0;
 }
 
 static void __exit tps65132_iic_exit(void)
 {
-	LCM_LOGI("%s\n", __func__);
+	pr_debug("[LCM]%s\n", __func__);
 	i2c_del_driver(&tps65132_iic_driver);
 }
 
@@ -863,7 +854,6 @@ static void push_table(struct LCM_setting_table *table,
 		default:
 			dsi_set_cmdq_V2(cmd, table[i].count,
 				table[i].para_list, force_update);
-			pr_debug("lcm cmd:0x%x", cmd);
 		}
 	}
 }
@@ -985,9 +975,9 @@ static void lcm_init_power(void)
 #ifdef BUILD_LK
 	mt6325_upmu_set_rg_vgp1_en(1);
 #else
-	LCM_LOGI("%s, begin\n", __func__);
+	pr_debug("[LCM]%s, begin\n", __func__);
 	hwPowerOn(MT6325_POWER_LDO_VGP1, VOL_DEFAULT, "LCM_DRV");
-	LCM_LOGI("%s, end\n", __func__);
+	pr_debug("[LCM]%s, end\n", __func__);
 #endif
 #endif
 #endif
@@ -1000,9 +990,9 @@ static void lcm_suspend_power(void)
 #ifdef BUILD_LK
 	mt6325_upmu_set_rg_vgp1_en(0);
 #else
-	LCM_LOGI("%s, begin\n", __func__);
+	pr_debug("[LCM]%s, begin\n", __func__);
 	hwPowerDown(MT6325_POWER_LDO_VGP1, "LCM_DRV");
-	LCM_LOGI("%s, end\n", __func__);
+	pr_debug("[LCM]%s, end\n", __func__);
 #endif
 #endif
 #endif
@@ -1015,9 +1005,9 @@ static void lcm_resume_power(void)
 #ifdef BUILD_LK
 	mt6325_upmu_set_rg_vgp1_en(1);
 #else
-	LCM_LOGI("%s, begin\n", __func__);
+	pr_debug("[LCM]%s, begin\n", __func__);
 	hwPowerOn(MT6325_POWER_LDO_VGP1, VOL_DEFAULT, "LCM_DRV");
-	LCM_LOGI("%s, end\n", __func__);
+	pr_debug("[LCM]%s, end\n", __func__);
 #endif
 #endif
 #endif
@@ -1047,11 +1037,11 @@ static void lcm_init(void)
 #endif
 
 	if (ret < 0)
-		LCM_LOGI("nt35595--tps6132--cmd=%0x--i2c write error--\n",
+		pr_debug("[LCM]nt35595--tps6132--cmd=%0x--i2c write error--\n",
 		cmd);
 	else
-		LCM_LOGI(
-		"nt35595-tps6132-cmd=%0x-i2c write success-\n", cmd);
+		pr_debug("[LCM]nt35595--tps6132--cmd=%0x--i2c write success--\n",
+		cmd);
 
 	cmd = 0x01;
 	data = 0x0E;
@@ -1063,11 +1053,11 @@ static void lcm_init(void)
 #endif
 
 	if (ret < 0)
-		LCM_LOGI(
-		"nt35595--tps6132--cmd=%0x--i2c write error--\n", cmd);
+		pr_debug("[LCM]nt35595--tps6132--cmd=%0x--i2c write error--\n",
+		cmd);
 	else
-		LCM_LOGI(
-		"nt35595--tps6132--cmd=%0x--i2c write success--\n", cmd);
+		pr_debug("[LCM]nt35595--tps6132--cmd=%0x--i2c write success--\n",
+		cmd);
 
 #endif
 	SET_RESET_PIN(1);
@@ -1159,7 +1149,7 @@ static unsigned int lcm_compare_id(void)
 	read_reg_v2(0xF4, buffer, 2);
 	id = buffer[0];		/* we only need ID */
 
-	LCM_LOGI("%s,nt35595 debug: nt35595 id = 0x%08x\n", __func__, id);
+	pr_debug("[LCM]%s,nt35595 debug: nt35595 id = 0x%08x\n", __func__, id);
 
 	if (id == LCM_ID_NT35595)
 		return 1;
@@ -1183,10 +1173,10 @@ static unsigned int lcm_esd_check(void)
 	read_reg_v2(0x53, buffer, 1);
 
 	if (buffer[0] != 0x24) {
-		LCM_LOGI("[LCM ERROR] [0x53]=0x%02x\n", buffer[0]);
+		pr_debug("[LCM][LCM ERROR] [0x53]=0x%02x\n", buffer[0]);
 		return TRUE;
 	}
-	LCM_LOGI("[LCM NORMAL] [0x53]=0x%02x\n", buffer[0]);
+	pr_debug("[LCM][LCM NORMAL] [0x53]=0x%02x\n", buffer[0]);
 	return FALSE;
 #else
 	return FALSE;
@@ -1209,7 +1199,7 @@ static unsigned int lcm_ata_check(unsigned char *buffer)
 	unsigned int data_array[3];
 	unsigned char read_buf[4];
 
-	LCM_LOGI("ATA check size = 0x%x,0x%x,0x%x,0x%x\n",
+	pr_debug("[LCM]ATA check size = 0x%x,0x%x,0x%x,0x%x\n",
 		x0_MSB, x0_LSB, x1_MSB, x1_LSB);
 	data_array[0] = 0x0005390A;	/* HS packet */
 	data_array[1] = (x1_MSB << 24) | (x0_LSB << 16) | (x0_MSB << 8) | 0x2a;
@@ -1249,7 +1239,7 @@ static unsigned int lcm_ata_check(unsigned char *buffer)
 static void lcm_setbacklight_cmdq(void *handle, unsigned int level)
 {
 
-	LCM_LOGI("%s,nt35595 backlight: level = %d\n", __func__, level);
+	pr_debug("[LCM]%s,nt35595 backlight: level = %d\n", __func__, level);
 
 	bl_level[0].para_list[0] = level;
 
@@ -1260,7 +1250,8 @@ static void lcm_setbacklight_cmdq(void *handle, unsigned int level)
 #if 0 /* defined but not used */
 static void lcm_setbacklight(unsigned int level)
 {
-	LCM_LOGI("%s,nt35595 backlight: level = %d\n", __func__, level);
+	pr_debug("[LCM]%s,nt35595 backlight: level = %d\n", __func__, level);
+
 	bl_level[0].para_list[0] = level;
 
 	push_table(bl_level,

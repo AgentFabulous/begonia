@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2016 Xiaomi Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -262,7 +261,7 @@ static void lcm_dsi_dispparam_xy_writepoint(enum panel_type panel_type)
 	struct dsi_cmd_desc write_tab;
 	unsigned int i = 0;
 	if ((PANEL_CSOT_NT36672A == panel_type) || (PANEL_TIANMA_NT36672A == panel_type)) {
-
+		//switch to cmd2 page 1
 		write_tab.dtype = 0xFF;
 		write_tab.dlen = 1;
 		write_tab.payload = vmalloc(1 * sizeof(unsigned char));
@@ -290,7 +289,7 @@ static void lcm_dsi_dispparam_xy_writepoint(enum panel_type panel_type)
 		for (i = 0; i < 2; i++)
 			pr_debug("[%s]0x%x\n",  __func__, read_tab.payload[i]);
 
-
+		//switch to cmd1
 		write_tab.dtype = 0xFF;
 		write_tab.dlen = 1;
 		write_tab.payload[0] = 0x10;

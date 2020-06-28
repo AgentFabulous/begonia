@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -305,7 +304,7 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 	params->dsi.switch_mode = CMD_MODE;
 	lcm_dsi_mode = SYNC_PULSE_VDO_MODE;
 
-	LCM_LOGI("lcm_get_params lcm_dsi_mode %d\n", lcm_dsi_mode);
+	LCM_LOGI("%s lcm_dsi_mode %d\n", __func__, lcm_dsi_mode);
 	params->dsi.switch_mode_enable = 0;
 
 	/* DSI */
@@ -377,8 +376,7 @@ static void lcm_init_power(void)
 		_lcm_i2c_write_bytes(0x0d, 0x1e);
 		_lcm_i2c_write_bytes(0x0e, 0x1e);
 
-	}
-	else
+	} else
 		LCM_LOGI("set_gpio_lcd_enp_bias not defined...\n");
 }
 

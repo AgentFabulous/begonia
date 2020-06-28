@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -712,17 +712,6 @@ struct LCM_DSI_PARAMS {
 
 
 /* ------------------------------------------------------------------------- */
-struct LCM_ROUND_CORNER {
-	unsigned int w;
-	unsigned int h;
-	unsigned int tp_size;
-	unsigned int bt_size;
-	void *lt_addr;
-	void *rt_addr;
-	void *lb_addr;
-	void *rb_addr;
-};
-
 struct LCM_PARAMS {
 	enum LCM_TYPE type;
 	enum LCM_CTRL ctrl;		/* ! how to control LCM registers */
@@ -758,10 +747,8 @@ struct LCM_PARAMS {
 	unsigned int corner_pattern_width;
 	unsigned int corner_pattern_height;
 	unsigned int corner_pattern_height_bot;
-	struct LCM_ROUND_CORNER round_corner_params;
 	unsigned int corner_pattern_tp_size;
 	void *corner_pattern_lt_addr;
-
 	int lcm_color_mode;
 	unsigned int min_luminance;
 	unsigned int average_luminance;
@@ -880,6 +867,7 @@ struct dsi_cmd_desc {
 	unsigned int vc;
 	unsigned int dlen;
 	unsigned int link_state;
+	unsigned int cmd;
 	char *payload;
 };
 
@@ -1001,7 +989,6 @@ struct LCM_DRIVER {
 
 	void (*aod)(int enter);
 	int (*led_i2c_reg_op)(char *buffer, int op, int count);
-
 	/* /////////////ARR-DFPS///////////////////////////// */
 	void (*dfps_send_lcm_cmd)(enum LCM_DFPS_SEND_CMD_WAY dfps_send_cmd_way,
 	enum LCM_DFPS_SEND_CMD_SPEED dfps_send_cmd_speed,

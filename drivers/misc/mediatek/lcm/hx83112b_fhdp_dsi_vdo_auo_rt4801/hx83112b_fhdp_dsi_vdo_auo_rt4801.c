@@ -61,12 +61,6 @@ static struct LCM_UTIL_FUNCS lcm_util;
 #define read_reg(cmd)	lcm_util.dsi_dcs_read_lcm_reg(cmd)
 #define read_reg_v2(cmd, buffer, buffer_size) \
 		lcm_util.dsi_dcs_read_lcm_reg_v2(cmd, buffer, buffer_size)
-/*ARR*/
-#define dfps_dsi_send_cmd(dfps_send_cmd_way, dfps_send_cmd_speed, \
-		cmdq, cmd, count, para_list, force_update) \
-		lcm_util.dsi_arr_send_cmd( \
-		dfps_send_cmd_way, dfps_send_cmd_speed, \
-		cmdq, cmd, count, para_list, force_update)
 
 #ifndef BUILD_LK
 #  include <linux/kernel.h>
@@ -388,152 +382,18 @@ static struct LCM_setting_table bl_level[] = {
 	{REGFLAG_END_OF_TABLE, 0x00, {} }
 };
 
-/***********************dfps-ARR start*****************************/
 static struct dynamic_fps_info lcm_dynamic_fps_setting[] = {
-	{DPFS_LEVEL0, 60, 20},
-	{DFPS_LEVEL1, 40, 1115},
-	{DFPS_LEVEL2, 30, 2210},
+	{60, 20},
+	{50, 458},
+	{40, 1115},
+	{30, 2210},
+#if 0
+	{60, 20, 50},
+	{50, 458, 60},
+	{40, 115, 75},
+	{30, 2210, 100},
+#endif
 };
-
-/* no need send cmd for hx83112b when enable dfps
- * here just for use example
- * lcm driver can add prev_f_cmd, cur_f_cmd for each level pair
- */
-
-#define DFPS_MAX_CMD_NUM 10
-
-struct LCM_dfps_cmd_table {
-	struct LCM_setting_table prev_f_cmd[DFPS_MAX_CMD_NUM];
-	struct LCM_setting_table cur_f_cmd[DFPS_MAX_CMD_NUM];
-};
-
-static struct LCM_dfps_cmd_table
-	dfps_cmd_table[DFPS_LEVELNUM][DFPS_LEVELNUM] = {
-
-/**********level 0 to 0,1,2 cmd*********************/
-[0][0] = {
-	/*prev_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-},
-
-[0][1] = {
-	/*prev_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-
-},
-
-[0][2] = {
-	/*prev_frame cmd*/
-	{
-	/*just use adjust backlight for test
-	 * lcm driver need add cmd here
-	 */
-	{0x51, 2, {0x0a, 0xFa} },
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	/*just use adjust backlight for test
-	 * lcm driver need add cmd here
-	 */
-	{0x51, 2, {0x0a, 0x0a} },
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-
-},
-
-
-/**********level 1 to 0,1,2 cmd*********************/
-[1][0] = {
-	/*prev_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-},
-
-[1][1] = {
-	/*prev_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-
-},
-
-[1][2] = {
-	/*prev_frame cmd*/
-	{
-	{0x51, 2, {0x0c, 0xFc} },
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	{0x51, 2, {0x0d, 0xFd} },
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-
-},
-
-/**********level 2 to 0,1,2 cmd*********************/
-[2][0] = {
-	/*prev_frame cmd*/
-	{
-	{0x51, 2, {0x0b, 0xFb} },
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	{0x51, 2, {0x0b, 0xF0} },
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-},
-
-[2][1] = {
-	/*prev_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-
-},
-
-[2][2] = {
-	/*prev_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-	/*cur_frame cmd*/
-	{
-	{REGFLAG_END_OF_TABLE, 0x00, {} },
-	},
-},
-
-};
-
-/***********************dfps-ARR  end*****************************/
-
 static void push_table(void *cmdq, struct LCM_setting_table *table,
 		       unsigned int count, unsigned char force_update)
 {
@@ -643,23 +503,10 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 	params->corner_pattern_tp_size = sizeof(top_rc_pattern);
 	params->corner_pattern_lt_addr = (void *)top_rc_pattern;
 #endif
-	/* ARR setting
-	 * dfps_need_inform_lcm:
-	 * whether need send cmd before and during change VFP
-	 * dfps_send_cmd_way:
-	 * now only LCM_DFPS_SEND_CMD_STOP_VDO supported
-	 * will stop vdo mode and send cmd between vfp and vsa of next frame
-	 * dfps_send_cmd_speed: now only LCM_DFPS_SEND_CMD_LP supported
-	 * will send cmd in LP mode
-	 */
-	params->dsi.dynamic_fps_levels = 3;
+	/*ARR setting*/
+	params->dsi.dynamic_fps_levels = 4;
 	params->max_refresh_rate = 60;
 	params->min_refresh_rate = 30;
-	params->dsi.dfps_need_inform_lcm[LCM_DFPS_FRAME_PREV] = 1;
-	params->dsi.dfps_need_inform_lcm[LCM_DFPS_FRAME_CUR] = 1;
-	params->dsi.dfps_send_cmd_way = LCM_DFPS_SEND_CMD_STOP_VDO;
-	params->dsi.dfps_send_cmd_speed = LCM_DFPS_SEND_CMD_LP;
-
 #if 0
 	/*vertical_frontporch should be related to the max fps*/
 	params->dsi.vertical_frontporch = 20;
@@ -678,7 +525,6 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 		? params->dsi.dynamic_fps_levels
 		: dynamic_fps_levels;
 
-	params->dsi.dynamic_fps_levels = dynamic_fps_levels;
 	for (i = 0; i < dynamic_fps_levels; i++) {
 		params->dsi.dynamic_fps_table[i].fps =
 			lcm_dynamic_fps_setting[i].fps;
@@ -848,87 +694,6 @@ static unsigned int lcm_compare_id(void)
 
 }
 
-/***********************dfps-ARR  function start*****************************/
-int lcm_get_dfps_level(unsigned int fps)
-{
-	unsigned int i = 0;
-	int dfps_level = -1;
-
-	for (i = 0; i < DFPS_LEVELNUM; i++) {
-		if (lcm_dynamic_fps_setting[i].fps == fps)
-			dfps_level = lcm_dynamic_fps_setting[i].level;
-	}
-	return dfps_level;
-}
-
-static void dfps_dsi_push_table(
-	enum LCM_DFPS_SEND_CMD_WAY dfps_send_cmd_way,
-	enum LCM_DFPS_SEND_CMD_SPEED dfps_send_cmd_speed,
-	void *cmdq, struct LCM_setting_table *table,
-	unsigned int count, unsigned char force_update)
-{
-	unsigned int i;
-	unsigned int cmd;
-
-	for (i = 0; i < count; i++) {
-		cmd = table[i].cmd;
-		switch (cmd) {
-		case REGFLAG_END_OF_TABLE:
-			return;
-		default:
-			dfps_dsi_send_cmd(
-				dfps_send_cmd_way, dfps_send_cmd_speed,
-				cmdq, cmd, table[i].count,
-				table[i].para_list, force_update);
-			break;
-		}
-	}
-
-}
-
-void lcm_dfps_inform_lcm(enum LCM_DFPS_SEND_CMD_WAY dfps_send_cmd_way,
-	enum LCM_DFPS_SEND_CMD_SPEED dfps_send_cmd_speed,
-	void *cmdq_handle, unsigned int from_fps, unsigned int to_fps,
-	enum LCM_DFPS_FRAME_ID frame_id)
-{
-	int from_level =  DPFS_LEVEL0;
-	int to_level = DPFS_LEVEL0;
-
-	struct LCM_dfps_cmd_table *p_dfps_cmds = NULL;
-
-	from_level = lcm_get_dfps_level(from_fps);
-	to_level = lcm_get_dfps_level(to_fps);
-
-	if (from_level < 0 || to_level < 0) {
-		LCM_LOGI("%s,no (f:%d, t:%d)\n", __func__, from_fps, to_fps);
-		goto done;
-	}
-
-	p_dfps_cmds =
-		&(dfps_cmd_table[from_level][to_level]);
-
-	switch (frame_id) {
-	case LCM_DFPS_FRAME_PREV:
-		dfps_dsi_push_table(dfps_send_cmd_way, dfps_send_cmd_speed,
-			cmdq_handle, p_dfps_cmds->prev_f_cmd,
-			ARRAY_SIZE(p_dfps_cmds->prev_f_cmd), 1);
-		break;
-	case LCM_DFPS_FRAME_CUR:
-		dfps_dsi_push_table(dfps_send_cmd_way, dfps_send_cmd_speed,
-			cmdq_handle, p_dfps_cmds->cur_f_cmd,
-			ARRAY_SIZE(p_dfps_cmds->cur_f_cmd), 1);
-		break;
-	default:
-		break;
-
-	}
-done:
-	LCM_LOGI("%s,done %d->%d\n", __func__, from_fps, to_fps);
-
-}
-
-/***********************dfps-ARR function end*****************************/
-
 struct LCM_DRIVER hx83112b_fhdp_dsi_vdo_auo_rt4801_lcm_drv = {
 	.name = "hx83112b_fhdp_dsi_vdo_auo_rt4801_drv",
 	.set_util_funcs = lcm_set_util_funcs,
@@ -943,7 +708,5 @@ struct LCM_DRIVER hx83112b_fhdp_dsi_vdo_auo_rt4801_lcm_drv = {
 	.set_backlight_cmdq = lcm_setbacklight_cmdq,
 	.ata_check = lcm_ata_check,
 	.update = lcm_update,
-	/*for dfps test*/
-	.dfps_send_lcm_cmd = lcm_dfps_inform_lcm,
 };
 

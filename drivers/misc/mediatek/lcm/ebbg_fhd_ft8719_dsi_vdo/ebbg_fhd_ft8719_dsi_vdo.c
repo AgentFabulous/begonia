@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -69,7 +69,6 @@ static struct LCM_UTIL_FUNCS lcm_util;
 		lcm_util.dsi_dcs_read_lcm_reg(cmd)
 #define read_reg_v2(cmd, buffer, buffer_size) \
 		lcm_util.dsi_dcs_read_lcm_reg_v2(cmd, buffer, buffer_size)
-
 /*ARR*/
 #define dfps_dsi_send_cmd(dfps_send_cmd_way, dfps_send_cmd_speed, \
 		cmdq, cmd, count, para_list, force_update) \
@@ -148,7 +147,6 @@ static struct LCM_setting_table bl_level[] = {
 	{0x51, 1, {0xFF} },
 	{REGFLAG_END_OF_TABLE, 0x00, {} }
 };
-
 
 /***********************dfps-ARR start*****************************/
 static struct dynamic_fps_info lcm_dynamic_fps_setting[] = {
@@ -446,6 +444,10 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 	params->dsi.lcm_esd_check_table[0].count = 1;
 	params->dsi.lcm_esd_check_table[0].para_list[0] = 0x24;
 
+	/* for ARR 2.0 */
+//	params->max_refresh_rate = 60;
+//	params->min_refresh_rate = 45;
+
 #ifdef CONFIG_MTK_ROUND_CORNER_SUPPORT
 	params->round_corner_en = 1;
 	params->corner_pattern_height = ROUND_CORNER_H_TOP;
@@ -453,7 +455,6 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 	params->corner_pattern_tp_size = sizeof(top_rc_pattern);
 	params->corner_pattern_lt_addr = (void *)top_rc_pattern;
 #endif
-
 	/* ARR setting
 	 * dfps_need_inform_lcm:
 	 * whether need send cmd before and during change VFP
@@ -471,6 +472,15 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 	params->dsi.dfps_send_cmd_way = LCM_DFPS_SEND_CMD_STOP_VDO;
 	params->dsi.dfps_send_cmd_speed = LCM_DFPS_SEND_CMD_LP;
 
+#if 0
+	/*vertical_frontporch should be related to the max fps*/
+	params->dsi.vertical_frontporch = 20;
+	/*vertical_frontporch_for_low_power
+	 *should be related to the min fps
+	 */
+	params->dsi.vertical_frontporch_for_low_power = 750;
+#endif
+
 	dynamic_fps_levels =
 		sizeof(lcm_dynamic_fps_setting)/sizeof(struct dynamic_fps_info);
 
@@ -486,6 +496,9 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 			lcm_dynamic_fps_setting[i].fps;
 		params->dsi.dynamic_fps_table[i].vfp =
 			lcm_dynamic_fps_setting[i].vfp;
+		/* params->dsi.dynamic_fps_table[i].idle_check_interval =
+		 * lcm_dynamic_fps_setting[i].idle_check_interval;
+		 */
 	}
 }
 
@@ -687,6 +700,7 @@ static unsigned int lcm_compare_id(void)
 
 }
 
+
 static int lcm_led_i2c_reg_op(char *buffer, int op, int count)
 {
 	int i, ret = -EINVAL;
@@ -812,4 +826,6 @@ struct LCM_DRIVER ebbg_fhd_ft8719_dsi_vdo_lcm_drv = {
 	.ata_check = lcm_ata_check,
 	.update = lcm_update,
 	.led_i2c_reg_op = lcm_led_i2c_reg_op,
+	/*for dfps test*/
+//	.dfps_send_lcm_cmd = lcm_dfps_inform_lcm,
 };
