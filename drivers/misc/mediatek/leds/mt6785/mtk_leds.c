@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -156,9 +156,8 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 	int mode, data, led_bits;
 	int pwm_config[5] = { 0 };
 
-	if (pled_dtsi) {
+	if (pled_dtsi)
 		goto out;
-	}
 
 	pr_info("[LED] %s pled_dtsi is null, load dts file\n", __func__);
 	pled_dtsi = kmalloc(TYPE_TOTAL * sizeof(struct cust_mt65xx_led),
@@ -221,14 +220,13 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 					 &led_bits);
 		if (!ret) {
 			pled_dtsi[i].led_bits = led_bits;
-			LEDS_DEBUG("The %s's led led_bits is : %d\n",
+			LEDS_DEBUG("The %s's led led_bits is : %ld\n",
 			     pled_dtsi[i].name, pled_dtsi[i].led_bits);
 		} else {
 			pled_dtsi[i].led_bits = 8;
 			LEDS_DEBUG("led dts can not get %s led led_bits\n",
 			    pled_dtsi[i].name);
 		}
-
 		ret = of_property_read_u32_array(led_node, "pwm_config",
 				pwm_config, ARRAY_SIZE(pwm_config));
 		if (!ret) {

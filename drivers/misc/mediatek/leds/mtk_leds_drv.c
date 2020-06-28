@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -313,7 +313,8 @@ int mt65xx_leds_brightness_set(enum mt65xx_led_type type,
 	if (type < 0 || type >= TYPE_TOTAL)
 		return -1;
 
-	level = min((int)level, (1 << cust_led_list[TYPE_LCD].led_bits) - 1);
+	level = min((int)level,
+		(1 << cust_led_list[TYPE_LCD].led_bits) - 1);
 	if (level < 0)
 		level = 0;
 
@@ -369,7 +370,7 @@ int backlight_brightness_set(int level)
 
 #ifdef CONFIG_BACKLIGHT_SUPPORT_LM36273
 	lm36273_brightness_set(level);
-
+	//we report backlight value to als sensor here for cabc feature is changing backlight value
 	cabc_backlight_value_notification(level);
 	return 0;
 #endif
@@ -395,7 +396,8 @@ int backlight_brightness_set(int level)
 			/* extend   led limit bits to pwm bits */
 			level = (limit
 				* ((1 << MT_LED_LEVEL_BIT) - 1)
-				+ (((1 << cust_led_list[TYPE_LCD].led_bits) - 1) / 2))
+				+ (((1 << cust_led_list[TYPE_LCD].led_bits) - 1)
+				/ 2))
 				/ ((1 << cust_led_list[TYPE_LCD].led_bits) - 1);
 		}
 		mutex_unlock(&bl_level_limit_mutex);
@@ -411,7 +413,7 @@ int backlight_brightness_set(int level)
 			+ (((1 << MT_LED_LEVEL_BIT) - 1) / 2))
 			/ ((1 << MT_LED_LEVEL_BIT) - 1));
 	}
-
+	return 0;
 }
 EXPORT_SYMBOL(backlight_brightness_set);
 
@@ -501,7 +503,9 @@ static int mt65xx_leds_probe(struct platform_device *pdev)
 
 		g_leds_data[i]->cdev.brightness_set = mt65xx_led_set;
 		g_leds_data[i]->cdev.blink_set = mt65xx_blink_set;
-		g_leds_data[i]->cdev.max_brightness = (1 << cust_led_list[i].led_bits) - 1;
+		g_leds_data[i]->cdev.max_brightness =
+			(1 << cust_led_list[i].led_bits) - 1;
+
 
 		INIT_WORK(&g_leds_data[i]->work, mt_mt65xx_led_work);
 
@@ -512,10 +516,12 @@ static int mt65xx_leds_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONTROL_BL_TEMPERATURE
+	mutex_lock(&bl_level_limit_mutex);
 	last_level = 0;
 	limit = g_leds_data[TYPE_LCD]->cdev.max_brightness;
 	limit_flag = 0;
 	current_level = 0;
+	mutex_unlock(&bl_level_limit_mutex);
 	LEDS_DRV_DEBUG
 	    ("last_level= %d, limit= %d, limit_flag= %d, current_level= %d\n",
 	     last_level, limit, limit_flag, current_level);
