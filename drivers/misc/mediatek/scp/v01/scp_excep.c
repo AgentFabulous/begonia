@@ -515,13 +515,10 @@ static void scp_prepare_aed_dump(char *aed_str,
 		memset(scp_detail, 0, SCP_AED_STR_LEN);
 
 		snprintf(scp_detail, SCP_AED_STR_LEN,
-		"%s\nscp_A pc=0x%08x, lr=0x%08x, psp=0x%08x, sp=0x%08x\n"
-		"last log:\n%s",
-		aed_str, scp_A_aee_status.pc,
-		scp_A_aee_status.lr,
-		scp_A_aee_status.psp,
-		scp_A_aee_status.sp,
-		scp_A_log);
+			"%s\nscp_A pc=0x%08x, lr=0x%08x, psp=0x%08x, sp=0x%08x"
+			"\nlast log:\n%s",
+			aed_str, scp_A_aee_status.pc, scp_A_aee_status.lr,
+			scp_A_aee_status.psp, scp_A_aee_status.sp, scp_A_log);
 
 		scp_detail[SCP_AED_STR_LEN - 1] = '\0';
 	}
@@ -568,7 +565,7 @@ void scp_aed(enum scp_excep_id type, enum scp_core_id id)
 	char *scp_aed_title;
 
 	mutex_lock(&scp_excep_mutex);
-
+	aed.detail = NULL;
 	/* get scp title and exception type*/
 	switch (type) {
 	case EXCEP_LOAD_FIRMWARE:
@@ -599,7 +596,6 @@ void scp_aed(enum scp_excep_id type, enum scp_core_id id)
 		scp_get_log(id);
 			break;
 	default:
-		scp_prepare_aed("scp unknown exception", &aed);
 		if (id == SCP_A_ID)
 			scp_aed_title = "SCP_A unknown exception";
 		else

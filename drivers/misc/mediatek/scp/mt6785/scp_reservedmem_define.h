@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,12 +17,21 @@
 
 static struct scp_reserve_mblock scp_reserve_mblock[] = {
 #ifdef CONFIG_MTK_VOW_SUPPORT
+#ifdef CONFIG_MTK_VOW_2E2K_SUPPORT
 	{
 		.num = VOW_MEM_ID,
 		.start_phys = 0x0,
 		.start_virt = 0x0,
-		.size = 0x49200,  /* 292KB */
+		.size = 0x49200,  /* 292KB (2 model size)*/
 	},
+#else
+	{
+		.num = VOW_MEM_ID,
+		.start_phys = 0x0,
+		.start_virt = 0x0,
+		.size = 0x38200,  /* 224KB (1 model size)*/
+	},
+#endif
 #endif
 	{
 		.num = SENS_MEM_ID,
