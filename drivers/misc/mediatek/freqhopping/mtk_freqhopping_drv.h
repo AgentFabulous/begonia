@@ -18,7 +18,8 @@
 #include "mtk_freqhopping.h"
 
 struct mt_fh_hal_driver {
-#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+#if defined(CONFIG_MTK_TINYSYS_SSPM_SUPPORT) || \
+	defined(CONFIG_MTK_TINYSYS_MCUPM_SUPPORT)
 	void (*fh_pll_set)(int pll_id, int field, int value);
 	int (*fh_pll_get)(int pll_id, int field);
 #endif
@@ -33,7 +34,8 @@ struct mt_fh_hal_driver {
 	int (*mt_dfs_armpll)(unsigned int coreid, unsigned int dds);
 	int (*mt_fh_hal_dumpregs_read)(struct seq_file *m, void *v);
 	int (*mt_fh_hal_slt_start)(void);
-	int (*mt_dfs_general_pll)(unsigned int pll_id, unsigned int target_dds);
+	int (*mt_dfs_general_pll)(enum FH_PLL_ID pll_id,
+				unsigned int target_dds);
 	void (*mt_fh_popod_restore)(void);
 	void (*mt_fh_popod_save)(void);
 
@@ -51,7 +53,8 @@ enum FH_DEVCTL_CMD_ID {
 	FH_DCTL_CMD_SSC_ENABLE = 0x1004,
 	FH_DCTL_CMD_SSC_DISABLE = 0x1005,
 	FH_DCTL_CMD_GENERAL_DFS = 0x1006,
-#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+#if defined(CONFIG_MTK_TINYSYS_SSPM_SUPPORT) || \
+	defined(CONFIG_MTK_TINYSYS_MCUPM_SUPPORT)
 	FH_DCTL_CMD_ARM_DFS = 0x1007,
 	FH_DCTL_CMD_MM_DFS = 0x1008,
 	FH_DCTL_CMD_FH_CONFIG = 0x1009,
