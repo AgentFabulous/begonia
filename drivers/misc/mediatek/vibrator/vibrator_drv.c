@@ -294,9 +294,9 @@ static void vib_shutdown(struct platform_device *pdev)
 		spin_unlock_irqrestore(&vibr->vibr_lock, flags);
 		pr_debug(VIB_TAG "%s: vibrator will disable\n", __func__);
 		vibr_Disable();
-	} else {
-		spin_unlock_irqrestore(&vibr->vibr_lock, flags);
+		return;
 	}
+	spin_unlock_irqrestore(&vibr->vibr_lock, flags);
 }
 
 
