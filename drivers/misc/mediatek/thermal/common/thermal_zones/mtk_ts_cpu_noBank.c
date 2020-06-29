@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -436,7 +436,7 @@ int mtk_gpufreq_register(struct mt_gpufreq_power_table_info *freqs, int num)
 	gpu_max_opp = mt_gpufreq_get_seg_max_opp_index();
 	Num_of_GPU_OPP = gpu_max_opp + mt_gpufreq_get_dvfs_table_num();
 	/* error check */
-	if (gpu_max_opp >= num || Num_of_GPU_OPP > num) {
+	if (gpu_max_opp >= num || Num_of_GPU_OPP > num || !Num_of_GPU_OPP) {
 		gpu_max_opp = 0;
 		Num_of_GPU_OPP = num;
 	}
@@ -1433,14 +1433,38 @@ static ssize_t tscpu_write
 	return -EINVAL;
 }
 
+static int cpu_temp_show(struct seq_file *seq, void *v)
+{
+	seq_printf(seq, "%d\n", g_max_temp);
+
+	return 0;
+}
+
+static int cpu_temp_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, cpu_temp_show, NULL);
+}
+
+static const struct file_operations cpu_temp_fops = {
+	.open           = cpu_temp_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
 static int tscpu_register_thermal(void)
 {
+	struct proc_dir_entry *entry;
 
 	tscpu_dprintk("%s\n", __func__);
 
 	/* trips : trip 0~3 */
 	thz_dev = mtk_thermal_zone_device_register("mtktscpu", num_trip, NULL,
 			&mtktscpu_dev_ops, 0, 0, 0, interval);
+
+	entry = proc_create("cpu_temp", 0444, NULL, &cpu_temp_fops);
+	if (!entry)
+		tscpu_dprintk("%s create cpu_temp failed\n", __func__);
 
 	return 0;
 }
@@ -1856,7 +1880,6 @@ static const struct file_operations lvts_time_profiling_opp_fops = {
 	.release = single_release,
 };
 #endif
-
 static int tscpu_open_log(struct inode *inode, struct file *file)
 {
 	return single_open(file, tscpu_read_log, NULL);
@@ -2298,18 +2321,22 @@ static void init_thermal(void)
 								__LINE__);
 
 		if (temp == 0x0) {
+			/* pause all periodoc temperature sensing point 0~2 */
+			/* TEMPMSRCTL1 */
 			thermal_pause_all_periodoc_temp_sensing();
 			break;
 		}
-
 		udelay(2);
 		cnt++;
 	}
+	thermal_disable_all_periodoc_temp_sensing();	/* TEMPMONCTL0 */
 
-	thermal_disable_all_periodoc_temp_sensing();
+	/* pr_notice(KERN_CRIT "cnt = %d, %d\n",cnt,__LINE__); */
 
+	/*Normal initial */
 	tscpu_thermal_initial_all_tc();
 
+	/* TEMPMSRCTL1 must release before start */
 	thermal_release_all_periodoc_temp_sensing();
 
 #if CFG_THERM_LVTS
@@ -2394,6 +2421,13 @@ static int tscpu_thermal_probe(struct platform_device *dev)
 
 	tscpu_printk("thermal_prob\n");
 
+	/*
+	 * default is dule mode(irq/reset),if not to config this and hot happen,
+	 * system will reset after 30 secs
+	 *
+	 * Thermal need to config to direct reset mode
+	 * this API provide by Weiqi Fu(RGU SW owner).
+	 */
 	if (get_io_reg_base() == 0)
 		return 0;
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -473,7 +473,7 @@ int tswmt_get_WiFi_tx_tput(void)
 	return tx_throughput;
 }
 
-static int wmt_cal_stats(unsigned long data)
+static void wmt_cal_stats(unsigned long data)
 {
 	struct wmt_stats *stats_info = (struct wmt_stats *)data;
 	struct timeval cur_time;
@@ -526,7 +526,6 @@ static int wmt_cal_stats(unsigned long data)
 
 	wmt_stats_timer.expires = jiffies + 1 * HZ;
 	add_timer(&wmt_stats_timer);
-	return 0;
 }
 
 static int wmt_thz_bind(struct thermal_zone_device *thz_dev,
@@ -666,9 +665,7 @@ static int wmt_thz_get_temp(struct thermal_zone_device *thz_dev, int *pv)
 	if (sensor_select < 0 || sensor_select >= NR_TS_SENSORS) {
 		#ifdef CONFIG_MTK_AEE_FEATURE
 		aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_DEFAULT,
-					"%s ",
-					"sensor_select: %d\n",
-					__func__, sensor_select);
+					"%s ", __func__);
 		#endif
 		sensor_select = 0;
 	}
@@ -1365,9 +1362,7 @@ struct file *filp, const char __user *buf, size_t len, loff_t *data)
 	if (sensor_select < 0 || sensor_select >= NR_TS_SENSORS) {
 		#ifdef CONFIG_MTK_AEE_FEATURE
 		aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_DEFAULT,
-					"%s ",
-					"sensor_select: %d\n",
-					__func__, sensor_select);
+					"%s ",	__func__);
 		#endif
 		sensor_select = 0;
 	}
@@ -1891,7 +1886,7 @@ static int wmt_tm_proc_register(void)
 		if (entry)
 			proc_set_user(entry, uid, gid);
 
-		entry = proc_create("clwmt_pid", 0660, wmt_tm_proc_dir,
+		entry = proc_create("clwmtx_pid", 0660, wmt_tm_proc_dir,
 								&_tm_pid_fops);
 
 		if (entry)
@@ -1971,7 +1966,7 @@ static int __init wmt_tm_init(void)
 	wmt_stats_info.pre_tx_bytes = 0;
 
 	init_timer_deferrable(&wmt_stats_timer);
-	wmt_stats_timer.function = (void *)&wmt_cal_stats;
+	wmt_stats_timer.function = &wmt_cal_stats;
 	wmt_stats_timer.data = (unsigned long)&wmt_stats_info;
 	wmt_stats_timer.expires = jiffies + 1 * HZ;
 	add_timer(&wmt_stats_timer);

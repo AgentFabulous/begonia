@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -52,12 +52,16 @@
 #include "linux/delay.h"
 #endif
 #if defined(THERMAL_VPU_SUPPORT)
-#if defined(CONFIG_MTK_VPU_SUPPORT)
+#if defined(CONFIG_MTK_APUSYS_SUPPORT)
+#include "apu_power_table.h"
+#else
 #include "vpu_dvfs.h"
 #endif
 #endif
 #if defined(THERMAL_MDLA_SUPPORT)
-#if defined(CONFIG_MTK_MDLA_SUPPORT)
+#if defined(CONFIG_MTK_APUSYS_SUPPORT)
+#include "apu_power_table.h"
+#else
 #include "mdla_dvfs.h"
 #endif
 #endif
@@ -438,8 +442,8 @@ mt_cpufreq_thermal_protect(unsigned int limited_power)
 
 int __attribute__((weak))
 mtk_eara_thermal_pb_handle(int total_pwr_budget,
-	int max_cpu_power, int max_gpu_power,
-	int max_vpu_power,  int max_mdla_power)
+			   int max_cpu_power, int max_gpu_power,
+			   int max_vpu_power,  int max_mdla_power)
 {
 	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return 0;
@@ -1963,8 +1967,8 @@ static int decide_ttj(void)
 		if (ctm_on == 1) {
 			TARGET_TJ = MIN(MAX_TARGET_TJ,
 					MAX(STEADY_TARGET_TJ,
-						(COEF_AE - COEF_BE * curr_tpcb
-								/ 1000)));
+						(COEF_AE - COEF_BE * (curr_tpcb
+								/ 1000))));
 
 		} else if (ctm_on == 2) {
 			/* +++ cATM+ +++ */
@@ -1974,8 +1978,8 @@ static int decide_ttj(void)
 
 		current_ETJ = MIN(MAX_EXIT_TJ,
 				MAX(STEADY_EXIT_TJ,
-					(COEF_AX - COEF_BX * curr_tpcb
-								/ 1000)));
+					(COEF_AX - COEF_BX * (curr_tpcb
+								/ 1000))));
 
 		/* tscpu_printk("cttj %d cetj %d tpcb %d\n",
 		 *			TARGET_TJ, current_ETJ, curr_tpcb);
@@ -2197,12 +2201,22 @@ static ssize_t tscpu_write_atm_setting
 		i_min_gpu_pwr = -1, i_max_gpu_pwr = -1;
 
 #if defined(THERMAL_VPU_SUPPORT)
+#ifdef CONFIG_MTK_APUSYS_SUPPORT
+	MINIMUM_VPU_POWER = vpu_power_table[APU_OPP_NUM - 1].power;
+	MAXIMUM_VPU_POWER = vpu_power_table[APU_OPP_0].power;
+#else
 	MINIMUM_VPU_POWER = vpu_power_table[VPU_OPP_NUM - 1].power;
 	MAXIMUM_VPU_POWER = vpu_power_table[VPU_OPP_0].power;
 #endif
-#if defined(THERMAL_MDLA_SUPPORT) && defined(CONFIG_MTK_MDLA_SUPPORT)
+#endif
+#if defined(THERMAL_MDLA_SUPPORT)
+#ifdef CONFIG_MTK_APUSYS_SUPPORT
+	MINIMUM_MDLA_POWER = mdla_power_table[APU_OPP_NUM - 1].power;
+	MAXIMUM_MDLA_POWER = mdla_power_table[APU_OPP_0].power;
+#else
 	MINIMUM_MDLA_POWER = mdla_power_table[MDLA_OPP_NUM - 1].power;
 	MAXIMUM_MDLA_POWER = mdla_power_table[MDLA_OPP_0].power;
+#endif
 #endif
 
 	len = (count < (sizeof(desc) - 1)) ? count : (sizeof(desc) - 1);
@@ -3377,7 +3391,7 @@ static enum hrtimer_restart atm_loop(struct hrtimer *timer)
 {
 	ktime_t ktime;
 #elif KRTATM_TIMER == KRTATM_NORMAL
-static int atm_loop(void)
+static void atm_loop(unsigned long data)
 {
 #endif
 	int temp;
@@ -3494,7 +3508,6 @@ exit:
 	atm_timer.expires = jiffies + msecs_to_jiffies(polling_time);
 	add_timer(&atm_timer);
 
-	return 0;
 #endif
 
 }
@@ -3528,7 +3541,7 @@ static void atm_timer_init(void)
 		atm_timer_polling_delay : 100;
 
 	init_timer_deferrable(&atm_timer);
-	atm_timer.function = (void *)&atm_loop;
+	atm_timer.function = &atm_loop;
 	atm_timer.data = (unsigned long)&atm_timer;
 	atm_timer.expires =
 		jiffies + msecs_to_jiffies(atm_timer_polling_delay);

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -67,8 +67,8 @@ static int mtk_cl_gpu_set_cur_state
 		mt_gpufreq_thermal_protect((g_gpu_level == 0) ? 0 :
 			mtk_gpu_power[g_gpu_level + gpu_max_opp].gpufreq_power);
 	} else {
-		mtk_cooler_gpu_dprintk("%s: mtk_gpu_power_table=%p, state=%d, GPU_OPP=%d\n",
-			__func__, mtk_gpu_power, state, (int) (Num_of_GPU_OPP - gpu_max_opp));
+		mtk_cooler_gpu_dprintk("%s: mtk_gpu_power_table=%p, state=%lu, GPU_OPP=%d\n",
+			__func__, mtk_gpu_power, state, Num_of_GPU_OPP - gpu_max_opp);
 	}
 
 	return 0;

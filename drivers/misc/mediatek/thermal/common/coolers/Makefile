@@ -1,6 +1,6 @@
 #
 # Copyright (C) 2015 MediaTek Inc.
-# Copyright (C) 2019 XiaoMi, Inc.
+# Copyright (C) 2020 XiaoMi, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -25,11 +25,16 @@ ccflags-y  += -I$(srctree)/drivers/power/mediatek/
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/base/power/eem_v1/inc/
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/dfrc/
 ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT),y)
-ccflags-y  += -I$(srctree)/drivers/misc/mediatek/sspm/
+ccflags-y  += -I$(srctree)/drivers/misc/mediatek/sspm
+ccflags-y  += -I$(srctree)/drivers/misc/mediatek/sspm/v1
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/sspm/$(MTK_PLATFORM)
 endif
+ifeq ($(CONFIG_MTK_APUSYS_SUPPORT),y)
+ccflags-y  += -I$(srctree)/drivers/misc/mediatek/apusys/power/2.0/$(MTK_PLATFORM)
+else
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/vpu/$(MTK_PLATFORM)
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/mdla/1.0
+endif
 
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6735"))
 ifeq ($(CONFIG_ARCH_MT6735),y)
@@ -152,13 +157,36 @@ endif
 
 
 
-ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6799" "mt6759" "mt6763" "mt6758" "mt6739" "mt6771" "mt6775" "mt6785"))
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6799" "mt6759" "mt6763" "mt6765" "mt6758"))
 ifeq ($(CONFIG_MTK_THERMAL_PA_VIA_ATCMD),y)
     obj-$(CONFIG_THERMAL) += mtk_cooler_mutt.o
 endif
-ifeq (,$(filter $(CONFIG_MTK_PLATFORM),"mt6785"))
 obj-$(CONFIG_THERMAL) += mtk_cooler_fps.o
+ifeq ($(CONFIG_MTK_PUMP_EXPRESS_PLUS_30_SUPPORT),y)
+	obj-$(CONFIG_THERMAL) += mtk_cooler_bcct_v1.o
+else
+	ifeq ($(CONFIG_MTK_GAUGE_VERSION),30)
+		obj-$(CONFIG_THERMAL) += mtk_cooler_bcct_v1.o
+		ifeq ($(CONFIG_MTK_DUAL_CHARGER_SUPPORT),y)
+			obj-$(CONFIG_THERMAL) += mtk_cooler_bcct_2nd.o
+		endif
+	else
+		obj-$(CONFIG_THERMAL) += mtk_cooler_bcct.o
+	endif
 endif
+obj-$(CONFIG_THERMAL) += mtk_cooler_atm.o
+obj-$(CONFIG_THERMAL) += mtk_cooler_dtm.o
+obj-$(CONFIG_THERMAL) += mtk_cooler_sysrst.o
+#obj-$(CONFIG_THERMAL) += mtk_cooler_NR.o
+obj-$(CONFIG_THERMAL) += mtk_cooler_VR_FPS.o
+endif
+
+
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6739" "mt6771" "mt6775" "mt6765" "mt6768" "mt6785"))
+ifeq ($(CONFIG_MTK_THERMAL_PA_VIA_ATCMD),y)
+    obj-$(CONFIG_THERMAL) += mtk_cooler_mutt.o
+endif
+#obj-$(CONFIG_THERMAL) += mtk_cooler_fps.o
 ifeq ($(CONFIG_MTK_PUMP_EXPRESS_PLUS_30_SUPPORT),y)
 	#obj-$(CONFIG_THERMAL) += mtk_cooler_bcct_v1.o
 else
@@ -171,16 +199,38 @@ else
 		#obj-$(CONFIG_THERMAL) += mtk_cooler_bcct.o
 	endif
 endif
-
 obj-$(CONFIG_THERMAL) += mtk_cooler_atm.o
 obj-$(CONFIG_THERMAL) += mtk_cooler_gpu_cus.o
 ifeq ($(CONFIG_MTK_VPU_SUPPORT),y)
 	obj-$(CONFIG_THERMAL) += mtk_cooler_vpu_cus.o
 endif
 obj-$(CONFIG_THERMAL) += mtk_cooler_char_curr_cus.o
-
 obj-$(CONFIG_THERMAL) += mtk_cooler_dtm.o
 obj-$(CONFIG_THERMAL) += mtk_cooler_sysrst.o
 #obj-$(CONFIG_THERMAL) += mtk_cooler_NR.o
 #obj-$(CONFIG_THERMAL) += mtk_cooler_VR_FPS.o
+endif
+
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6885"))
+ifeq ($(CONFIG_MTK_THERMAL_PA_VIA_ATCMD),y)
+    obj-$(CONFIG_THERMAL) += mtk_cooler_mutt.o
+endif
+#obj-$(CONFIG_THERMAL) += mtk_cooler_fps.o
+ifeq ($(CONFIG_MTK_PUMP_EXPRESS_PLUS_30_SUPPORT),y)
+	obj-$(CONFIG_THERMAL) += mtk_cooler_bcct_v1.o
+else
+	ifeq ($(CONFIG_MTK_GAUGE_VERSION),30)
+		obj-$(CONFIG_THERMAL) += mtk_cooler_bcct_v1.o
+		ifeq ($(CONFIG_MTK_DUAL_CHARGER_SUPPORT),y)
+			obj-$(CONFIG_THERMAL) += mtk_cooler_bcct_2nd.o
+		endif
+	#else
+	#	obj-$(CONFIG_THERMAL) += mtk_cooler_bcct.o
+	endif
+endif
+obj-$(CONFIG_THERMAL) += mtk_cooler_atm.o
+obj-$(CONFIG_THERMAL) += mtk_cooler_dtm.o
+obj-$(CONFIG_THERMAL) += mtk_cooler_sysrst.o
+#obj-$(CONFIG_THERMAL) += mtk_cooler_NR.o
+obj-$(CONFIG_THERMAL) += mtk_cooler_VR_FPS.o
 endif

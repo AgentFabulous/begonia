@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -33,7 +34,7 @@
 #define mtk_cooler_kshutdown_dprintk(fmt, args...)
 #endif
 
-#define MAX_NUM_INSTANCE_MTK_COOLER_KSHUTDOWN  5
+#define MAX_NUM_INSTANCE_MTK_COOLER_KSHUTDOWN  8
 
 static struct thermal_cooling_device
 *cl_kshutdown_dev[MAX_NUM_INSTANCE_MTK_COOLER_KSHUTDOWN] = { 0 };
@@ -84,7 +85,7 @@ static unsigned long cl_kshutdown_state[MAX_NUM_INSTANCE_MTK_COOLER_KSHUTDOWN]
 				"%s %s invokes machine_power_off\n", __func__,
 				cdev->type);
 
-		machine_power_off();
+//		machine_power_off();
 	}
 
 	return 0;

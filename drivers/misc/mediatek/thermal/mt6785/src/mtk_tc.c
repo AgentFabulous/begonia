@@ -90,9 +90,9 @@ struct thermal_controller tscpu_g_tc[THERMAL_CONTROLLER_NUM] = {
 		.tc_speed = {
 			0x00C,
 			0x001,
-			0x002,
+			0x03B,
 			0x0000030D
-		} /* 1ms */
+		} /* 4.9ms */
 	},
 	[1] = {
 		.ts = {L_TS_MCU5, L_TS_MCU6, L_TS_MCU7, L_TS_MCU0},
@@ -102,9 +102,9 @@ struct thermal_controller tscpu_g_tc[THERMAL_CONTROLLER_NUM] = {
 		.tc_speed = {
 			0x00C,
 			0x001,
-			0x002,
+			0x03B,
 			0x0000030D
-		} /* 1ms */
+		} /* 4.9ms */
 	},
 	[2] = {
 		.ts = {L_TS_MCU8, L_TS_MCU9},

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -115,7 +115,7 @@ static int mtk_cl_char_curr_set_cur_state
 
 #if (CONFIG_MTK_GAUGE_VERSION == 30)
 	if (state >= max_char_curr_index || state < 0) {
-		mtk_cooler_char_curr_dprintk("%s: wrong state=%d %d\n",
+		mtk_cooler_char_curr_dprintk("%s: wrong state=%lu %d\n",
 			__func__, state, max_char_curr_index);
 	} else {
 		g_char_curr_level = state;

@@ -487,7 +487,7 @@ int mtk_gpufreq_register(struct mt_gpufreq_power_table_info *freqs, int num)
 	gpu_max_opp = mt_gpufreq_get_seg_max_opp_index();
 	Num_of_GPU_OPP = gpu_max_opp + mt_gpufreq_get_dvfs_table_num();
 	/* error check */
-	if (gpu_max_opp >= num || Num_of_GPU_OPP > num) {
+	if (gpu_max_opp >= num || Num_of_GPU_OPP > num || !Num_of_GPU_OPP) {
 		gpu_max_opp = 0;
 		Num_of_GPU_OPP = num;
 	}

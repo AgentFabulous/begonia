@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -59,7 +59,7 @@ static int mtk_cl_flashlight_set_cur_state
 	if (state < g_max_flashlight_level) {
 		flashlight_set_cooler_level(state);
 		g_flashlight_level = state;
-		mtk_cooler_flashlight_dprintk("%s: %d\n", "set_cur_state", g_flashlight_level);
+		mtk_cooler_flashlight_dprintk("%u\n", g_flashlight_level);
 	}
 
 	return 0;

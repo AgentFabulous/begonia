@@ -38,7 +38,7 @@
 #define CFG_THERM_LVTS				(1)
 
 #if CFG_THERM_LVTS
-#define	CFG_LVTS_DOMINATOR			(0)
+#define	CFG_LVTS_DOMINATOR			(1)
 #define	LVTS_DEVICE_AUTO_RCK			(1)
 #else
 #define	CFG_LVTS_DOMINATOR			(0)
@@ -208,9 +208,6 @@ extern int is_cpu_power_min(void);	/* in mtk_ts_cpu.c */
 extern int get_cpu_target_tj(void);
 
 extern int get_cpu_target_offset(void);
-
-extern int mtk_gpufreq_register(
-	struct mt_gpufreq_power_table_info *freqs, int num);
 
 extern int get_target_tj(void);
 

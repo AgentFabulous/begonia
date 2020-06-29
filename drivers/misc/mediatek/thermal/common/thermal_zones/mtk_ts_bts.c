@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -54,7 +54,13 @@ IMM_GetOneChannelValue(int dwChannel, int data[4], int *rawdata)
 	pr_notice("E_WF: %s doesn't exist\n", __func__);
 	return -1;
 }
+
 #endif
+int __attribute__ ((weak))
+tsdctm_thermal_get_ttj_on(void)
+{
+	return 0;
+}
 
 /*=============================================================*/
 static kuid_t uid = KUIDT_INIT(0);
@@ -710,7 +716,8 @@ int mtkts_bts_get_hw_temp(void)
 	mutex_unlock(&BTS_lock);
 
 
-	if (tsatm_thermal_get_catm_type() == 2)
+	if ((tsatm_thermal_get_catm_type() == 2) &&
+		(tsdctm_thermal_get_ttj_on() == 0))
 		t_ret2 = wakeup_ta_algo(TA_CATMPLUS_TTJ);
 
 	if (t_ret2 < 0)

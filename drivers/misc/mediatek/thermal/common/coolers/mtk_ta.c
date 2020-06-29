@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -210,6 +210,7 @@ void atm_ctrl_cmd_from_user(void *nl_data, struct tad_nl_msg_t *ret_msg)
 		{
 			memcpy(&g_tad_ttj, &msg->tad_data[0],
 						sizeof(g_tad_ttj));
+
 			tsta_dprintk(
 				"[%s] g_tad_ttj = %d\n", __func__,
 								g_tad_ttj);
@@ -388,7 +389,7 @@ int wakeup_ta_algo(int flow_state)
 		int size = TAD_NL_MSG_T_HDR_LEN + sizeof(flow_state);
 
 		/*tad_msg = (struct tad_nl_msg_t *)vmalloc(size);*/
-		tad_msg = vmalloc(size);
+		tad_msg = kmalloc(size, GFP_KERNEL);
 
 		if (tad_msg == NULL) {
 			g_ta_status = g_ta_status | 0x00100000;
@@ -400,7 +401,7 @@ int wakeup_ta_algo(int flow_state)
 		memcpy(tad_msg->tad_data, &flow_state, sizeof(flow_state));
 		tad_msg->tad_data_len += sizeof(flow_state);
 		ta_nl_send_to_user(g_tad_pid, 0, tad_msg);
-		vfree(tad_msg);
+		kfree(tad_msg);
 		return 0;
 	}
 	tsta_warn("[%s] error,g_tad_pid=0\n", __func__);
