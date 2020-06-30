@@ -1,15 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2018 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
+ * Author: Argus Lin <argus.lin@mediatek.com>
  */
 
 #include "accdet.h"
@@ -17,16 +10,20 @@
 #ifdef CONFIG_ACCDET_EINT
 #include <linux/of_gpio.h>
 #endif
-#include <upmu_common.h>
 #include <linux/timer.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/sched/clock.h>
-#include <mtk_auxadc_intf.h>
-#include <mach/mtk_pmic.h>
+#include <linux/timer.h>
 #include <linux/irq.h>
 #include "reg_accdet.h"
+#if defined CONFIG_MTK_PMIC_NEW_ARCH
+#include <upmu_common.h>
+#include <mtk_auxadc_intf.h>
+#include <mach/mtk_pmic.h>
 #include <mach/upmu_hw.h>
+#endif
+#include <mach/mtk_pmic_wrap.h>
 #ifdef CONFIG_MTK_PMIC_WRAP
 #include <linux/regmap.h>
 #include <linux/soc/mediatek/pmic_wrap.h>
@@ -143,13 +140,13 @@ static struct workqueue_struct *eint_workqueue;
  */
 #define MICBIAS_DISABLE_TIMER   (6 * HZ)
 static struct timer_list micbias_timer;
-static void dis_micbias_timerhandler(unsigned long data);
+static void dis_micbias_timerhandler(struct timer_list *t);
 static bool dis_micbias_done;
 #ifdef CONFIG_ACCDET_EINT_IRQ
 static u32 gmoistureID;
 #endif
 static bool accdet_thing_in_flag;
-static char accdet_log_buf[1280];
+static char accdet_log_buf[1536];
 
 /* accdet_init_timer:  init accdet if audio doesn't call to accdet for DC trim
  * timeout: 10 seconds
@@ -157,8 +154,7 @@ static char accdet_log_buf[1280];
  */
 #define ACCDET_INIT_WAIT_TIMER   (10 * HZ)
 static struct timer_list  accdet_init_timer;
-static void delay_init_timerhandler(unsigned long data);
-
+static void delay_init_timerhandler(struct timer_list *t);
 static struct wakeup_source *accdet_irq_lock;
 static struct wakeup_source *accdet_timer_lock;
 static DEFINE_MUTEX(accdet_eint_irq_sync_mutex);
@@ -245,12 +241,35 @@ static void accdet_modify_vref_volt_self(void);
 /*******************global function declaration*****************/
 
 #if !defined CONFIG_MTK_PMIC_NEW_ARCH
-void pmic_register_interrupt_callback(unsigned int intNo
-				, void(EINT_FUNC_PTR)(void))
+enum PMIC_FAKE_IRQ_ENUM {
+	INT_ACCDET,
+	INT_ACCDET_EINT0,
+	INT_ACCDET_EINT1,
+};
+
+void pmic_register_interrupt_callback(unsigned int intNo,
+	void(EINT_FUNC_PTR)(void))
+{
+}
+
+void pmic_enable_interrupt(enum PMIC_FAKE_IRQ_ENUM intNo,
+	unsigned int en, char *str)
 {
 }
 
 unsigned int pmic_Read_Efuse_HPOffset(int i)
+{
+	return 0;
+}
+#endif
+
+#if !defined CONFIG_MTK_PMIC_WRAP && !defined CONFIG_MTK_PMIC_WRAP_HAL
+signed int pwrap_read(unsigned int adr, unsigned int *rdata)
+{
+	return 0;
+}
+
+signed int pwrap_write(unsigned int adr, unsigned int wdata)
 {
 	return 0;
 }
@@ -406,171 +425,182 @@ static void mini_dump_register(void)
 
 static void dump_register(void)
 {
-	int addr = 0, end_addr = 0, idx = 0;
+	int addr = 0, st_addr = 0, end_addr = 0, idx = 0;
 
-if (dump_reg) {
+	if (dump_reg) {
 #ifdef CONFIG_ACCDET_EINT_IRQ
 #ifdef CONFIG_ACCDET_SUPPORT_EINT0
-	pr_info("Accdet EINT0 support,MODE_%d regs:\n", accdet_dts.mic_mode);
+		pr_info("Accdet EINT0 support,MODE_%d regs:\n",
+				accdet_dts.mic_mode);
 #elif defined CONFIG_ACCDET_SUPPORT_EINT1
-	pr_info("Accdet EINT1 support,MODE_%d regs:\n", accdet_dts.mic_mode);
+		pr_info("Accdet EINT1 support,MODE_%d regs:\n",
+				accdet_dts.mic_mode);
 #elif defined CONFIG_ACCDET_SUPPORT_BI_EINT
-	pr_info("Accdet BIEINT support,MODE_%d regs:\n",
+		pr_info("Accdet BIEINT support,MODE_%d regs:\n",
 				accdet_dts.mic_mode);
 #else
-	pr_info("ACCDET_EINT_IRQ:NO EINT configed.Error!!\n");
+		pr_info("ACCDET_EINT_IRQ:NO EINT configed.Error!!\n");
 #endif
 #elif defined CONFIG_ACCDET_EINT
-	pr_info("Accdet EINT,MODE_%d regs:\n", accdet_dts.mic_mode);
+		pr_info("Accdet EINT,MODE_%d regs:\n",
+				accdet_dts.mic_mode);
 #endif
 
-	pr_info("ACCDET_RG\n");
-	end_addr = PMIC_ACCDET_MON_FLAG_EN_ADDR;
-	for (addr = PMIC_ACCDET_AUXADC_SEL_ADDR; addr <= end_addr; addr += 8) {
-		idx = addr;
-		pr_info("(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
-			idx, pmic_read(idx),
-			idx+2, pmic_read(idx+2),
-			idx+4, pmic_read(idx+4),
-			idx+6, pmic_read(idx+6));
-	}
-	pr_info("AUDDEC_ANA_RG\n");
-	end_addr = PMIC_RG_CLKSQ_EN_ADDR;
-	for (addr = PMIC_RG_AUDPREAMPLON_ADDR; addr <= end_addr; addr += 8) {
-		idx = addr;
-		pr_info("(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
-			idx, pmic_read(idx),
-			idx+2, pmic_read(idx+2),
-			idx+4, pmic_read(idx+4),
-			idx+6, pmic_read(idx+6));
-	}
+		pr_info("ACCDET_RG\n");
+		st_addr = PMIC_ACCDET_AUXADC_SEL_ADDR;
+		end_addr = PMIC_ACCDET_MON_FLAG_EN_ADDR;
+		for (addr = st_addr; addr <= end_addr; addr += 8) {
+			idx = addr;
+			pr_info("(0x%x)=0x%x (0x%x)=0x%x ",
+				idx, pmic_read(idx),
+				idx+2, pmic_read(idx+2));
+			pr_info("(0x%x)=0x%x (0x%x)=0x%x\n",
+				idx+4, pmic_read(idx+4),
+				idx+6, pmic_read(idx+6));
+		}
+		pr_info("AUDDEC_ANA_RG\n");
+		st_addr = PMIC_RG_AUDPREAMPLON_ADDR;
+		end_addr = PMIC_RG_CLKSQ_EN_ADDR;
+		for (addr = st_addr; addr <= end_addr; addr += 8) {
+			idx = addr;
+			pr_info("(0x%x)=0x%x (0x%x)=0x%x ",
+				idx, pmic_read(idx),
+				idx+2, pmic_read(idx+2));
+			pr_info("(0x%x)=0x%x (0x%x)=0x%x\n",
+				idx+4, pmic_read(idx+4),
+				idx+6, pmic_read(idx+6));
+		}
 
-	pr_info("(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
-		PMIC_RG_RTC32K_CK_PDN_ADDR,
-		pmic_read(PMIC_RG_RTC32K_CK_PDN_ADDR),
-		PMIC_RG_ACCDET_CK_PDN_ADDR,
-		pmic_read(PMIC_RG_ACCDET_CK_PDN_ADDR),
-		PMIC_RG_ACCDET_RST_ADDR,
-		pmic_read(PMIC_RG_ACCDET_RST_ADDR),
-		PMIC_RG_INT_EN_ACCDET_ADDR,
-		pmic_read(PMIC_RG_INT_EN_ACCDET_ADDR));
-	pr_info("(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
-		PMIC_RG_INT_MASK_ACCDET_ADDR,
-		pmic_read(PMIC_RG_INT_MASK_ACCDET_ADDR),
-		PMIC_RG_INT_STATUS_ACCDET_ADDR,
-		pmic_read(PMIC_RG_INT_STATUS_ACCDET_ADDR),
-		PMIC_RG_AUDPWDBMICBIAS1_ADDR,
-		pmic_read(PMIC_RG_AUDPWDBMICBIAS1_ADDR),
-		PMIC_RG_AUDACCDETMICBIAS0PULLLOW_ADDR,
-		pmic_read(PMIC_RG_AUDACCDETMICBIAS0PULLLOW_ADDR));
-	pr_info("(0x%x)=0x%x (0x%x)=0x%x\n",
-		PMIC_AUXADC_RQST_CH0_ADDR,
-		pmic_read(PMIC_AUXADC_RQST_CH0_ADDR),
-		PMIC_AUXADC_ACCDET_AUTO_SPL_ADDR,
-		pmic_read(PMIC_AUXADC_ACCDET_AUTO_SPL_ADDR));
-	pr_info("(0x%x)=0x%x\n", PMIC_RG_HPLOUTPUTSTBENH_VAUDP32_ADDR,
+		pr_info("(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
+			PMIC_RG_RTC32K_CK_PDN_ADDR,
+			pmic_read(PMIC_RG_RTC32K_CK_PDN_ADDR),
+			PMIC_RG_ACCDET_CK_PDN_ADDR,
+			pmic_read(PMIC_RG_ACCDET_CK_PDN_ADDR),
+			PMIC_RG_ACCDET_RST_ADDR,
+			pmic_read(PMIC_RG_ACCDET_RST_ADDR),
+			PMIC_RG_INT_EN_ACCDET_ADDR,
+			pmic_read(PMIC_RG_INT_EN_ACCDET_ADDR));
+		pr_info("(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
+			PMIC_RG_INT_MASK_ACCDET_ADDR,
+			pmic_read(PMIC_RG_INT_MASK_ACCDET_ADDR),
+			PMIC_RG_INT_STATUS_ACCDET_ADDR,
+			pmic_read(PMIC_RG_INT_STATUS_ACCDET_ADDR),
+			PMIC_RG_AUDPWDBMICBIAS1_ADDR,
+			pmic_read(PMIC_RG_AUDPWDBMICBIAS1_ADDR),
+			PMIC_RG_AUDACCDETMICBIAS0PULLLOW_ADDR,
+			pmic_read(PMIC_RG_AUDACCDETMICBIAS0PULLLOW_ADDR));
+		pr_info("(0x%x)=0x%x (0x%x)=0x%x\n",
+			PMIC_AUXADC_RQST_CH0_ADDR,
+			pmic_read(PMIC_AUXADC_RQST_CH0_ADDR),
+			PMIC_AUXADC_ACCDET_AUTO_SPL_ADDR,
+			pmic_read(PMIC_AUXADC_ACCDET_AUTO_SPL_ADDR));
+		pr_info("(0x%x)=0x%x\n", PMIC_RG_HPLOUTPUTSTBENH_VAUDP32_ADDR,
 			pmic_read(PMIC_RG_HPLOUTPUTSTBENH_VAUDP32_ADDR));
 
-	pr_info("accdet_dts:deb0=0x%x,deb1=0x%x,deb3=0x%x,deb4=0x%x\n",
-		 cust_pwm_deb->debounce0, cust_pwm_deb->debounce1,
-		 cust_pwm_deb->debounce3, cust_pwm_deb->debounce4);
-} else
-	mini_dump_register();
+		pr_info("accdet_dts:deb0=0x%x,deb1=0x%x,deb3=0x%x,deb4=0x%x\n",
+			 cust_pwm_deb->debounce0, cust_pwm_deb->debounce1,
+			 cust_pwm_deb->debounce3, cust_pwm_deb->debounce4);
+	} else
+		mini_dump_register();
 }
 
 
 #if PMIC_ACCDET_KERNEL
-static char buf_temp[1536] = { 0 };
 static void cat_register(char *buf)
 {
-	int addr = 0, end_addr = 0, idx = 0;
+	int addr = 0, st_addr = 0, end_addr = 0, idx = 0;
 
 	dump_reg = true;
 	dump_register();
 	dump_reg = false;
-	sprintf(buf_temp, "ACCDET_RG\n");
-	strncat(buf, buf_temp, strlen(buf_temp));
+	sprintf(accdet_log_buf, "ACCDET_RG\n");
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
+	st_addr = PMIC_ACCDET_AUXADC_SEL_ADDR;
 	end_addr = PMIC_ACCDET_MON_FLAG_EN_ADDR;
-for (addr = PMIC_ACCDET_AUXADC_SEL_ADDR; addr <= end_addr; addr += 8) {
-	idx = addr;
-	sprintf(buf_temp, "(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
-		idx, pmic_read(idx),
-	idx+2, pmic_read(idx+2),
-		idx+4, pmic_read(idx+4),
-		idx+6, pmic_read(idx+6));
-	strncat(buf, buf_temp, strlen(buf_temp));
-}
-	sprintf(buf_temp, "AUDDEC_ANA_RG\n");
-	strncat(buf, buf_temp, strlen(buf_temp));
+	for (addr = st_addr; addr <= end_addr; addr += 8) {
+		idx = addr;
+		sprintf(accdet_log_buf,
+			"(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
+			idx, pmic_read(idx),
+			idx+2, pmic_read(idx+2),
+			idx+4, pmic_read(idx+4),
+			idx+6, pmic_read(idx+6));
+		strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
+	}
+	sprintf(accdet_log_buf, "AUDDEC_ANA_RG\n");
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
+	st_addr = PMIC_RG_AUDPREAMPLON_ADDR;
 	end_addr = PMIC_RG_CLKSQ_EN_ADDR;
-for (addr = PMIC_RG_AUDPREAMPLON_ADDR; addr <= end_addr; addr += 8) {
-	idx = addr;
-	sprintf(buf_temp, "(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
-		idx, pmic_read(idx),
-		idx+2, pmic_read(idx+2),
-		idx+4, pmic_read(idx+4),
-		idx+6, pmic_read(idx+6));
-	strncat(buf, buf_temp, strlen(buf_temp));
-}
+	for (addr = st_addr; addr <= end_addr; addr += 8) {
+		idx = addr;
+		sprintf(accdet_log_buf,
+			"(0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x (0x%x)=0x%x\n",
+			idx, pmic_read(idx),
+			idx+2, pmic_read(idx+2),
+			idx+4, pmic_read(idx+4),
+			idx+6, pmic_read(idx+6));
+		strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
+	}
 #ifdef CONFIG_ACCDET_EINT_IRQ
 #ifdef CONFIG_ACCDET_SUPPORT_EINT0
-	sprintf(buf_temp, "[Accdet EINT0 support][MODE_%d]regs:\n",
+	sprintf(accdet_log_buf, "[Accdet EINT0 support][MODE_%d]regs:\n",
 		accdet_dts.mic_mode);
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 #elif defined CONFIG_ACCDET_SUPPORT_EINT1
-	sprintf(buf_temp, "[ccdet EINT1 support][MODE_%d]regs:\n",
+	sprintf(accdet_log_buf, "[ccdet EINT1 support][MODE_%d]regs:\n",
 		accdet_dts.mic_mode);
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 #elif defined CONFIG_ACCDET_SUPPORT_BI_EINT
-	sprintf(buf_temp, "[Accdet BIEINT support][MODE_%d] regs:\n",
+	sprintf(accdet_log_buf, "[Accdet BIEINT support][MODE_%d] regs:\n",
 		accdet_dts.mic_mode);
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 #else
 	strncat(buf, "ACCDET_EINT_IRQ:NO EINT configed.Error!!\n", 64);
 #endif
 #elif defined CONFIG_ACCDET_EINT
-	sprintf(buf_temp, "[Accdet AP EINT][MODE_%d] regs:\n",
+	sprintf(accdet_log_buf, "[Accdet AP EINT][MODE_%d] regs:\n",
 		accdet_dts.mic_mode);
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 #else
 	strncat(buf, "ACCDET EINT:No configed.Error!!\n", 64);
 #endif
 
-	sprintf(buf_temp, "[0x%x]=0x%x\n",
+	sprintf(accdet_log_buf, "[0x%x]=0x%x\n",
 		PMIC_RG_SCK32K_CK_PDN_ADDR,
 		pmic_read(PMIC_RG_SCK32K_CK_PDN_ADDR));
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 
-	sprintf(buf_temp, "[0x%x]=0x%x\n",
+	sprintf(accdet_log_buf, "[0x%x]=0x%x\n",
 		PMIC_RG_ACCDET_RST_ADDR, pmic_read(PMIC_RG_ACCDET_RST_ADDR));
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 
-	sprintf(buf_temp, "[0x%x]=0x%x, [0x%x]=0x%x, [0x%x]=0x%x\n",
+	sprintf(accdet_log_buf, "[0x%x]=0x%x, [0x%x]=0x%x, [0x%x]=0x%x\n",
 		PMIC_RG_INT_EN_ACCDET_ADDR,
 		pmic_read(PMIC_RG_INT_EN_ACCDET_ADDR),
 		PMIC_RG_INT_MASK_ACCDET_ADDR,
 		pmic_read(PMIC_RG_INT_MASK_ACCDET_ADDR),
 		PMIC_RG_INT_STATUS_ACCDET_ADDR,
 		pmic_read(PMIC_RG_INT_STATUS_ACCDET_ADDR));
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 
-	sprintf(buf_temp, "[0x%x]=0x%x,[0x%x]=0x%x\n",
+	sprintf(accdet_log_buf, "[0x%x]=0x%x,[0x%x]=0x%x\n",
 		PMIC_RG_AUDPWDBMICBIAS1_ADDR,
 		pmic_read(PMIC_RG_AUDPWDBMICBIAS1_ADDR),
 		PMIC_RG_AUDACCDETMICBIAS0PULLLOW_ADDR,
 		pmic_read(PMIC_RG_AUDACCDETMICBIAS0PULLLOW_ADDR));
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 
-	sprintf(buf_temp, "[0x%x]=0x%x, [0x%x]=0x%x\n",
+	sprintf(accdet_log_buf, "[0x%x]=0x%x, [0x%x]=0x%x\n",
 		PMIC_AUXADC_RQST_CH5_ADDR, pmic_read(PMIC_AUXADC_RQST_CH5_ADDR),
 		PMIC_AUXADC_ACCDET_AUTO_SPL_ADDR,
 		pmic_read(PMIC_AUXADC_ACCDET_AUTO_SPL_ADDR));
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 
-	sprintf(buf_temp, "dtsInfo:deb0=0x%x,deb1=0x%x,deb3=0x%x,deb4=0x%x\n",
+	sprintf(accdet_log_buf,
+		"dtsInfo:deb0=0x%x,deb1=0x%x,deb3=0x%x,deb4=0x%x\n",
 		 cust_pwm_deb->debounce0, cust_pwm_deb->debounce1,
 		 cust_pwm_deb->debounce3, cust_pwm_deb->debounce4);
-	strncat(buf, buf_temp, strlen(buf_temp));
+	strncat(buf, accdet_log_buf, strlen(accdet_log_buf));
 }
 
 static int dbug_thread(void *unused)
@@ -845,39 +875,10 @@ static u32 accdet_get_auxadc(int deCount)
 static void accdet_get_efuse(void)
 {
 	u32 efuseval = 0;
-#ifdef CONFIG_FOUR_KEY_HEADSET
-	u32 tmp_val = 0;
-	u32 tmp_8bit = 0
-#endif
 	int tmp_div;
 	unsigned int moisture_eint0;
 	unsigned int moisture_eint1;
 
-#ifdef CONFIG_FOUR_KEY_HEADSET
-	/* 4-key efuse:
-	 * bit[9:2] efuse value is loaded, so every read out value need to be
-	 * left shift 2 bit,and then compare with voltage get from AUXADC.
-	 * AD efuse: key-A Voltage:0--AD;
-	 * DB efuse: key-D Voltage: AD--DB;
-	 * BC efuse: key-B Voltage:DB--BC;
-	 * key-C Voltage: BC--600;
-	 */
-	tmp_val = pmic_Read_Efuse_HPOffset(103);
-	tmp_8bit = tmp_val & ACCDET_CALI_MASK0;
-	accdet_dts.four_key.mid = tmp_8bit << 2;
-
-	tmp_8bit = (tmp_val >> 8) & ACCDET_CALI_MASK0;
-	accdet_dts.four_key.voice = tmp_8bit << 2;
-
-	tmp_val = pmic_Read_Efuse_HPOffset(104);
-	tmp_8bit = tmp_val & ACCDET_CALI_MASK0;
-	accdet_dts.four_key.up = tmp_8bit << 2;
-
-	accdet_dts.four_key.down = 600;
-	pr_info("accdet key thresh: mid=%dmv,voice=%dmv,up=%dmv,down=%dmv\n",
-		accdet_dts.four_key.mid, accdet_dts.four_key.voice,
-		accdet_dts.four_key.up, accdet_dts.four_key.down);
-#endif
 	/* accdet offset efuse:
 	 * this efuse must divided by 2
 	 */
@@ -946,6 +947,36 @@ static void accdet_get_efuse(void)
 }
 
 #ifdef CONFIG_FOUR_KEY_HEADSET
+static void accdet_get_efuse_4key(void)
+{
+	u32 tmp_val = 0;
+	u32 tmp_8bit = 0
+
+	/* 4-key efuse:
+	 * bit[9:2] efuse value is loaded, so every read out value need to be
+	 * left shift 2 bit,and then compare with voltage get from AUXADC.
+	 * AD efuse: key-A Voltage:0--AD;
+	 * DB efuse: key-D Voltage: AD--DB;
+	 * BC efuse: key-B Voltage:DB--BC;
+	 * key-C Voltage: BC--600;
+	 */
+	tmp_val = pmic_Read_Efuse_HPOffset(103);
+	tmp_8bit = tmp_val & ACCDET_CALI_MASK0;
+	accdet_dts.four_key.mid = tmp_8bit << 2;
+
+	tmp_8bit = (tmp_val >> 8) & ACCDET_CALI_MASK0;
+	accdet_dts.four_key.voice = tmp_8bit << 2;
+
+	tmp_val = pmic_Read_Efuse_HPOffset(104);
+	tmp_8bit = tmp_val & ACCDET_CALI_MASK0;
+	accdet_dts.four_key.up = tmp_8bit << 2;
+
+	accdet_dts.four_key.down = 600;
+	pr_info("accdet key thresh: mid=%dmv,voice=%dmv,up=%dmv,down=%dmv\n",
+		accdet_dts.four_key.mid, accdet_dts.four_key.voice,
+		accdet_dts.four_key.up, accdet_dts.four_key.down);
+}
+
 static u32 key_check(u32 v)
 {
 	if ((v < accdet_dts.four_key.down) && (v >= accdet_dts.four_key.up))
@@ -1712,7 +1743,7 @@ static inline void headset_plug_out(void)
 #endif
 }
 #if PMIC_ACCDET_KERNEL
-static void dis_micbias_timerhandler(unsigned long data)
+static void dis_micbias_timerhandler(struct timer_list *t)
 {
 	int ret = 0;
 
@@ -1914,7 +1945,6 @@ cur_AB = pmic_read(PMIC_ACCDET_MEM_IN_ADDR) >> ACCDET_STATE_MEM_IN_OFFSET;
 
 			/* adjust debounce1 to original 0x800(64ms),
 			 * to fix miss key issue when fast press double key.
-			 * this is side effect of bigger deb1 to fix 3pole detetc as 4-pole
 			 */
 			accdet_set_debounce(accdet_state001,
 				button_press_debounce_01);
@@ -2587,8 +2617,10 @@ static int accdet_get_dts_data(void)
 	if (!ret)
 		memcpy(&accdet_dts.four_key, four_key+1,
 				sizeof(struct four_key_threshold));
-	else
-		pr_info("accdet get 4-key-thrsh fail\n");
+	else {
+		pr_info("accdet get 4-key-thrsh dts fail, use efuse\n");
+		accdet_get_efuse_4key();
+	}
 
 	pr_info("accdet key thresh mid = %d, voice = %d, up = %d, dwn = %d\n",
 		accdet_dts.four_key.mid, accdet_dts.four_key.voice,
@@ -3172,7 +3204,7 @@ cur_AB = pmic_read(PMIC_ACCDET_MEM_IN_ADDR) >> ACCDET_STATE_MEM_IN_OFFSET;
 #if PMIC_ACCDET_KERNEL
 EXPORT_SYMBOL(accdet_late_init);
 
-static void delay_init_timerhandler(unsigned long data)
+static void delay_init_timerhandler(struct timer_list *t)
 {
 	if (pmic_read(PMIC_SWCID_ADDR) == 0x5910) {
 		pr_info("accdet not supported\r");
@@ -3267,17 +3299,12 @@ int mt_accdet_probe(struct platform_device *dev)
 		goto err_create_attr;
 	}
 
-	/* init the timer to disable micbias. */
-	init_timer(&micbias_timer);
+	/* modify timer api for kernel 4.19 */
+	timer_setup(&micbias_timer, dis_micbias_timerhandler, 0);
+	timer_setup(&accdet_init_timer, delay_init_timerhandler, 0);
 	micbias_timer.expires = jiffies + MICBIAS_DISABLE_TIMER;
-	micbias_timer.function = &dis_micbias_timerhandler;
-	micbias_timer.data = 0;
-
-	/* set the timer ensure accdet can be init even audio never call */
-	init_timer(&accdet_init_timer);
 	accdet_init_timer.expires = jiffies + ACCDET_INIT_WAIT_TIMER;
-	accdet_init_timer.function = &delay_init_timerhandler;
-	accdet_init_timer.data = 0;
+	/* the third argument may include TIMER_* flags */
 
 	/* wake lock */
 	accdet_irq_lock = wakeup_source_register("accdet_irq_lock");

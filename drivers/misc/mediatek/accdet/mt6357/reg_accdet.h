@@ -17,7 +17,7 @@
 /* Register Address Define */
 #define ACCDET_BASE		(0x00000000)
 #define PMIC_REG_BASE_START	(0x0000)
-#define PMIC_REG_BASE_END	(0x2540)
+#define PMIC_REG_BASE_END	(0x2340)
 
 
 /*-------Register_TOP_REG----------------------*/
@@ -27,65 +27,65 @@
 #define TOP_CKPDN_CON0_CLR	((unsigned int)(ACCDET_BASE + 0x0110))
 
 /*-------Register_AUXADC_REG----------------------*/
-#define AUXADC_RQST0		((unsigned int)(ACCDET_BASE + 0x1108))
-#define AUXADC_RQST0_SET	((unsigned int)(ACCDET_BASE + 0x1108))
-#define AUXADC_RQST0_CLR	((unsigned int)(ACCDET_BASE + 0x1108))
-#define AUXADC_ACCDET		((unsigned int)(ACCDET_BASE + 0x11B8))
+#define AUXADC_RQST0		((unsigned int)(ACCDET_BASE + 0x110E))
+#define AUXADC_RQST0_SET	((unsigned int)(ACCDET_BASE + 0x1110))
+#define AUXADC_RQST0_CLR	((unsigned int)(ACCDET_BASE + 0x1112))
+#define AUXADC_ACCDET		((unsigned int)(ACCDET_BASE + 0x1198))
 
 /*--------------Register_AUD_REG--------------------------*/
 /* Accdet clk&reset&int all in AUD_REG domain */
 
-#define AUD_TOP_CKPDN_CON0	((unsigned int)(ACCDET_BASE + 0x220C))
-#define AUD_TOP_RST_CON0	((unsigned int)(ACCDET_BASE + 0x2220))
-#define AUD_TOP_INT_CON0	((unsigned int)(ACCDET_BASE + 0x2228))
-#define AUD_TOP_INT_CON0_SET	((unsigned int)(ACCDET_BASE + 0x222A))
-#define AUD_TOP_INT_CON0_CLR	((unsigned int)(ACCDET_BASE + 0x222C))
+#define AUD_TOP_CKPDN_CON0	((unsigned int)(ACCDET_BASE + 0x208C))
+#define AUD_TOP_RST_CON0	((unsigned int)(ACCDET_BASE + 0x209A))
+#define AUD_TOP_INT_CON0	((unsigned int)(ACCDET_BASE + 0x20A2))
+#define AUD_TOP_INT_CON0_SET	((unsigned int)(ACCDET_BASE + 0x20A4))
+#define AUD_TOP_INT_CON0_CLR	((unsigned int)(ACCDET_BASE + 0x20A6))
 
-#define AUD_TOP_INT_MASK_CON0	((unsigned int)(ACCDET_BASE + 0x222E))
-#define AUD_TOP_INT_MASK_CON0_SET	((unsigned int)(ACCDET_BASE + 0x2230))
-#define AUD_TOP_INT_MASK_CON0_CLR	((unsigned int)(ACCDET_BASE + 0x2232))
-#define AUD_TOP_INT_STATUS0	((unsigned int)(ACCDET_BASE + 0x2234))
+#define AUD_TOP_INT_MASK_CON0	((unsigned int)(ACCDET_BASE + 0x20A8))
+#define AUD_TOP_INT_MASK_CON0_SET	((unsigned int)(ACCDET_BASE + 0x20AA))
+#define AUD_TOP_INT_MASK_CON0_CLR	((unsigned int)(ACCDET_BASE + 0x20AC))
+#define AUD_TOP_INT_STATUS0	((unsigned int)(ACCDET_BASE + 0x20AE))
 
 /* analog RG */
 /* ACCDET_FAST_DISCHARGE_REG */
-#define AUDENC_ANA_CON6		((unsigned int)(ACCDET_BASE + 0x2394))
+#define AUDENC_ANA_CON6		((unsigned int)(ACCDET_BASE + 0x2194))
 /* ACCDET_MOISTURE_REG */
-#define AUDENC_ANA_CON9		((unsigned int)(ACCDET_BASE + 0x239A))
+#define AUDENC_ANA_CON9		((unsigned int)(ACCDET_BASE + 0x219A))
 /* ACCDET_MICBIAS_REG */
-#define AUDENC_ANA_CON10	((unsigned int)(ACCDET_BASE + 0x239C))
+#define AUDENC_ANA_CON10	((unsigned int)(ACCDET_BASE + 0x219C))
 /* ACCDET_ADC_REG */
-#define AUDENC_ANA_CON11	((unsigned int)(ACCDET_BASE + 0x239E))
+#define AUDENC_ANA_CON11	((unsigned int)(ACCDET_BASE + 0x219E))
 
 /*--------------ACCDET_REG-------------------------------*/
-#define ACCDET_RSV		((unsigned int)(ACCDET_BASE + 0x2508))
-#define ACCDET_CTRL		((unsigned int)(ACCDET_BASE + 0x250A))
-#define ACCDET_STATE_SWCTRL	((unsigned int)(ACCDET_BASE + 0x250C))
-#define ACCDET_PWM_WIDTH	((unsigned int)(ACCDET_BASE + 0x250E))
-#define ACCDET_PWM_THRESH	((unsigned int)(ACCDET_BASE + 0x2510))
-#define ACCDET_EN_DELAY_NUM	((unsigned int)(ACCDET_BASE + 0x2512))
-#define ACCDET_DEBOUNCE0	((unsigned int)(ACCDET_BASE + 0x2514))
-#define ACCDET_DEBOUNCE1	((unsigned int)(ACCDET_BASE + 0x2516))
-#define ACCDET_DEBOUNCE2	((unsigned int)(ACCDET_BASE + 0x2518))
-#define ACCDET_DEBOUNCE3	((unsigned int)(ACCDET_BASE + 0x251A))
-#define ACCDET_DEBOUNCE4	((unsigned int)(ACCDET_BASE + 0x251C))
-#define ACCDET_DEFAULT_STATE_RG	((unsigned int)(ACCDET_BASE + 0x251E))
-#define ACCDET_IRQ_STS		((unsigned int)(ACCDET_BASE + 0x2520))
-#define ACCDET_CONTROL_RG	((unsigned int)(ACCDET_BASE + 0x2522))
-#define ACCDET_STATE_RG		((unsigned int)(ACCDET_BASE + 0x2524))
-#define ACCDET_EINT0_CTL	((unsigned int)(ACCDET_BASE + 0x2526))
-#define ACCDET_EINT0_PWM_DELAY	((unsigned int)(ACCDET_BASE + 0x2528))
-#define ACCDET_TEST_DEBUG	((unsigned int)(ACCDET_BASE + 0x252A))
-#define ACCDET_EINT0_STATE	((unsigned int)(ACCDET_BASE + 0x252C))
-#define ACCDET_CUR_DEB		((unsigned int)(ACCDET_BASE + 0x252E))
-#define ACCDET_EINT0_CUR_DEB	((unsigned int)(ACCDET_BASE + 0x2530))
-#define ACCDET_RSV_CON0		((unsigned int)(ACCDET_BASE + 0x2532))
-#define ACCDET_RSV_CON1		((unsigned int)(ACCDET_BASE + 0x2534))
-#define ACCDET_AUXADC_CON_TIME	((unsigned int)(ACCDET_BASE + 0x2536))
-#define ACCDET_HW_MODE_DFF	((unsigned int)(ACCDET_BASE + 0x2538))
-#define ACCDET_EINT1_CTL	((unsigned int)(ACCDET_BASE + 0x253A))
-#define ACCDET_EINT1_PWM_DELAY	((unsigned int)(ACCDET_BASE + 0x253C))
-#define ACCDET_EINT1_STATE	((unsigned int)(ACCDET_BASE + 0x253E))
-#define ACCDET_EINT1_CUR_DEB	((unsigned int)(ACCDET_BASE + 0x2540))
+#define ACCDET_RSV		((unsigned int)(ACCDET_BASE + 0x2308))
+#define ACCDET_CTRL		((unsigned int)(ACCDET_BASE + 0x230A))
+#define ACCDET_STATE_SWCTRL	((unsigned int)(ACCDET_BASE + 0x230C))
+#define ACCDET_PWM_WIDTH	((unsigned int)(ACCDET_BASE + 0x230E))
+#define ACCDET_PWM_THRESH	((unsigned int)(ACCDET_BASE + 0x2310))
+#define ACCDET_EN_DELAY_NUM	((unsigned int)(ACCDET_BASE + 0x2312))
+#define ACCDET_DEBOUNCE0	((unsigned int)(ACCDET_BASE + 0x2314))
+#define ACCDET_DEBOUNCE1	((unsigned int)(ACCDET_BASE + 0x2316))
+#define ACCDET_DEBOUNCE2	((unsigned int)(ACCDET_BASE + 0x2318))
+#define ACCDET_DEBOUNCE3	((unsigned int)(ACCDET_BASE + 0x231A))
+#define ACCDET_DEBOUNCE4	((unsigned int)(ACCDET_BASE + 0x231C))
+#define ACCDET_DEFAULT_STATE_RG	((unsigned int)(ACCDET_BASE + 0x231E))
+#define ACCDET_IRQ_STS		((unsigned int)(ACCDET_BASE + 0x2320))
+#define ACCDET_CONTROL_RG	((unsigned int)(ACCDET_BASE + 0x2322))
+#define ACCDET_STATE_RG		((unsigned int)(ACCDET_BASE + 0x2324))
+#define ACCDET_EINT0_CTL	((unsigned int)(ACCDET_BASE + 0x2326))
+#define ACCDET_EINT0_PWM_DELAY	((unsigned int)(ACCDET_BASE + 0x2328))
+#define ACCDET_TEST_DEBUG	((unsigned int)(ACCDET_BASE + 0x232A))
+#define ACCDET_EINT0_STATE	((unsigned int)(ACCDET_BASE + 0x232C))
+#define ACCDET_CUR_DEB		((unsigned int)(ACCDET_BASE + 0x232E))
+#define ACCDET_EINT0_CUR_DEB	((unsigned int)(ACCDET_BASE + 0x2330))
+#define ACCDET_RSV_CON0		((unsigned int)(ACCDET_BASE + 0x2332))
+#define ACCDET_RSV_CON1		((unsigned int)(ACCDET_BASE + 0x2334))
+#define ACCDET_AUXADC_CON_TIME	((unsigned int)(ACCDET_BASE + 0x2336))
+#define ACCDET_HW_MODE_DFF	((unsigned int)(ACCDET_BASE + 0x2338))
+#define ACCDET_EINT1_CTL	((unsigned int)(ACCDET_BASE + 0x233A))
+#define ACCDET_EINT1_PWM_DELAY	((unsigned int)(ACCDET_BASE + 0x233C))
+#define ACCDET_EINT1_STATE	((unsigned int)(ACCDET_BASE + 0x233E))
+#define ACCDET_EINT1_CUR_DEB	((unsigned int)(ACCDET_BASE + 0x2340))
 
 
 /*************Register Bit Define*************/
@@ -100,9 +100,6 @@
 #define RG_INT_EN_ACCDET_EINT0_B6	(0x01<<6)
 #define RG_INT_EN_ACCDET_EINT1_B7	(0x01<<7)
 #define RG_INT_EN_ACCDET_EINT_B6_7	(0x03<<6)
-#define ACCDET_EINT1_IVAL_SEL_B13		(0x2000)
-#define ACCDET_EINT0_IVAL_SEL_B14		(0x4000)
-#define ACCDET_EINT1_IVAL_SEL_B15		(0x8000)
 
 /* AUD_TOP_INT_MASK_CON0:bit5,int;bit6,eint0;bit7,eint1 */
 #define RG_INT_MASK_ACCDET_B5		(0x01<<5)
@@ -119,16 +116,16 @@
 /* AUDENC_ANA_CON6:  analog fast discharge*/
 #define RG_AUDSPARE			(0x00A0)
 #define RG_AUDSPARE_FSTDSCHRG_ANALOG_DIR_EN	(1<<5)
-#define RG_AUDSPARE_FSTDSCHRG_IMPR_EN		(1<<6)
+#define RG_AUDSPARE_FSTDSCHRG_IMPR_EN		(1<<7)
+
+/* AUDENC_ANA_CON9: */
+#define RG_AUDMICBIAS1_DCSW1PEN		(0x01<<8)
+
 
 /* AUDENC_ANA_CON10: */
-#define RG_AUDMICBIAS1_DCSW1PEN		(0x01<<8)
-#define RG_AUD_MICBIAS1_LOWP_EN		(1<<2)
-
-/* AUDENC_ANA_CON11: */
-#define RG_ACCDET_MODE_ANA11_MODE1	(0x0807)
-#define RG_ACCDET_MODE_ANA11_MODE2	(0x0887)
-#define RG_ACCDET_MODE_ANA11_MODE6	(0x0887)
+#define RG_ACCDET_MODE_ANA10_MODE1	(0x0807)
+#define RG_ACCDET_MODE_ANA10_MODE2	(0x0887)
+#define RG_ACCDET_MODE_ANA10_MODE6	(0x0887)
 
 /* ------Register_AUXADC_REG  Bit Define------ */
 /* AUXADC_ADC5:  Auxadc CH5 read data */
@@ -202,13 +199,13 @@
 #define ACCDET_MBIAS_PWM_IDLE_B10	(0x01<<10)
 #define ACCDET_VTH_PWM_IDLE_B9		(0x01<<9)
 #define ACCDET_CMP_PWM_IDLE_B8		(0x01<<8)
-#define ACCDET_PWM_IDLE			(0x07<<8)
+#define ACCDET_PWM_IDLE				(0x07<<8)
 #define ACCDET_EINT1_PWM_EN_B4		(0x01<<4)
 #define ACCDET_EINT0_PWM_EN_B3		(0x01<<3)
 #define ACCDET_MICBIAS_PWM_EN_B2	(0x01<<2)
 #define ACCDET_VTH_PWM_EN_B1		(0x01<<1)
 #define ACCDET_CMP_PWM_EN_B0		(0x01<<0)
-#define ACCDET_PWM_EN			(0x07)
+#define ACCDET_PWM_EN				(0x07)
 #define ACCDET_EINT_PWM_EN_B3_4		(0x03<<3)
 
 /* ACCDET_CON3-CON5, set ACCDET PWM width, thresh, rise/falling */

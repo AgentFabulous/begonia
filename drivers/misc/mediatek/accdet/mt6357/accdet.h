@@ -178,8 +178,6 @@ void mt_accdet_remove(void);
 void mt_accdet_suspend(void);
 void mt_accdet_resume(void);
 int mt_accdet_probe(struct platform_device *dev);
-long mt_accdet_unlocked_ioctl(struct file *file,
-	unsigned int cmd, unsigned long arg);
 
 #endif
 
