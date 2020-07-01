@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -265,7 +264,6 @@ int Ripi_cpu_dvfs_thread(void *data)
 				p->mt_policy->max =
 					cpu_dvfs_get_freq_by_idx(p,
 					p->idx_opp_ppm_limit);
-
 
 #ifdef SINGLE_CLUSTER
 				cid =
@@ -1258,10 +1256,8 @@ void cpuhvfs_pvt_tbl_create(void)
 	memset_io((u8 *)record_IMAX_Ref, 0x00, PVT_IMAX_TBL_SIZE);
 
 	record_IMAX_Tbl = xrecord_IMAX_Tbl[lv];
-	for (i = 0; i < (NR_FREQ + 1) * IMAX_EN_RATIO_TBL_NUM; i++) {
+	for (i = 0; i < (NR_FREQ + 1) * IMAX_EN_RATIO_TBL_NUM; i++)
 		record_IMAX_Ref[i] = *(record_IMAX_Tbl + i);
-
-	}
 	csram_write(OFFS_IMAX_EN, imax_state);
 	csram_write(OFFS_IMAX_THERMAL_EN, 1);
 	mb(); /* SRAM writing */

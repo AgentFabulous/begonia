@@ -27,8 +27,12 @@
 #include <mt-plat/upmu_common.h>
 #endif
 /* TODO: fix */
-#if !defined(SPM_K414_EARLY_PORTING)
+#if !defined(SPM_K414_EARLY_PORTING) && \
+	!defined(CONFIG_MACH_MT6739) && \
+	!defined(CONFIG_MACH_MT6771)
 #include <mtk_pmic_api_buck.h>
+#elif defined(CONFIG_MACH_MT6739)
+#include "pmic_api_buck.h"
 #endif
 #include <upmu_sw.h>
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
@@ -53,7 +57,7 @@
 #endif
 /* TODO: fix */
 #if !defined(SPM_K414_EARLY_PORTING)
-#include <linux/wakelock.h>
+#include <linux/pm_wakeup.h>
 #endif
 
 #include <linux/platform_device.h>
@@ -62,7 +66,7 @@
 #include <mtk_spm_misc.h>
 #include <mtk_spm_resource_req_internal.h>
 /* TODO: fix */
-#if !defined(SPM_K414_EARLY_PORTING)
+#if !defined(SPM_K414_EARLY_PORTING) && defined(CONFIG_MTK_SYS_CIRQ)
 #include <mt-plat/mtk_cirq.h>
 #endif
 
@@ -80,9 +84,9 @@ u32 spm_irq_0;
 #if defined(CONFIG_MACH_MT6763)
 #define NF_EDGE_TRIG_IRQS	7
 #elif defined(CONFIG_MACH_MT6739)
-#define NF_EDGE_TRIG_IRQS	3
+#define NF_EDGE_TRIG_IRQS	2
 #elif defined(CONFIG_MACH_MT6771)
-#define NF_EDGE_TRIG_IRQS	4	/* TODO: confirm & modify */
+#define NF_EDGE_TRIG_IRQS	3 /* remove auxadc (lowbattery_irq_b) */
 #endif
 static u32 edge_trig_irqs[NF_EDGE_TRIG_IRQS];
 
@@ -327,16 +331,6 @@ static void spm_register_init(void)
 		if (!edge_trig_irqs[1])
 			spm_err("get mdcldma failed\n");
 	}
-
-	/* conn_wdt_irq_b */
-	node = of_find_compatible_node(NULL, NULL, "mediatek,mt6739-consys");
-	if (!node) {
-		spm_err("find mt6739-consys node failed\n");
-	} else {
-		edge_trig_irqs[2] = irq_of_parse_and_map(node, 1);
-		if (!edge_trig_irqs[2])
-			spm_err("get mt6739-consys failed\n");
-	}
 #elif defined(CONFIG_MACH_MT6771)
 	/* mediatek,infracfg_ao */
 	node = of_find_compatible_node(NULL, NULL, "mediatek,infracfg_ao");
@@ -369,6 +363,7 @@ static void spm_register_init(void)
 	}
 
 	/* mediatek,auxadc */
+	/* remove auxadc (lowbattery_irq_b)
 	node = of_find_compatible_node(NULL, NULL, "mediatek,auxadc");
 	if (!node) {
 		spm_err("find mediatek,auxadc node failed\n");
@@ -377,6 +372,7 @@ static void spm_register_init(void)
 		if (!edge_trig_irqs[3])
 			spm_err("get mediatek,auxadc failed\n");
 	}
+	*/
 #endif
 
 #if defined(CONFIG_MACH_MT6763)
@@ -389,16 +385,15 @@ static void spm_register_init(void)
 		 edge_trig_irqs[5],
 		 edge_trig_irqs[6]);
 #elif defined(CONFIG_MACH_MT6739)
+	spm_err("edge trigger irqs: %d, %d\n",
+		 edge_trig_irqs[0],
+		 edge_trig_irqs[1]);
+#elif defined(CONFIG_MACH_MT6771)
 	spm_err("edge trigger irqs: %d, %d, %d\n",
 		 edge_trig_irqs[0],
 		 edge_trig_irqs[1],
 		 edge_trig_irqs[2]);
-#elif defined(CONFIG_MACH_MT6771)
-	spm_err("edge trigger irqs: %d, %d, %d, %d\n",
-		 edge_trig_irqs[0],
-		 edge_trig_irqs[1],
-		 edge_trig_irqs[2],
-		 edge_trig_irqs[3]);
+	//	 edge_trig_irqs[3]); /* remove auxadc (lowbattery_irq_b) */
 #endif
 
 #if defined(CONFIG_MACH_MT6739)
@@ -464,7 +459,7 @@ static int spm_pm_event(struct notifier_block *notifier,
 		ret = spm_to_sspm_command(SPM_SUSPEND_PREPARE, &spm_d);
 		spin_unlock_irqrestore(&__spm_lock, flags);
 		if (ret < 0) {
-			pr_err("#@# %s(%d) PM_SUSPEND_PREPARE return %d!!!\n",
+			printk_deferred("[name:spm&]#@# %s(%d) PM_SUSPEND_PREPARE return %d!!!\n",
 			       __func__, __LINE__, ret);
 			return NOTIFY_BAD;
 		}
@@ -474,7 +469,7 @@ static int spm_pm_event(struct notifier_block *notifier,
 		ret = spm_to_sspm_command(SPM_POST_SUSPEND, &spm_d);
 		spin_unlock_irqrestore(&__spm_lock, flags);
 		if (ret < 0) {
-			pr_err("#@# %s(%d) PM_POST_SUSPEND return %d!!!\n",
+			printk_deferred("[name:spm&]#@# %s(%d) PM_POST_SUSPEND return %d!!!\n",
 			       __func__, __LINE__, ret);
 			return NOTIFY_BAD;
 		}
@@ -546,11 +541,11 @@ static struct platform_device *pspmdev;
 
 /* TODO: fix */
 #if !defined(SPM_K414_EARLY_PORTING)
-struct wake_lock spm_wakelock;
+struct wakeup_source spm_wakelock;
 
 void spm_pm_stay_awake(int sec)
 {
-	wake_lock_timeout(&spm_wakelock, HZ * sec);
+	__pm_wakeup_event(&spm_wakelock, jiffies_to_msecs(HZ * sec));
 };
 #endif
 
@@ -567,7 +562,7 @@ static void __spm_check_dram_type(void)
 		__spmfw_idx = SPMFW_LP4X_1CH;
 	else if (ddr_type == TYPE_LPDDR3 && emi_ch_num == 1)
 		__spmfw_idx = SPMFW_LP3_1CH;
-	pr_info("#@# %s(%d) __spmfw_idx 0x%x\n",
+	printk_deferred("[name:spm&]#@# %s(%d) __spmfw_idx 0x%x\n",
 		__func__, __LINE__, __spmfw_idx);
 };
 #elif defined(CONFIG_MACH_MT6771)
@@ -586,8 +581,10 @@ static void __spm_check_dram_type(void)
 		__spmfw_idx = SPMFW_LP4X_2CH_3200;
 	else if (ddr_type == TYPE_LPDDR3 && ddr_hz == 1866)
 		__spmfw_idx = SPMFW_LP3_1CH_1866;
-	pr_info("#@# %s(%d) __spmfw_idx 0x%x\n",
-		__func__, __LINE__, __spmfw_idx);
+	else if (ddr_type == TYPE_LPDDR4 && ddr_hz == 2400)
+		__spmfw_idx = SPMFW_LP4_2CH_2400;
+	printk_deferred("[name:spm&]#@# %s(%d) __spmfw_idx 0x%x (type:%d freq:%d)\n",
+		__func__, __LINE__, __spmfw_idx, ddr_type, ddr_hz);
 };
 #elif defined(CONFIG_MACH_MT6739)
 static void __spm_check_dram_type(void)
@@ -618,6 +615,9 @@ int __init spm_module_init(void)
 	int ret = -1;
 	int is_ext_buck = 0;
 
+	int i;
+	unsigned int irq_type;
+
 #if defined(CONFIG_MACH_MT6739)
 #if defined(CONFIG_MTK_PMIC) || defined(CONFIG_MTK_PMIC_NEW_ARCH)
 	spm_crit2("pmic_ver %d\n", PMIC_LP_CHIP_VER());
@@ -626,7 +626,7 @@ int __init spm_module_init(void)
 
 /* TODO: fix */
 #if !defined(SPM_K414_EARLY_PORTING)
-	wake_lock_init(&spm_wakelock, WAKE_LOCK_SUSPEND, "spm");
+	wakeup_source_init(&spm_wakelock, "spm");
 #endif
 
 	spm_register_init();
@@ -636,6 +636,14 @@ int __init spm_module_init(void)
 	if (spm_fs_init() != 0)
 		r = -EPERM;
 #endif
+
+	/* Note: Initialize irq type to avoid pending irqs */
+	for (i = 0; i < NF_EDGE_TRIG_IRQS; i++) {
+		if (edge_trig_irqs[i]) {
+			irq_type = irq_get_trigger_type(edge_trig_irqs[i]);
+			irq_set_irq_type(edge_trig_irqs[i], irq_type);
+		}
+	}
 
 #ifdef CONFIG_FAST_CIRQ_CLONE_FLUSH
 	set_wakeup_sources(edge_trig_irqs, NF_EDGE_TRIG_IRQS);
@@ -655,7 +663,7 @@ int __init spm_module_init(void)
 /* TODO: fix */
 #if !defined(SPM_K414_EARLY_PORTING)
 	if (spm_golden_setting_cmp(1) != 0)
-		aee_kernel_warning(
+		aee_kernel_warning("SPM Warning",
 			"SPM Warning, dram golden setting mismach");
 #else
 	if (spm_golden_setting_cmp(1) != 0)
@@ -668,19 +676,19 @@ int __init spm_module_init(void)
 
 	ret = platform_driver_register(&spm_dev_drv);
 	if (ret) {
-		pr_debug("fail to register platform driver\n");
+		printk_deferred("[name:spm&]fail to register platform driver\n");
 		return ret;
 	}
 
 	pspmdev = platform_device_register_simple("spm", -1, NULL, 0);
 	if (IS_ERR(pspmdev)) {
-		pr_debug("Failed to register platform device.\n");
+		printk_deferred("[name:spm&]Failed to register platform device.\n");
 		return -EINVAL;
 	}
 
 	spm_dir = debugfs_create_dir("spm", NULL);
 	if (spm_dir == NULL) {
-		pr_debug("Failed to create spm dir in debugfs.\n");
+		printk_deferred("[name:spm&]Failed to create spm dir in debugfs.\n");
 		return -EINVAL;
 	}
 
@@ -704,7 +712,7 @@ int __init spm_module_init(void)
 #ifdef CONFIG_PM
 	ret = register_pm_notifier(&spm_pm_notifier_func);
 	if (ret) {
-		pr_debug("Failed to register PM notifier.\n");
+		printk_deferred("[name:spm&]Failed to register PM notifier.\n");
 		return ret;
 	}
 #endif /* CONFIG_PM */
@@ -715,7 +723,7 @@ int __init spm_module_init(void)
 	is_ext_buck = is_ext_buck_exist();
 #endif
 #endif
-	pr_info("#@# %s(%d) is_ext_buck_exist() 0x%x\n",
+	printk_deferred("[name:spm&]#@# %s(%d) is_ext_buck_exist() 0x%x\n",
 		__func__, __LINE__, is_ext_buck);
 	SMC_CALL(MTK_SIP_KERNEL_SPM_ARGS, SPM_ARGS_SPMFW_IDX,
 		 __spm_get_dram_type(), is_ext_buck);
@@ -1092,6 +1100,7 @@ int spm_golden_setting_cmp(bool en)
 #elif defined(CONFIG_MACH_MT6771)
 	switch (__spm_get_dram_type()) {
 	case SPMFW_LP4X_2CH_3733:
+	case SPMFW_LP4_2CH_2400:
 		ddrphy_setting = ddrphy_setting_lp4_2ch;
 		ddrphy_num = ARRAY_SIZE(ddrphy_setting_lp4_2ch);
 		break;
@@ -1143,7 +1152,7 @@ void spm_phypll_mode_check(void)
 
 /* TODO: fix */
 #if !defined(SPM_K414_EARLY_PORTING)
-		aee_kernel_warning(
+		aee_kernel_warning("SPM Warning",
 			"SPM Warning, Invalid SPM_POWER_ON_VAL0: 0x%08x\n",
 			val);
 #else
@@ -1161,7 +1170,7 @@ void spm_pmic_power_mode(int mode, int force, int lock)
 	static int prev_mode = -1;
 
 	if (mode < PMIC_PWR_NORMAL || mode >= PMIC_PWR_NUM) {
-		pr_debug("wrong spm pmic power mode");
+		printk_deferred("[name:spm&]wrong spm pmic power mode");
 		return;
 	}
 
@@ -1213,7 +1222,9 @@ void spm_pmic_power_mode(int mode, int force, int lock)
 #endif
 		break;
 	default:
-		pr_debug("spm pmic power mode (%d) is not configured\n", mode);
+		printk_deferred(
+		"[name:spm&]spm pmic power mode (%d) is not configured\n",
+		mode);
 	}
 #endif
 
@@ -1231,7 +1242,7 @@ void mt_spm_for_gps_only(int enable)
 {
 	spm_for_gps_flag = !!enable;
 #if 0
-	pr_debug("#@# %s(%d) spm_for_gps_flag %d\n",
+	printk_deferred("[name:spm&]#@# %s(%d) spm_for_gps_flag %d\n",
 		 __func__, __LINE__, spm_for_gps_flag);
 #endif
 }
@@ -1269,11 +1280,11 @@ int spm_to_sspm_command_async(u32 cmd, struct spm_data *spm_d)
 		ret = sspm_ipi_send_async(IPI_ID_SPM_SUSPEND,
 					  IPI_OPT_DEFAUT, spm_d, SPM_D_LEN);
 		if (ret != 0)
-			pr_err("#@# %s(%d) sspm_ipi_send_async(cmd:0x%x) ret %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) sspm_ipi_send_async(cmd:0x%x) ret %d\n",
 			       __func__, __LINE__, cmd, ret);
 		break;
 	default:
-		pr_err("#@# %s(%d) cmd(%d) wrong!!!\n",
+		printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) wrong!!!\n",
 		       __func__, __LINE__, cmd);
 		break;
 	}
@@ -1283,7 +1294,7 @@ int spm_to_sspm_command_async(u32 cmd, struct spm_data *spm_d)
 
 int spm_to_sspm_command_async_wait(u32 cmd)
 {
-	int ack_data;
+	int ack_data = 0;
 	unsigned int ret = 0;
 
 	switch (cmd) {
@@ -1297,16 +1308,16 @@ int spm_to_sspm_command_async_wait(u32 cmd)
 					       IPI_OPT_DEFAUT, &ack_data);
 
 		if (ret != 0) {
-			pr_err("#@# %s(%d) sspm_ipi_send_async_wait(cmd:0x%x) ret %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) sspm_ipi_send_async_wait(cmd:0x%x) ret %d\n",
 			       __func__, __LINE__, cmd, ret);
 		} else if (ack_data < 0) {
 			ret = ack_data;
-			pr_err("#@# %s(%d) cmd(%d) return %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) return %d\n",
 			       __func__, __LINE__, cmd, ret);
 		}
 		break;
 	default:
-		pr_err("#@# %s(%d) cmd(%d) wrong!!!\n",
+		printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) wrong!!!\n",
 		       __func__, __LINE__, cmd);
 		break;
 	}
@@ -1316,7 +1327,7 @@ int spm_to_sspm_command_async_wait(u32 cmd)
 
 int spm_to_sspm_command(u32 cmd, struct spm_data *spm_d)
 {
-	int ack_data;
+	int ack_data = 0;
 	unsigned int ret = 0;
 	/* struct spm_data _spm_d; */
 
@@ -1335,11 +1346,11 @@ int spm_to_sspm_command(u32 cmd, struct spm_data *spm_d)
 					 spm_d, SPM_D_LEN,
 					 &ack_data, 1);
 		if (ret != 0) {
-			pr_err("#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
 			       __func__, __LINE__, cmd, ret);
 		} else if (ack_data < 0) {
 			ret = ack_data;
-			pr_err("#@# %s(%d) cmd(%d) return %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) return %d\n",
 			       __func__, __LINE__, cmd, ret);
 		}
 		break;
@@ -1349,11 +1360,11 @@ int spm_to_sspm_command(u32 cmd, struct spm_data *spm_d)
 					 IPI_OPT_POLLING, spm_d,
 					 SPM_D_LEN, &ack_data, 1);
 		if (ret != 0) {
-			pr_err("#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
 			       __func__, __LINE__, cmd, ret);
 		} else if (ack_data < 0) {
 			ret = ack_data;
-			pr_err("#@# %s(%d) cmd(%d) return %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) return %d\n",
 			       __func__, __LINE__, cmd, ret);
 		}
 		break;
@@ -1364,11 +1375,11 @@ int spm_to_sspm_command(u32 cmd, struct spm_data *spm_d)
 					 IPI_OPT_POLLING, spm_d,
 					 SPM_D_LEN, &ack_data, 1);
 		if (ret != 0) {
-			pr_err("#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
 			       __func__, __LINE__, cmd, ret);
 		} else if (ack_data < 0) {
 			ret = ack_data;
-			pr_err("#@# %s(%d) cmd(%d) return %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) return %d\n",
 			       __func__, __LINE__, cmd, ret);
 		}
 		break;
@@ -1379,11 +1390,11 @@ int spm_to_sspm_command(u32 cmd, struct spm_data *spm_d)
 					 IPI_OPT_POLLING, spm_d,
 					 SPM_D_LEN, &ack_data, 1);
 		if (ret != 0) {
-			pr_err("#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
 			       __func__, __LINE__, cmd, ret);
 		} else if (ack_data < 0) {
 			ret = ack_data;
-			pr_err("#@# %s(%d) cmd(%d) return %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) return %d\n",
 			       __func__, __LINE__, cmd, ret);
 		}
 		break;
@@ -1394,16 +1405,16 @@ int spm_to_sspm_command(u32 cmd, struct spm_data *spm_d)
 					 IPI_OPT_POLLING, spm_d,
 					 SPM_D_LEN, &ack_data, 1);
 		if (ret != 0) {
-			pr_err("#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) sspm_ipi_send_sync(cmd:0x%x) ret %d\n",
 			       __func__, __LINE__, cmd, ret);
 		} else if (ack_data < 0) {
 			ret = ack_data;
-			pr_err("#@# %s(%d) cmd(%d) return %d\n",
+			printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) return %d\n",
 			       __func__, __LINE__, cmd, ret);
 		}
 		break;
 	default:
-		pr_err("#@# %s(%d) cmd(%d) wrong!!!\n",
+		printk_deferred("[name:spm&]#@# %s(%d) cmd(%d) wrong!!!\n",
 		       __func__, __LINE__, cmd);
 		break;
 	}

@@ -2309,6 +2309,13 @@ static void __mt_gpufreq_volt_switch(
 			vsram_gpu_new,
 			vsram_gpu_old);
 
+	if (g_fixed_freq_volt_state) {
+		gpufreq_pr_debug(
+			"@%s: skip DVS when both freq and volt are fixed\n",
+			__func__);
+		return;
+	}
+
 #if MT_GPUFREQ_SETTLE_TIME_PROFILE == 0
 	if (vgpu_new > vgpu_old) {
 		vgpu_steps = ((vgpu_new - vgpu_old) / PMIC_STEP) + 1;

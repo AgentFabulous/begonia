@@ -179,3 +179,17 @@ int spm_to_sspm_command(u32 cmd, struct spm_data *spm_d)
 
 	return ret;
 }
+
+//Fix me
+static atomic_t ipi_lock_cnt;
+bool is_sspm_ipi_lock_spm(void)
+{
+	int lock_cnt = -1;
+	bool ret = false;
+
+	lock_cnt = atomic_read(&ipi_lock_cnt);
+
+	ret = (lock_cnt == 0) ? false : true;
+
+	return ret;
+}

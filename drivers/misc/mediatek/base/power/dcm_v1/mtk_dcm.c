@@ -39,6 +39,80 @@ void __attribute__((weak)) dcm_pre_init(void)
 	dcm_pr_info("weak function of %s\n", __func__);
 }
 
+short __attribute__((weak)) dcm_get_cpu_cluster_stat(void)
+{
+	dcm_pr_info("weak function of %s\n", __func__);
+
+	return 0;
+}
+
+void __attribute__((weak)) dcm_infracfg_ao_emi_indiv(int on)
+{
+	dcm_pr_info("weak function of %s: on=%d\n", __func__, on);
+}
+
+int __attribute__((weak)) dcm_set_stall_wr_del_sel
+				(unsigned int mp0, unsigned int mp1)
+{
+	dcm_pr_info("weak function of %s: mp0=%d, mp1=%d\n",
+					__func__, mp0, mp1);
+
+	return 0;
+}
+
+void __attribute__((weak)) dcm_set_fmem_fsel_dbc
+				(unsigned int fsel, unsigned int dbc)
+{
+	dcm_pr_info("weak function of %s: fsel=%d, dbc=%d\n",
+					__func__, fsel, dbc);
+}
+
+int __attribute__((weak)) dcm_smc_get_cnt(int type_id)
+{
+	dcm_pr_info("weak function of %s: dcm->type_id=%d\n",
+					__func__, type_id);
+
+	return 0;
+}
+
+void __attribute__((weak)) dcm_smc_msg_send(unsigned int msg)
+{
+	dcm_pr_info("weak function of %s: msg=%d\n", __func__, msg);
+}
+
+void __attribute__((weak)) dcm_set_hotplug_nb(void)
+{
+	dcm_pr_info("weak function of %s\n", __func__);
+}
+
+int __attribute__((weak)) sync_dcm_set_cci_freq(unsigned int cci)
+{
+	dcm_pr_info_limit("weak function of %s: cci=%u\n", __func__, cci);
+
+	return 0;
+}
+
+int __attribute__((weak)) sync_dcm_set_mp0_freq(unsigned int mp0)
+{
+	dcm_pr_info_limit("weak function of %s: mp0=%u\n", __func__, mp0);
+
+	return 0;
+}
+
+int __attribute__((weak)) sync_dcm_set_mp1_freq(unsigned int mp1)
+{
+	dcm_pr_info_limit("weak function of %s: mp1=%u\n", __func__, mp1);
+
+	return 0;
+}
+
+int __attribute__((weak)) sync_dcm_set_mp2_freq(unsigned int mp2)
+{
+	dcm_pr_info_limit("weak function of %s: mp2=%u\n", __func__, mp2);
+
+	return 0;
+}
+
 void __attribute__((weak)) *mt_dramc_chn_base_get(int channel)
 {
 	dcm_pr_info("weak function of %s\n", __func__);
@@ -112,8 +186,7 @@ void dcm_set_default(unsigned int type)
 		}
 	}
 
-	/* Not anymore dcm setup in ATF in mt6785/mt6779. */
-	/* dcm_smc_msg_send(init_dcm_type); */
+	dcm_smc_msg_send(init_dcm_type);
 
 	mutex_unlock(&dcm_lock);
 }
@@ -157,8 +230,7 @@ void dcm_set_state(unsigned int type, int state)
 			__func__, type, state,
 			init_dcm_type_pre,
 			init_dcm_type);
-		/* Not anymore dcm setup in ATF in mt6785/mt6779. */
-		/* dcm_smc_msg_send(init_dcm_type); */
+		dcm_smc_msg_send(init_dcm_type);
 	}
 
 	mutex_unlock(&dcm_lock);
@@ -194,8 +266,7 @@ void dcm_disable(unsigned int type)
 	if (init_dcm_type_pre != init_dcm_type) {
 		dcm_pr_info("[%s]type:0x%08x, init_dcm_type=0x%x->0x%x\n",
 			 __func__, type, init_dcm_type_pre, init_dcm_type);
-		/* Not anymore dcm setup in ATF in mt6785/mt6779. */
-		/* dcm_smc_msg_send(init_dcm_type); */
+		dcm_smc_msg_send(init_dcm_type);
 	}
 
 	mutex_unlock(&dcm_lock);
@@ -239,8 +310,7 @@ void dcm_restore(unsigned int type)
 	if (init_dcm_type_pre != init_dcm_type) {
 		dcm_pr_info("[%s]type:0x%08x, init_dcm_type=0x%x->0x%x\n",
 			 __func__, type, init_dcm_type_pre, init_dcm_type);
-		/* Not anymore dcm setup in ATF in mt6785/mt6779. */
-		/* dcm_smc_msg_send(init_dcm_type); */
+		dcm_smc_msg_send(init_dcm_type);
 	}
 
 	mutex_unlock(&dcm_lock);
@@ -275,9 +345,10 @@ static ssize_t dcm_state_show(struct kobject *kobj, struct kobj_attribute *attr,
 			"\n******** dcm dump state *********\n");
 	for (i = 0, dcm = &dcm_array[0]; i < NR_DCM_TYPE; i++, dcm++)
 		len += snprintf(buf+len, PAGE_SIZE-len,
-				"[%-16s 0x%08x] current state:%d (%d), atf_on_cnt:N/A\n",
+				"[%-16s 0x%08x] current state:%d (%d), atf_on_cnt:%u\n",
 				dcm->name, dcm->typeid, dcm->current_state,
-				dcm->disable_refcnt);
+				dcm->disable_refcnt,
+				dcm_smc_get_cnt(dcm->typeid));
 
 	len += snprintf(buf+len, PAGE_SIZE-len,
 			"\n********** dcm_state help *********\n");
@@ -298,6 +369,9 @@ static ssize_t dcm_state_show(struct kobject *kobj, struct kobj_attribute *attr,
 	len += snprintf(buf+len, PAGE_SIZE-len,
 			"init_dcm_type=0x%x, all_dcm_type=0x%x, dcm_debug=%d, ",
 			init_dcm_type, all_dcm_type, dcm_debug);
+	len += snprintf(buf+len, PAGE_SIZE-len,
+			"dcm_cpu_cluster_stat=%d\n",
+			dcm_get_cpu_cluster_stat());
 	len += snprintf(buf+len, PAGE_SIZE-len, "dcm_get_chip_sw_ver=0x%x\n",
 			dcm_get_chip_sw_ver());
 
@@ -310,6 +384,7 @@ static ssize_t dcm_state_store(struct kobject *kobj,
 {
 	char cmd[16];
 	unsigned int mask;
+	unsigned int val0, val1;
 	int ret, mode;
 
 	if (sscanf(buf, "%15s %x", cmd, &mask) == 2) {
@@ -331,6 +406,16 @@ static ssize_t dcm_state_store(struct kobject *kobj,
 				dcm_debug = 0;
 			else if (mask == 1)
 				dcm_debug = 1;
+			else if (mask == 2)
+				dcm_infracfg_ao_emi_indiv(0);
+			else if (mask == 3)
+				dcm_infracfg_ao_emi_indiv(1);
+		} else if (!strcmp(cmd, "set_stall_sel")) {
+			if (sscanf(buf, "%15s %x %x", cmd, &val0, &val1) == 3)
+				dcm_set_stall_wr_del_sel(val0, val1);
+		} else if (!strcmp(cmd, "set_fmem")) {
+			if (sscanf(buf, "%15s %d %d", cmd, &val0, &val1) == 3)
+				dcm_set_fmem_fsel_dbc(val0, val1);
 		} else if (!strcmp(cmd, "set")) {
 			if (sscanf(buf, "%15s %x %d", cmd, &mask, &mode) == 3) {
 				mask &= all_dcm_type;
@@ -343,7 +428,7 @@ static ssize_t dcm_state_store(struct kobject *kobj,
 				 */
 				if (mask & STALL_DCM_TYPE) {
 					if (mode)
-						dcm_pr_info("stall dcm is enabled for?Default(Normal) mode started\n");
+						dcm_pr_info("stall dcm is enabled for Default(Normal) mode started\n");
 					else
 						dcm_pr_info("stall dcm is disabled for Performance(Sports) mode started\n");
 				}
@@ -415,7 +500,7 @@ int __init mt_dcm_init(void)
 #endif /* #ifdef DCM_DEBUG_MON */
 #endif /* #ifdef CONFIG_PM */
 
-	/* dcm_set_hotplug_nb(); */
+	dcm_set_hotplug_nb();
 
 	dcm_initiated = 1;
 

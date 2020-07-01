@@ -17,7 +17,7 @@
 #include <linux/cpumask.h>
 #include <linux/kthread.h>
 #include <linux/mutex.h>
-#include <linux/of.h>
+
 #include <mtk_ppm_api.h>
 #include <linux/nmi.h>
 
@@ -29,14 +29,6 @@ static DEFINE_MUTEX(ppm_mutex);
 
 #ifdef CONFIG_PM_WAKELOCKS
 static struct wakeup_source *hps_ws;
-#endif
-
-#ifdef CONFIG_ARM
-#define CPU_DOWN	cpu_down
-#define CPU_UP		cpu_up
-#else
-#define CPU_DOWN(i)	device_offline(get_cpu_device(i))
-#define CPU_UP(i)	device_online(get_cpu_device(i))
 #endif
 
 #define HPS_RETRY	10
@@ -81,7 +73,7 @@ static int ppm_thread_fn(void *data)
 				pr_debug_ratelimited("CPU%d: ppm-request=%d, offline->powerup\n",
 					 i, request_cpu_up);
 Retry_ON:
-				rc = CPU_UP(i);
+				rc = device_online(get_cpu_device(i));
 				if (rc)	{
 					if (retry > HPS_RETRY) {
 						pr_debug_ratelimited(
@@ -107,7 +99,7 @@ Retry_ON:
 				pr_debug_ratelimited("CPU%d: ppm-request=%d, online->powerdown\n",
 					 i, request_cpu_up);
 Retry_OFF:
-				rc = CPU_DOWN(i);
+				rc = device_offline(get_cpu_device(i));
 				if (rc) {
 					if (retry > HPS_RETRY) {
 						pr_debug_ratelimited(
@@ -145,21 +137,10 @@ static void ppm_limit_callback(struct ppm_client_req req)
 
 void ppm_notifier(void)
 {
-	unsigned int cpu;
-	struct device_node *dn = 0;
-	const char *smp_method = 0;
 	cpumask_copy(&ppm_online_cpus, cpu_online_mask);
 
-	for_each_present_cpu(cpu) {
-		dn = of_get_cpu_node(cpu, NULL);
-		smp_method = of_get_property(dn, "smp-method", NULL);
-		if (smp_method != NULL) {
-			if (!strcmp("disabled", smp_method)) {
-				pr_info("[ENTER Hotplug DEBUG MODE!!!]\n");
-				return;
-			}
-		}
-	}
+	/* register PPM callback */
+	mt_ppm_register_client(PPM_CLIENT_HOTPLUG, &ppm_limit_callback);
 
 	/* create a kthread to serve the requests from PPM */
 	ppm_kthread = kthread_create(ppm_thread_fn, NULL, "cpuhp-ppm");
@@ -168,9 +149,6 @@ void ppm_notifier(void)
 		       PTR_ERR(ppm_kthread));
 		return;
 	}
-
-	/* register PPM callback */
-	mt_ppm_register_client(PPM_CLIENT_HOTPLUG, &ppm_limit_callback);
 
 	hps_ws = wakeup_source_register("hps");
 	if (!hps_ws)

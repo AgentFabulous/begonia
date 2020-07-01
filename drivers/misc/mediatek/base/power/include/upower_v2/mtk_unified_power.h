@@ -19,25 +19,32 @@
 extern "C" {
 #endif
 #include <linux/sched.h>
+#if defined(CONFIG_MACH_MT6759)
+#include "mtk_unified_power_mt6759.h"
+#endif
+
+#if defined(CONFIG_MACH_MT6763)
+#include "mtk_unified_power_mt6763.h"
+#endif
 
 #if defined(CONFIG_MACH_MT6758)
 #include "mtk_unified_power_mt6758.h"
+#endif
+
+#if defined(CONFIG_MACH_MT6739)
+#include "mtk_unified_power_mt6739.h"
 #endif
 
 #if defined(CONFIG_MACH_MT6765)
 #include "mtk_unified_power_mt6765.h"
 #endif
 
-#if defined(CONFIG_MACH_MT6761)
-#include "mtk_unified_power_mt6761.h"
+#if defined(CONFIG_MACH_MT6771)
+#include "mtk_unified_power_mt6771.h"
 #endif
 
-#if defined(CONFIG_MACH_MT3967)
-#include "mtk_unified_power_mt3967.h"
-#endif
-
-#if defined(CONFIG_MACH_MT6779)
-#include "mtk_unified_power_mt6779.h"
+#if defined(CONFIG_MACH_MT6775)
+#include "mtk_unified_power_mt6775.h"
 #endif
 
 #if defined(CONFIG_MACH_MT6768)
@@ -46,6 +53,10 @@ extern "C" {
 
 #if defined(CONFIG_MACH_MT6785)
 #include "mtk_unified_power_mt6785.h"
+#endif
+
+#if defined(CONFIG_MACH_MT6885)
+#include "mtk_unified_power_mt6885.h"
 #endif
 
 #define UPOWER_TAG "[UPOWER]"
@@ -95,30 +106,27 @@ struct upower_tbl_info {
  **************************/
 extern struct upower_tbl *upower_tbl_ref; /* upower table reference to sram*/
 extern int degree_set[NR_UPOWER_DEGREE];
-extern struct upower_tbl_info *upower_tbl_infos; /* collect all of raw tbls */
-extern struct upower_tbl_info *p_upower_tbl_infos; /* ptr to list of all tbls */
+/* collect all the raw tables */
+extern struct upower_tbl_info *upower_tbl_infos;
+/* points to upower_tbl_infos[] */
+extern struct upower_tbl_info *p_upower_tbl_infos;
 extern unsigned char upower_enable;
 extern unsigned char upower_recognize_by_eem[NR_UPOWER_BANK];
 void set_sched_turn_point_cap(void);
-void init_cpu_capacity(unsigned int cpu);
 
 /***************************
  * APIs                    *
  **************************/
-/* provided by eem */
-extern unsigned int mt_eem_is_enabled(void);
 /* PPM */
 extern unsigned int upower_get_power(enum upower_bank bank, unsigned int opp,
-	enum upower_dtype type);
+		enum upower_dtype type);
 /* EAS */
 extern struct upower_tbl_info **upower_get_tbl(void);
 extern int upower_get_turn_point(void);
 extern struct upower_tbl *upower_get_core_tbl(unsigned int cpu);
 /* EEM */
-
-
-extern void upower_update_volt_by_eem(enum upower_bank bank,
-	unsigned int *volt, unsigned int opp_num);
+extern void upower_update_volt_by_eem(enum upower_bank bank, unsigned int *volt,
+		unsigned int opp_num);
 extern void upower_update_degree_by_eem(enum upower_bank bank, int deg);
 
 /* platform part */

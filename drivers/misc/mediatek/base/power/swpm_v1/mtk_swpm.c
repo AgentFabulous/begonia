@@ -126,7 +126,7 @@ static int dump_power_proc_show(struct seq_file *m, void *v)
 {
 	char buf[256];
 	char *ptr = buf;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < NR_POWER_RAIL; i++) {
 		ptr += snprintf(ptr, 256, "%s",
@@ -139,7 +139,7 @@ static int dump_power_proc_show(struct seq_file *m, void *v)
 
 	for (i = 0; i < NR_POWER_RAIL; i++) {
 		ptr += snprintf(ptr, 256, "%d",
-			swpm_get_avg_power((enum power_rail)i, avg_window));
+			swpm_get_avg_power(i, avg_window));
 		if (i != NR_POWER_RAIL - 1)
 			ptr += sprintf(ptr, "/");
 		else
@@ -151,6 +151,7 @@ static int dump_power_proc_show(struct seq_file *m, void *v)
 	return 0;
 }
 
+#ifndef CPU_LKG_NOT_SUPPORT
 static int dump_lkg_power_proc_show(struct seq_file *m, void *v)
 {
 	int i, j;
@@ -167,6 +168,7 @@ static int dump_lkg_power_proc_show(struct seq_file *m, void *v)
 
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_MTK_GPU_SWPM_SUPPORT
 static int gpu_debug_proc_show(struct seq_file *m, void *v)
@@ -174,13 +176,34 @@ static int gpu_debug_proc_show(struct seq_file *m, void *v)
 	seq_printf(m, "\nSWPM gpu_debug is %s\n",
 		(swpm_gpu_debug == true) ? "enabled" : "disabled");
 
+	if (swpm_gpu_debug == true) {
+		seq_printf(m, "gpu freq urate : %u\n",
+			swpm_info_ref->gpu_counter[gfreq]);
+		seq_printf(m, "gpu volt : %u\n",
+			swpm_info_ref->gpu_counter[gvolt]);
+		seq_printf(m, "gpu loading : %u\n",
+			swpm_info_ref->gpu_counter[gloading]);
+		seq_printf(m, "alu urate : %u\n",
+			swpm_info_ref->gpu_counter[galu_urate]);
+		seq_printf(m, "tex urate : %u\n",
+			swpm_info_ref->gpu_counter[gtex_urate]);
+		seq_printf(m, "lsc urate : %u\n",
+			swpm_info_ref->gpu_counter[glsc_urate]);
+		seq_printf(m, "l2c urate : %u\n",
+			swpm_info_ref->gpu_counter[gl2c_urate]);
+		seq_printf(m, "vary urate : %u\n",
+			swpm_info_ref->gpu_counter[gvary_urate]);
+		seq_printf(m, "tiler urate : %u\n",
+			swpm_info_ref->gpu_counter[gtiler_urate]);
+	}
+
 	return 0;
 }
 
 static ssize_t gpu_debug_proc_write(struct file *file,
 		const char __user *buffer, size_t count, loff_t *pos)
 {
-	int enable;
+	int enable = 0;
 
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
@@ -211,7 +234,7 @@ static int debug_proc_show(struct seq_file *m, void *v)
 static ssize_t debug_proc_write(struct file *file,
 		const char __user *buffer, size_t count, loff_t *pos)
 {
-	int enable;
+	int enable = 0;
 
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
@@ -237,7 +260,7 @@ static ssize_t enable_proc_write(struct file *file,
 		const char __user *buffer, size_t count, loff_t *pos)
 {
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
-	int type, enable;
+	int type = 0, enable = 0;
 #endif
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
@@ -278,19 +301,21 @@ static ssize_t update_cnt_proc_write(struct file *file,
 		const char __user *buffer, size_t count, loff_t *pos)
 {
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
-	int type, cnt;
+	int type = 0, cnt = 0;
 #endif
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
 	if (!buf)
 		return -EINVAL;
 
+	swpm_lock(&swpm_mutex);
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
 	if (sscanf(buf, "%d %d", &type, &cnt) == 2)
 		swpm_set_update_cnt(type, cnt);
 	else
 		swpm_err("echo <type or 65535> <cnt> > /proc/swpm/update_cnt\n");
 #endif
+	swpm_unlock(&swpm_mutex);
 
 	return count;
 }
@@ -326,7 +351,7 @@ static int profile_proc_show(struct seq_file *m, void *v)
 static ssize_t profile_proc_write(struct file *file,
 		const char __user *buffer, size_t count, loff_t *pos)
 {
-	int enable;
+	int enable = 0;
 
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
@@ -356,7 +381,7 @@ static int avg_window_proc_show(struct seq_file *m, void *v)
 static ssize_t avg_window_proc_write(struct file *file,
 	const char __user *buffer, size_t count, loff_t *pos)
 {
-	int window;
+	int window = 0;
 
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
@@ -381,7 +406,7 @@ static int log_interval_proc_show(struct seq_file *m, void *v)
 static ssize_t log_interval_proc_write(struct file *file,
 	const char __user *buffer, size_t count, loff_t *pos)
 {
-	unsigned int interval;
+	unsigned int interval = 0;
 
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
@@ -406,7 +431,7 @@ static int log_mask_proc_show(struct seq_file *m, void *v)
 static ssize_t log_mask_proc_write(struct file *file,
 	const char __user *buffer, size_t count, loff_t *pos)
 {
-	unsigned int mask;
+	unsigned int mask = 0;
 
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
@@ -455,7 +480,7 @@ static int idd_tbl_proc_show(struct seq_file *m, void *v)
 static ssize_t idd_tbl_proc_write(struct file *file,
 	const char __user *buffer, size_t count, loff_t *pos)
 {
-	unsigned int type, idd_idx, val;
+	unsigned int type = 0, idd_idx = 0, val = 0;
 
 	char *buf = _copy_from_user_for_proc(buffer, count);
 
@@ -481,7 +506,9 @@ end:
 #endif
 
 PROC_FOPS_RO(dump_power);
+#ifndef CPU_LKG_NOT_SUPPORT
 PROC_FOPS_RO(dump_lkg_power);
+#endif
 #ifdef CONFIG_MTK_GPU_SWPM_SUPPORT
 PROC_FOPS_RW(gpu_debug);
 #endif
@@ -508,7 +535,9 @@ static int create_procfs(void)
 
 	struct pentry swpm_entries[] = {
 		PROC_ENTRY(dump_power),
+#ifndef CPU_LKG_NOT_SUPPORT
 		PROC_ENTRY(dump_lkg_power),
+#endif
 		PROC_ENTRY(debug),
 		PROC_ENTRY(enable),
 		PROC_ENTRY(update_cnt),
@@ -573,7 +602,7 @@ static int log_loop(void)
 	unsigned long expires;
 	char buf[256] = {0};
 	char *ptr = buf;
-	int i;
+	unsigned int i;
 #ifdef LOG_LOOP_TIME_PROFILE
 	ktime_t t1, t2;
 	unsigned long long diff, diff2;
@@ -593,7 +622,7 @@ static int log_loop(void)
 	for (i = 0; i < NR_POWER_RAIL; i++) {
 		if ((1 << i) & log_mask) {
 			ptr += snprintf(ptr, 256, "%d/",
-				swpm_get_avg_power((enum power_rail)i, 50));
+				swpm_get_avg_power(i, 50));
 		}
 	}
 	ptr--;
@@ -658,7 +687,7 @@ late_initcall(swpm_init);
 /***************************************************************************
  *  API
  ***************************************************************************/
-unsigned int swpm_get_avg_power(enum power_rail type, unsigned int avg_window)
+unsigned int swpm_get_avg_power(unsigned int type, unsigned int avg_window)
 {
 	unsigned int *ptr;
 	unsigned int cnt, idx, sum = 0, pwr = 0;

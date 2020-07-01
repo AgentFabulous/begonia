@@ -24,10 +24,8 @@ int __weak cpuhp_platform_cpuoff(int cluster, int cpu, int isalone, int action)
 {
 	poweroff_cpu(cpu);
 
-#if !defined(CONFIG_MACH_MT6768) && !defined(CONFIG_MACH_MT6785)
 	if (isalone)
 		poweroff_cluster(cluster);
-#endif
 
 	return 0;
 }

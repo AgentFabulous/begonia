@@ -39,7 +39,7 @@
 #include <mtk_spm_dpidle.h>
 #include <mtk_spm_idle.h>
 #ifdef CONFIG_THERMAL
-//#include <mach/mtk_thermal.h>
+#include <mach/mtk_thermal.h>
 #endif
 #include <mtk_idle.h>
 #include <mtk_idle_internal.h>
@@ -49,9 +49,9 @@
 #include <mtk_spm_resource_req.h>
 #include <mtk_spm_resource_req_internal.h>
 
-//#include <trace/events/mtk_idle_event.h>
+#include <trace/events/mtk_idle_event.h>
 
-//#include "ufs-mtk.h"
+#include "ufs-mtk.h"
 
 #ifdef CONFIG_MTK_DCS
 #include <mt-plat/mtk_meminfo.h>
@@ -73,12 +73,12 @@
 #define IDLE_GPT GPT4
 #define NR_CMD_BUF		128
 
-#define IDLE_TAG     "Power/swap "
-#define idle_err(fmt, args...)		pr_err(IDLE_TAG fmt, ##args)
-#define idle_warn(fmt, args...)		pr_warn(IDLE_TAG fmt, ##args)
-#define idle_info(fmt, args...)		pr_debug(IDLE_TAG fmt, ##args)
-#define idle_ver(fmt, args...)		pr_debug(IDLE_TAG fmt, ##args)
-#define idle_dbg(fmt, args...)		pr_debug(IDLE_TAG fmt, ##args)
+#define IDLE_TAG     "[name:spm&]Power/swap "
+#define idle_err(fmt, args...)		printk_deferred(IDLE_TAG fmt, ##args)
+#define idle_warn(fmt, args...)		printk_deferred(IDLE_TAG fmt, ##args)
+#define idle_info(fmt, args...)		printk_deferred(IDLE_TAG fmt, ##args)
+#define idle_ver(fmt, args...)		printk_deferred(IDLE_TAG fmt, ##args)
+#define idle_dbg(fmt, args...)		printk_deferred(IDLE_TAG fmt, ##args)
 
 #define log2buf(p, s, fmt, args...) \
 	(p += scnprintf(p, sizeof(s) - strlen(s), fmt, ##args))
@@ -245,14 +245,14 @@ int mtk_idle_notifier_register(struct notifier_block *n)
 	symname = kallsyms_lookup((unsigned long)n->notifier_call,
 			NULL, NULL, NULL, namebuf);
 	if (symname) {
-		pr_err("[mt_idle_ntf] <%02d>%08lx (%s)\n",
+		printk_deferred("[name:spm&][mt_idle_ntf] <%02d>%08lx (%s)\n",
 			index++, (unsigned long)n->notifier_call, symname);
 	} else {
-		pr_err("[mt_idle_ntf] <%02d>%08lx\n",
+		printk_deferred("[name:spm&][mt_idle_ntf] <%02d>%08lx\n",
 			index++, (unsigned long)n->notifier_call);
 	}
 #else
-	pr_err("[mt_idle_ntf] <%02d>%08lx\n",
+	printk_deferred("[name:spm&][mt_idle_ntf] <%02d>%08lx\n",
 			index++, (unsigned long)n->notifier_call);
 #endif
 
@@ -487,7 +487,9 @@ static void enable_idle_by_bit(int idle_type, int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	WARN_ON(INVALID_GRP_ID(grp));
+	if (!((idle_type >= 0 && idle_type < NR_TYPES) &&
+		(grp >= 0 && grp < NR_GRPS)))
+		return;
 	enable_idle_by_mask(idle_type, grp, mask);
 
 	if (idle_type == IDLE_TYPE_SO)
@@ -499,7 +501,10 @@ static void disable_idle_by_bit(int idle_type, int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	WARN_ON(INVALID_GRP_ID(grp));
+	if (!((idle_type >= 0 && idle_type < NR_TYPES) &&
+		(grp >= 0 && grp < NR_GRPS)))
+		return;
+
 	disable_idle_by_mask(idle_type, grp, mask);
 
 	if (idle_type == IDLE_TYPE_SO)
@@ -558,8 +563,10 @@ static bool soidle3_can_enter(int cpu, int reason)
 			reason = BY_BOOT;
 			goto out;
 		} else {
+			#if !defined(CONFIG_MACH_MT6739)
 			idle_warn("SODI3: blocking by uptime, count = %d\n",
 				  sodi3_by_uptime_count);
+			#endif
 			sodi3_by_uptime_count = -1;
 		}
 	}
@@ -624,8 +631,10 @@ static bool soidle_can_enter(int cpu, int reason)
 			reason = BY_BOOT;
 			goto out;
 		} else {
+			#if !defined(CONFIG_MACH_MT6739)
 			idle_warn("SODI: blocking by uptime, count = %d\n",
 				  sodi_by_uptime_count);
+			#endif
 			sodi_by_uptime_count = -1;
 		}
 	}
@@ -1185,8 +1194,9 @@ int dpidle_enter(int cpu)
 
 		if ((current_ts - dpidle_gs_dump_req_ts) >=
 			dpidle_gs_dump_delay_ms) {
+			#if !defined(CONFIG_MACH_MT6739)
 			idle_warn("dpidle dump LP golden\n");
-
+			#endif
 			dpidle_gs_dump_req = 0;
 			operation_cond |= DEEPIDLE_OPT_DUMP_LP_GOLDEN;
 		}
@@ -1980,7 +1990,9 @@ static int mtk_cpuidle_debugfs_init(void)
 	/* Initialize debugfs */
 	root_entry = debugfs_create_dir("cpuidle", NULL);
 	if (!root_entry) {
+		#if !defined(CONFIG_MACH_MT6739)
 		idle_err("Can not create debugfs `dpidle_state`\n");
+		#endif
 		return 1;
 	}
 
@@ -2001,35 +2013,53 @@ static int mtk_cpuidle_debugfs_init(void)
 #if defined(CONFIG_MACH_MT6763)
 void mtk_spm_dump_debug_info(void)
 {
-	pr_info("SPM_POWER_ON_VAL0     0x%08x\n", spm_read(SPM_POWER_ON_VAL0));
-	pr_info("SPM_POWER_ON_VAL1     0x%08x\n", spm_read(SPM_POWER_ON_VAL1));
-	pr_info("PCM_PWR_IO_EN         0x%08x\n", spm_read(PCM_PWR_IO_EN));
-	pr_info("PCM_REG0_DATA         0x%08x\n", spm_read(PCM_REG0_DATA));
-	pr_info("PCM_REG7_DATA         0x%08x\n", spm_read(PCM_REG7_DATA));
-	pr_info("PCM_REG12_DATA        0x%08x\n", spm_read(PCM_REG12_DATA));
-	pr_info("PCM_REG13_DATA        0x%08x\n", spm_read(PCM_REG13_DATA));
-	pr_info("PCM_REG15_DATA        0x%08x\n", spm_read(PCM_REG15_DATA));
-	pr_info("SPM_MAS_PAUSE_MASK_B  0x%08x\n",
+	printk_deferred("[name:spm&]SPM_POWER_ON_VAL0     0x%08x\n",
+			spm_read(SPM_POWER_ON_VAL0));
+	printk_deferred("[name:spm&]SPM_POWER_ON_VAL1     0x%08x\n",
+			spm_read(SPM_POWER_ON_VAL1));
+	printk_deferred("[name:spm&]PCM_PWR_IO_EN         0x%08x\n",
+			spm_read(PCM_PWR_IO_EN));
+	printk_deferred("[name:spm&]PCM_REG0_DATA         0x%08x\n",
+			spm_read(PCM_REG0_DATA));
+	printk_deferred("[name:spm&]PCM_REG7_DATA         0x%08x\n",
+			spm_read(PCM_REG7_DATA));
+	printk_deferred("[name:spm&]PCM_REG12_DATA        0x%08x\n",
+			spm_read(PCM_REG12_DATA));
+	printk_deferred("[name:spm&]PCM_REG13_DATA        0x%08x\n",
+			spm_read(PCM_REG13_DATA));
+	printk_deferred("[name:spm&]PCM_REG15_DATA        0x%08x\n",
+			spm_read(PCM_REG15_DATA));
+	printk_deferred("[name:spm&]SPM_MAS_PAUSE_MASK_B  0x%08x\n",
 		spm_read(SPM_MAS_PAUSE_MASK_B));
-	pr_info("SPM_MAS_PAUSE2_MASK_B 0x%08x\n",
+	printk_deferred("[name:spm&]SPM_MAS_PAUSE2_MASK_B 0x%08x\n",
 		spm_read(SPM_MAS_PAUSE2_MASK_B));
-	pr_info("SPM_SW_FLAG           0x%08x\n", spm_read(SPM_SW_FLAG));
-	pr_info("SPM_DEBUG_FLAG        0x%08x\n", spm_read(SPM_SW_DEBUG));
-	pr_info("SPM_PC_TRACE_G0       0x%08x\n", spm_read(SPM_PC_TRACE_G0));
-	pr_info("SPM_PC_TRACE_G1       0x%08x\n", spm_read(SPM_PC_TRACE_G1));
-	pr_info("SPM_PC_TRACE_G2       0x%08x\n", spm_read(SPM_PC_TRACE_G2));
-	pr_info("SPM_PC_TRACE_G3       0x%08x\n", spm_read(SPM_PC_TRACE_G3));
-	pr_info("SPM_PC_TRACE_G4       0x%08x\n", spm_read(SPM_PC_TRACE_G4));
-	pr_info("SPM_PC_TRACE_G5       0x%08x\n", spm_read(SPM_PC_TRACE_G5));
-	pr_info("SPM_PC_TRACE_G6       0x%08x\n", spm_read(SPM_PC_TRACE_G6));
-	pr_info("SPM_PC_TRACE_G7       0x%08x\n", spm_read(SPM_PC_TRACE_G7));
-	pr_info("DCHA_GATING_LATCH_0   0x%08x\n",
+	printk_deferred("[name:spm&]SPM_SW_FLAG           0x%08x\n",
+			spm_read(SPM_SW_FLAG));
+	printk_deferred("[name:spm&]SPM_DEBUG_FLAG        0x%08x\n",
+			spm_read(SPM_SW_DEBUG));
+	printk_deferred("[name:spm&]SPM_PC_TRACE_G0       0x%08x\n",
+			spm_read(SPM_PC_TRACE_G0));
+	printk_deferred("[name:spm&]SPM_PC_TRACE_G1       0x%08x\n",
+			spm_read(SPM_PC_TRACE_G1));
+	printk_deferred("[name:spm&]SPM_PC_TRACE_G2       0x%08x\n",
+			spm_read(SPM_PC_TRACE_G2));
+	printk_deferred("[name:spm&]SPM_PC_TRACE_G3       0x%08x\n",
+			spm_read(SPM_PC_TRACE_G3));
+	printk_deferred("[name:spm&]SPM_PC_TRACE_G4       0x%08x\n",
+			spm_read(SPM_PC_TRACE_G4));
+	printk_deferred("[name:spm&]SPM_PC_TRACE_G5       0x%08x\n",
+			spm_read(SPM_PC_TRACE_G5));
+	printk_deferred("[name:spm&]SPM_PC_TRACE_G6       0x%08x\n",
+			spm_read(SPM_PC_TRACE_G6));
+	printk_deferred("[name:spm&]SPM_PC_TRACE_G7       0x%08x\n",
+			spm_read(SPM_PC_TRACE_G7));
+	printk_deferred("[name:spm&]DCHA_GATING_LATCH_0   0x%08x\n",
 		spm_read(DCHA_GATING_LATCH_0));
-	pr_info("DCHA_GATING_LATCH_5   0x%08x\n",
+	printk_deferred("[name:spm&]DCHA_GATING_LATCH_5   0x%08x\n",
 		spm_read(DCHA_GATING_LATCH_5));
-	pr_info("DCHB_GATING_LATCH_0   0x%08x\n",
+	printk_deferred("[name:spm&]DCHB_GATING_LATCH_0   0x%08x\n",
 		spm_read(DCHB_GATING_LATCH_0));
-	pr_info("DCHB_GATING_LATCH_5   0x%08x\n",
+	printk_deferred("[name:spm&]DCHB_GATING_LATCH_5   0x%08x\n",
 		spm_read(DCHB_GATING_LATCH_5));
 }
 #endif
@@ -2073,7 +2103,9 @@ void mtk_idle_set_clkmux_addr(void)
 
 void __init mtk_cpuidle_framework_init(void)
 {
+	#if !defined(CONFIG_MACH_MT6739)
 	idle_ver("[%s]entry!!\n", __func__);
+	#endif
 
 #if defined(CONFIG_MACH_MT6763)
 #ifdef CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES

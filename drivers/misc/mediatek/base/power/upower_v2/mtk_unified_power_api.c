@@ -14,10 +14,9 @@
 #include <linux/module.h>
 #include "mtk_upower.h"
 
-
 /* PTP will update volt in init2 isr handler */
 void upower_update_volt_by_eem(enum upower_bank bank,
-	unsigned int *volt, unsigned int opp_num)
+		unsigned int *volt, unsigned int opp_num)
 {
 	int i, j;
 	int index = opp_num;
@@ -31,19 +30,15 @@ void upower_update_volt_by_eem(enum upower_bank bank,
 	for (i = 0; i < NR_UPOWER_BANK; i++) {
 		if (upower_recognize_by_eem[i] == bank) {
 			for (j = 0; j < opp_num; j++) {
-				/* reorder idx of volt */
+				/* reorder idex of volt */
 				index = opp_num - j - 1;
 				upower_tbl_ref[i].row[index].volt = volt[j];
 			}
-			if (upower_tbl_ref[i].lkg_idx >= NR_UPOWER_DEGREE)
-				upower_tbl_ref[i].lkg_idx = 0; /* default 85 */
-			upower_debug("(bk %d)volt = %u, (eem bk %d)volt = %u\n",
+			upower_debug("(upower bk %d)volt = %u, (eem bk %d)volt = %u\n",
 				i, upower_tbl_ref[i].row[0].volt,
 				bank, volt[0]);
 		}
 	}
-	//upower_update_dyn_pwr();
-	//upower_update_lkg_pwr();
 }
 EXPORT_SYMBOL(upower_update_volt_by_eem);
 
@@ -110,12 +105,16 @@ EXPORT_SYMBOL(upower_get_tbl);
 
 int upower_get_turn_point(void)
 {
+#ifndef DISABLE_TP
 	struct upower_tbl *L_tbl;
 	int turn_point;
 
 	L_tbl = &upower_tbl_ref[UPOWER_BANK_L];
 	turn_point = L_tbl->turn_point;
 	return turn_point;
+#else
+	return -1;
+#endif
 
 }
 EXPORT_SYMBOL(upower_get_turn_point);
@@ -213,4 +212,3 @@ upower_dtype type)
 	return ret;
 }
 EXPORT_SYMBOL(upower_get_power);
-

@@ -882,14 +882,20 @@ static int ppm_main_resume(struct device *dev)
 
 static int ppm_main_data_init(void)
 {
+#ifndef NO_SCHEDULE_API
 	struct cpumask cpu_mask;
+#endif
 	int ret = 0;
 	int i;
 
 	FUNC_ENTER(FUNC_LV_MAIN);
 
 	/* get cluster num */
-	ppm_main_info.cluster_num = (unsigned int)ppm_get_nr_clusters();
+#ifndef NO_SCHEDULE_API
+	ppm_main_info.cluster_num = (unsigned int)arch_get_nr_clusters();
+#else
+	ppm_main_info.cluster_num = NR_PPM_CLUSTERS;
+#endif
 	ppm_info("cluster_num = %d\n", ppm_main_info.cluster_num);
 
 	/* init exclusive core */
@@ -911,11 +917,22 @@ static int ppm_main_data_init(void)
 		ppm_main_info.cluster_info[i].max_freq_except_userlimit = 0;
 
 		/* get topology info */
-		ppm_get_cl_cpus(&cpu_mask, i);
+#ifndef NO_SCHEDULE_API
+		arch_get_cluster_cpus(&cpu_mask, i);
 		ppm_main_info.cluster_info[i].core_num =
 			cpumask_weight(&cpu_mask);
 		ppm_main_info.cluster_info[i].cpu_id =
 			cpumask_first(&cpu_mask);
+#else
+		ppm_main_info.cluster_info[i].core_num =
+			get_cluster_cpu_core(i);
+		if (i > 0)
+			ppm_main_info.cluster_info[i].cpu_id =
+				ppm_main_info.cluster_info[i-1].cpu_id +
+				get_cluster_cpu_core(i-1);
+		else
+			ppm_main_info.cluster_info[i].cpu_id = 0;
+#endif
 		ppm_info("ppm cluster %d -> core_num = %d, cpu_id = %d\n",
 				ppm_main_info.cluster_info[i].cluster_id,
 				ppm_main_info.cluster_info[i].core_num,

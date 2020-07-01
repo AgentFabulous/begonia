@@ -15,7 +15,9 @@
 #define __MTK_SPM_MISC_H__
 
 /* TODO: fix */
-#if !defined(SPM_K414_EARLY_PORTING)
+#if !defined(SPM_K414_EARLY_PORTING) && \
+	!defined(CONFIG_MACH_MT6739) && \
+	!defined(CONFIG_MACH_MT6771)
 #include <linux/irqchip/mtk-gic.h>
 #else
 #include <linux/irqchip/mtk-gic-extend.h>
@@ -38,9 +40,15 @@ extern void mt_irq_unmask_for_sleep(unsigned int irq);
 #endif
 
 /* UART */
+#if defined(CONFIG_MACH_MT6739)
+extern int request_uart_to_sleep(void);
+extern int request_uart_to_wakeup(void);
+extern void mtk_uart_restore(void);
+#else
 extern int mtk8250_request_to_sleep(void);
 extern int mtk8250_request_to_wakeup(void);
 extern void mtk8250_restore_dev(void);
+#endif
 extern void dump_uart_reg(void);
 
 #if defined(CONFIG_MICROTRUST_TEE_SUPPORT)
@@ -141,7 +149,7 @@ unsigned int pmic_read_interface_nolock(unsigned int RegNum,
 					unsigned int MASK,
 					unsigned int SHIFT)
 {
-	pr_info("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 	return 0;
 }
 
@@ -151,7 +159,7 @@ unsigned int pmic_config_interface(unsigned int RegNum,
 				   unsigned int MASK,
 				   unsigned int SHIFT)
 {
-	pr_info("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 	return 0;
 }
 __attribute__ ((weak))
@@ -160,7 +168,7 @@ unsigned int pmic_config_interface_nolock(unsigned int RegNum,
 					  unsigned int MASK,
 					  unsigned int SHIFT)
 {
-	pr_info("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 	return 0;
 }
 #endif /* CONFIG_FPGA_EARLY_PORTING */
@@ -168,7 +176,7 @@ unsigned int pmic_config_interface_nolock(unsigned int RegNum,
 __attribute__ ((weak))
 int vcorefs_get_curr_ddr(void)
 {
-	pr_info("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 	return -1;
 }
 

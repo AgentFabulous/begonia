@@ -27,7 +27,7 @@
 #ifdef CONFIG_ARM64
 /* TODO: fix */
 #if !defined(SPM_K414_EARLY_PORTING)
-#include <linux/irqchip/mtk-gic.h>
+#include <linux/irqchip/mtk-gic-extend.h>
 #endif
 #endif
 #if defined(CONFIG_MTK_SYS_CIRQ)
@@ -55,7 +55,7 @@
 /* TODO: fix */
 #if !defined(SPM_K414_EARLY_PORTING)
 #include <mtk_spm_pmic_wrap.h>
-#include <mtk_pmic_api_buck.h>
+#include <pmic_api_buck.h>
 #endif
 #endif /* CONFIG_FPGA_EARLY_PORTING */
 
@@ -91,28 +91,28 @@ static unsigned int spm_sleep_count;
 
 int __attribute__ ((weak)) mtk_enter_idle_state(int idx)
 {
-	pr_err("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 	return -1;
 }
 
 void __attribute__((weak)) mt_cirq_clone_gic(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 }
 
 void __attribute__((weak)) mt_cirq_enable(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 }
 
 void __attribute__((weak)) mt_cirq_flush(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 }
 
 void __attribute__((weak)) mt_cirq_disable(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 }
 
 static inline void spm_suspend_footprint(enum spm_suspend_step step)
@@ -141,14 +141,14 @@ struct spm_lp_scen __spm_suspend = {
 
 static void spm_trigger_wfi_for_sleep(struct pwr_ctrl *pwrctrl)
 {
-	if (is_cpu_pdn(pwrctrl->pcm_flags))
+	if (is_cpu_pdn(pwrctrl->pcm_flags)) {
 /* TODO: fix */
 #if !defined(SPM_K414_EARLY_PORTING)
 		spm_dormant_sta = mtk_enter_idle_state(MTK_SUSPEND_MODE);
 #else
 		;
 #endif
-	else {
+	} else {
 		/* need to comment out all cmd in CPU_PM_ENTER case, */
 		/* at gic_cpu_pm_notifier() @ drivers/irqchip/irq-gic-v3.c */
 		SMC_CALL(MTK_SIP_KERNEL_SPM_ARGS, SPM_ARGS_SUSPEND, 0, 0);
@@ -162,7 +162,11 @@ static void spm_trigger_wfi_for_sleep(struct pwr_ctrl *pwrctrl)
 		spm_crit2("spm_dormant_sta %d", spm_dormant_sta);
 
 	if (is_infra_pdn(pwrctrl->pcm_flags))
+#if defined(CONFIG_MACH_MT6739)
+		mtk_uart_restore();
+#else
 		mtk8250_restore_dev();
+#endif
 }
 
 static void spm_suspend_pcm_setup_before_wfi(u32 cpu,
@@ -313,7 +317,7 @@ u32 spm_get_sleep_wakesrc(void)
 /* extern int get_dlpt_imix_spm(void); */
 int __attribute__((weak)) get_dlpt_imix_spm(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
 	return 0;
 }
 #endif
@@ -403,7 +407,11 @@ unsigned int spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	spm_suspend_footprint(SPM_SUSPEND_ENTER_UART_SLEEP);
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MACH_MT6739)
+	if (request_uart_to_sleep()) {
+#else
 	if (mtk8250_request_to_sleep()) {
+#endif
 		last_wr = WR_UART_BUSY;
 		goto RESTORE_IRQ;
 	}
@@ -416,7 +424,11 @@ unsigned int spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	spm_suspend_footprint(SPM_SUSPEND_LEAVE_WFI);
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MACH_MT6739)
+	request_uart_to_wakeup();
+#else
 	mtk8250_request_to_wakeup();
+#endif
 RESTORE_IRQ:
 #endif
 

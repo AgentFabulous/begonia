@@ -24,6 +24,10 @@ ccflags-y += \
 	-I$(srctree)/drivers/misc/mediatek/sspm/$(CONFIG_MTK_PLATFORM)
 endif
 
+# only build-in dummy driver for MT6885
+ifeq ($(CONFIG_MACH_MT6885),y)
+obj-y := mtk_ppm_dummy.o
+else
 ifneq ($(CONFIG_FPGA_EARLY_PORTING),y)
 # main
 obj-y := mtk_ppm_main.o
@@ -36,9 +40,8 @@ obj-y += mtk_ppm_profile.o
 # for IPI to SSPM
 obj-y += mtk_ppm_ipi.o
 
-# no need for Talbot, will not port this
 # for CPI
-# obj-y += mtk_ppm_cpi.o
+obj-y += mtk_ppm_cpi.o
 
 # policies
 obj-y += mtk_ppm_policy_dlpt.o
@@ -58,4 +61,5 @@ obj-y += mach/
 else
 # dummy driver to avoid build error
 obj-y := mtk_ppm_dummy.o
+endif
 endif

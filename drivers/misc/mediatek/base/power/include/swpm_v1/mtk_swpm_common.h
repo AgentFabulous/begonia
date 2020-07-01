@@ -14,7 +14,7 @@
 #ifndef __MTK_SWPM_COMMON_H__
 #define __MTK_SWPM_COMMON_H__
 
-#include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
@@ -43,10 +43,10 @@
 #define swpm_lock(lock)		mutex_lock(lock)
 #define swpm_unlock(lock)	mutex_unlock(lock)
 
-#define swpm_get_status(type)	((swpm_status & (1 << type)) >> type)
-#define swpm_set_status(type)	(swpm_status |= (1 << type))
-#define swpm_clr_status(type)	(swpm_status &= ~(1 << type))
-#define for_each_pwr_mtr(i)	for (i = 0; i < NR_POWER_METER; i++)
+#define swpm_get_status(type)  ((swpm_status & (1 << type)) >> type)
+#define swpm_set_status(type)  (swpm_status |= (1 << type))
+#define swpm_clr_status(type)  (swpm_status &= ~(1 << type))
+#define for_each_pwr_mtr(i)    for (i = 0; i < NR_POWER_METER; i++)
 
 extern bool swpm_debug;
 extern unsigned int swpm_status;

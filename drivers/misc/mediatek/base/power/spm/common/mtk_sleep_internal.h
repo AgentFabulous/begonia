@@ -21,7 +21,18 @@
 #define slp_read(addr)              __raw_readl((void __force __iomem *)(addr))
 #define slp_write(addr, val)        mt65xx_reg_sync_writel(val, addr)
 
+/**************************************
+ * only for internal debug
+ **************************************/
+#ifdef CONFIG_MTK_LDVT
+#define SLP_SLEEP_DPIDLE_EN         1
+#define SLP_REPLACE_DEF_WAKESRC     1
 #define SLP_SUSPEND_LOG_EN          1
+#else
+#define SLP_SLEEP_DPIDLE_EN         1
+#define SLP_REPLACE_DEF_WAKESRC     0
+#define SLP_SUSPEND_LOG_EN          1
+#endif
 
 #define	SPM_SUSPEND_PLAT_SLP_DP		(1<<0u)
 /**************************************

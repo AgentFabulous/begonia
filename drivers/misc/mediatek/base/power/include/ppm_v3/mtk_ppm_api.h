@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -136,6 +136,7 @@ extern void mt_ppm_dlpt_kick_PBM(struct ppm_cluster_status *cluster_status,
 extern void mt_ppm_cpu_thermal_protect(unsigned int limited_power);
 extern unsigned int mt_ppm_thermal_get_min_power(void);
 extern unsigned int mt_ppm_thermal_get_max_power(void);
+extern unsigned int mt_ppm_thermal_get_power_big_max_opp(unsigned int opp);
 extern unsigned int mt_ppm_thermal_get_cur_power(void);
 extern int ppm_find_pwr_idx(struct ppm_cluster_status *cluster_status);
 

@@ -34,6 +34,7 @@
 #include <mtk_mcdi_profile.h>
 #include <mtk_mcdi_util.h>
 #include <mtk_mcdi_cpc.h>
+#include <mtk_mcdi_mcupm.h>
 
 #include <mtk_mcdi_plat.h>
 #include <mtk_mcdi_reg.h>
@@ -225,7 +226,7 @@ static ssize_t mcdi_state_read(struct file *filp,
 	int len = 0;
 	int i;
 	char *p = dbg_buf;
-	unsigned long ac_cpu_cond_info[NF_ANY_CORE_CPU_COND_INFO];
+	unsigned long ac_cpu_cond_info[NF_ANY_CORE_CPU_COND_INFO] = {0};
 	int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
 
 	struct mcdi_feature_status feature_stat;
@@ -551,7 +552,7 @@ static int mcdi_procfs_init(void)
 
 static void __go_to_wfi(int cpu)
 {
-	remove_cpu_from_prefer_schedule_domain(cpu);
+/*	remove_cpu_from_prefer_schedule_domain(cpu); */
 
 	trace_rgidle_rcuidle(cpu, 1);
 
@@ -562,7 +563,7 @@ static void __go_to_wfi(int cpu)
 
 	trace_rgidle_rcuidle(cpu, 0);
 
-	add_cpu_to_prefer_schedule_domain(cpu);
+/*	add_cpu_to_prefer_schedule_domain(cpu); */
 }
 
 void mcdi_heart_beat_log_dump(void)
@@ -574,7 +575,7 @@ void mcdi_heart_beat_log_dump(void)
 	bool dump_log = false;
 	unsigned long mcdi_cnt;
 	unsigned long any_core_info = 0;
-	unsigned long ac_cpu_cond_info[NF_ANY_CORE_CPU_COND_INFO];
+	unsigned long ac_cpu_cond_info[NF_ANY_CORE_CPU_COND_INFO] = {0};
 	unsigned int cpu_mask = 0;
 	unsigned int cluster_mask = 0;
 	struct mcdi_feature_status feature_stat;
@@ -711,6 +712,8 @@ int mcdi_enter(int cpu)
 
 		aee_rr_rec_mcdi_val(cpu, MCDI_STATE_CPU_OFF << 16 | 0xff);
 
+		mcdi_cluster_counter_set_cpu_residency(cpu);
+
 		mtk_enter_idle_state(MTK_MCDI_CPU_MODE);
 
 		aee_rr_rec_mcdi_val(cpu, 0x0);
@@ -725,6 +728,8 @@ int mcdi_enter(int cpu)
 		trace_mcdi_rcuidle(cpu, 1);
 
 		aee_rr_rec_mcdi_val(cpu, MCDI_STATE_CLUSTER_OFF << 16 | 0xff);
+
+		mcdi_cluster_counter_set_cpu_residency(cpu);
 
 		mtk_enter_idle_state(MTK_MCDI_CLUSTER_MODE);
 

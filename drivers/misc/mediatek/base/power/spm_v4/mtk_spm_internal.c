@@ -51,15 +51,6 @@
 #include <mt-plat/mtk_meminfo.h>
 #endif
 
-#if defined(CONFIG_MACH_MT6771)
-/* for mp1 vproc control check with mcdi and hps */
-/* TODO: fix */
-#if !defined(SPM_K414_EARLY_PORTING)
-#include "mtk_hps_internal.h"
-#include "mtk_mcdi_governor.h"
-#endif
-#endif
-
 /**************************************
  * Config and Parameter
  **************************************/
@@ -378,7 +369,7 @@ void spm_set_dummy_read_addr(int debug)
 				enable_4G(), rank0_addr, rank1_addr);
 
 	mt_secure_call(MTK_SIP_KERNEL_SPM_DUMMY_READ,
-		       rank0_addr, rank1_addr, 0);
+		       rank0_addr, rank1_addr, 0, 0);
 #endif /* CONFIG_MACH_MT6739 */
 }
 
@@ -386,7 +377,7 @@ int __attribute__ ((weak)) get_dynamic_period(int first_use,
 					      int first_wakeup_time,
 					      int battery_capacity_level)
 {
-	/* pr_err("NO %s !!!\n", __func__); */
+	/* printk_deferred("[name:spm&]NO %s !!!\n", __func__); */
 	return 5401;
 }
 
@@ -415,12 +406,12 @@ u32 _spm_get_wake_period(int pwake_time, unsigned int last_wr)
 
 bool __attribute__ ((weak)) mcdi_is_buck_off(int cluster_idx)
 {
-	spm_crit2("NO %s !!!\n", __func__);
+//	spm_crit2("NO %s !!!\n", __func__);
 	return false;
 }
 bool __attribute__ ((weak)) cpuhp_is_buck_off(int cluster_idx)
 {
-	spm_crit2("NO %s !!!\n", __func__);
+//	spm_crit2("NO %s !!!\n", __func__);
 	return false;
 }
 

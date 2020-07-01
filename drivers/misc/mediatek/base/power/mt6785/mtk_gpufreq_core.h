@@ -333,5 +333,9 @@ struct g_pmic_info {
  **************************************************/
 extern bool mtk_get_gpu_loading(unsigned int *pLoading);
 extern unsigned int mt_get_ckgen_freq(unsigned int idx);
+#ifdef CONFIG_THERMAL
+extern int mtk_gpufreq_register(
+		struct mt_gpufreq_power_table_info *freqs, int num);
+#endif
 
 #endif /* _MT_GPUFREQ_CORE_H_ */

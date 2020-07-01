@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2015 MediaTek Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -36,6 +36,7 @@
 #include <mt-plat/sync_write.h>
 #include <mt-plat/upmu_common.h>
 
+#define TAG     "[Power/clkbuf]"
 #ifdef pr_fmt
 #undef pr_fmt
 #endif
@@ -46,7 +47,6 @@
 		if (clkbuf_debug)			\
 			pr_info(fmt, ##args);		\
 	} while (0)
-
 #define clkbuf_readl(addr)			__raw_readl(addr)
 #define clkbuf_writel(addr, val)	mt_reg_sync_writel(val, addr)
 

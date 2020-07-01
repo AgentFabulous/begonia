@@ -37,6 +37,7 @@
 #include <mtk_mcdi_api.h>
 
 #include <mtk_lp_dts.h>
+static DEFINE_SPINLOCK(slp_lock);
 
 unsigned long slp_dp_cnt[NR_CPUS] = {0};
 static unsigned int slp_wake_reason = WR_NONE;
@@ -53,7 +54,7 @@ int slp_dump_golden_setting_type = GS_PMIC;
 static int slp_suspend_ops_valid(suspend_state_t state)
 {
 	if (slp_suspend_ops_valid_on)
-		return suspend_valid_only_mem(state);
+		return state == PM_SUSPEND_MEM;
 	else
 		return 0;
 }
@@ -71,12 +72,12 @@ static int slp_suspend_ops_begin(suspend_state_t state)
 
 static int slp_suspend_ops_prepare(void)
 {
+#if 0
+	/* legacy log */
+	printk_deferred("[name:spm&][SLP] @@@@@@@@@@@@@@\tChip_pm_prepare\t@@@@@@@@@@@@@@\n");
+#endif
 	return 0;
 }
-
-int __attribute__((weak)) spm_load_firmware_status(void) { return -1; }
-void __attribute__((weak)) mtk_idle_cond_update_state(void) {}
-void __attribute__((weak)) mtk_spm_res_level_set(void) {}
 
 #if defined(CONFIG_MTK_SND_SOC_NEW_ARCH) \
 || defined(CONFIG_SND_SOC_MTK_SMART_PHONE)
@@ -123,20 +124,6 @@ spm_output_sleep_option(void)
 
 }
 
-__attribute__ ((weak))
-int slp_set_wakesrc(u32 wakesrc, bool enable, bool ck26m_on)
-{
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
-	return 0;
-}
-
-__attribute__ ((weak))
-int spm_set_dpidle_wakesrc(u32 wakesrc, bool enable, bool replace)
-{
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
-	return 0;
-}
-
 int __attribute__((weak))
 spm_set_sleep_wakesrc(u32 wakesrc, bool enable, bool replace)
 {
@@ -145,7 +132,7 @@ spm_set_sleep_wakesrc(u32 wakesrc, bool enable, bool replace)
 
 bool __attribute__((weak)) spm_is_enable_sleep(void)
 {
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
+	pr_info("NO %s !!!\n", __func__);
 	return false;
 }
 
@@ -191,6 +178,7 @@ static int slp_suspend_ops_enter(suspend_state_t state)
 {
 	int ret = 0;
 
+#if SLP_SLEEP_DPIDLE_EN
 #if defined(CONFIG_MTK_SND_SOC_NEW_ARCH) \
 || defined(CONFIG_SND_SOC_MTK_SMART_PHONE)
 	unsigned int fm_radio_is_playing = 0;
@@ -200,6 +188,12 @@ static int slp_suspend_ops_enter(suspend_state_t state)
 	else
 		fm_radio_is_playing = 1;
 #endif /* CONFIG_MTK_SND_SOC_NEW_ARCH || CONFIG_SND_SOC_MTK_SMART_PHONE */
+#endif
+
+#if 0
+	/* legacy log */
+	printk_deferred("[name:spm&][SLP] @@@@@@@@@@@@@@@\tChip_pm_enter\t@@@@@@@@@@@@@@@\n");
+#endif
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
 	if (slp_dump_gpio)
@@ -217,6 +211,14 @@ static int slp_suspend_ops_enter(suspend_state_t state)
 		goto LEAVE_SLEEP;
 	}
 
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+	if (is_sspm_ipi_lock_spm()) {
+		printk_deferred("[name:spm&][SLP] CANNOT SLEEP DUE TO SSPM IPI\n");
+		ret = -EPERM;
+		goto LEAVE_SLEEP;
+	}
+#endif /* CONFIG_MTK_TINYSYS_SSPM_SUPPORT */
+
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
 	if (spm_load_firmware_status() < 1) {
 		printk_deferred("[name:spm&]SPM FIRMWARE IS NOT READY\n");
@@ -229,10 +231,7 @@ static int slp_suspend_ops_enter(suspend_state_t state)
 
 	mtk_idle_cond_update_state();
 
-	mtk_spm_res_level_set();
-
-	mtk_suspend_cond_info();
-
+#if SLP_SLEEP_DPIDLE_EN
 #if defined(CONFIG_MTK_SND_SOC_NEW_ARCH) \
 || defined(CONFIG_SND_SOC_MTK_SMART_PHONE)
 	if (slp_ck26m_on | fm_radio_is_playing) {
@@ -242,8 +241,12 @@ static int slp_suspend_ops_enter(suspend_state_t state)
 		slp_wake_reason = spm_go_to_sleep_ex(
 			SPM_SUSPEND_PLAT_SLP_DP);
 		slp_dp_cnt[smp_processor_id()]++;
-	} else
+	} else {
+#endif
+		mtk_suspend_cond_info();
+
 		slp_wake_reason = spm_go_to_sleep_ex(0);
+	}
 
 	mcdi_task_pause(false);
 
@@ -262,10 +265,18 @@ LEAVE_SLEEP:
 
 static void slp_suspend_ops_finish(void)
 {
+#if 0
+	/* legacy log */
+	printk_deferred("[name:spm&][SLP] @@@@@@@@@@@@\tChip_pm_finish\t@@@@@@@@@@\n");
+#endif
 }
 
 static void slp_suspend_ops_end(void)
 {
+#if 0
+	/* legacy log */
+	printk_deferred("[name:spm&][SLP] @@@@@@@@@@@@\tChip_pm_end\t@@@@@@@@@@@@\n");
+#endif
 }
 
 static const struct platform_suspend_ops slp_suspend_ops = {
@@ -276,6 +287,55 @@ static const struct platform_suspend_ops slp_suspend_ops = {
 	.finish = slp_suspend_ops_finish,
 	.end = slp_suspend_ops_end,
 };
+
+__attribute__ ((weak))
+int spm_set_dpidle_wakesrc(u32 wakesrc, bool enable, bool replace)
+{
+	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
+	return 0;
+}
+
+/*
+ * wakesrc : WAKE_SRC_XXX
+ * enable  : enable or disable @wakesrc
+ * ck26m_on: if true, mean @wakesrc needs 26M to work
+ */
+int slp_set_wakesrc(u32 wakesrc, bool enable, bool ck26m_on)
+{
+	int r;
+	unsigned long flags;
+
+	printk_deferred("[name:spm&][SLP] wakesrc = 0x%x, enable = %u, ck26m_on = %u\n",
+		wakesrc, enable, ck26m_on);
+
+#if SLP_REPLACE_DEF_WAKESRC
+	if (wakesrc & WAKE_SRC_CFG_KEY)
+#else
+	if (!(wakesrc & WAKE_SRC_CFG_KEY))
+#endif
+		return -EPERM;
+
+	spin_lock_irqsave(&slp_lock, flags);
+
+#if SLP_REPLACE_DEF_WAKESRC
+	if (ck26m_on)
+		r = spm_set_dpidle_wakesrc(wakesrc, enable, true);
+	else
+		r = spm_set_sleep_wakesrc(wakesrc, enable, true);
+#else
+	if (ck26m_on)
+		r = spm_set_dpidle_wakesrc(wakesrc & ~WAKE_SRC_CFG_KEY,
+				enable, false);
+	else
+		r = spm_set_sleep_wakesrc(wakesrc & ~WAKE_SRC_CFG_KEY, enable,
+				false);
+#endif
+
+	if (!r)
+		slp_ck26m_on = ck26m_on;
+	spin_unlock_irqrestore(&slp_lock, flags);
+	return r;
+}
 
 unsigned int slp_get_wake_reason(void)
 {
@@ -371,13 +431,12 @@ void slp_module_init(void)
 	}
 
 	spm_output_sleep_option();
-	printk_deferred("[name:spm&], SUSPEND_LOG_EN:%d\n", SLP_SUSPEND_LOG_EN);
+	pr_info("[SLP] SLEEP_DPIDLE_EN:%d, REPLACE_DEF_WAKESRC:%d",
+		SLP_SLEEP_DPIDLE_EN, SLP_REPLACE_DEF_WAKESRC);
+	pr_info(", SUSPEND_LOG_EN:%d\n", SLP_SUSPEND_LOG_EN);
 	suspend_set_ops(&slp_suspend_ops);
 #if SLP_SUSPEND_LOG_EN
 	console_suspend_enabled = 0;
-#endif
-#ifdef CONFIG_PM_SLEEP_DEBUG
-	pm_print_times_enabled = false;
 #endif
 }
 

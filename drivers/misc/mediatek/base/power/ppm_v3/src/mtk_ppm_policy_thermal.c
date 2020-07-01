@@ -81,7 +81,9 @@ unsigned int mt_ppm_thermal_get_max_power(void)
 
 unsigned int mt_ppm_thermal_get_cur_power(void)
 {
+#ifndef NO_SCHEDULE_API
 	struct cpumask cluster_cpu, online_cpu;
+#endif
 	int i;
 	int power;
 
@@ -93,10 +95,14 @@ unsigned int mt_ppm_thermal_get_cur_power(void)
 		return mt_ppm_thermal_get_max_power();
 
 	for_each_ppm_clusters(i) {
-		ppm_get_cl_cpus(&cluster_cpu, i);
+#ifndef NO_SCHEDULE_API
+		arch_get_cluster_cpus(&cluster_cpu, i);
 		cpumask_and(&online_cpu, &cluster_cpu, cpu_online_mask);
 
 		cluster_status[i].core_num = cpumask_weight(&online_cpu);
+#else
+		cluster_status[i].core_num = get_cluster_max_cpu_core(i);
+#endif
 		cluster_status[i].volt = 0;	/* don't care */
 		if (!cluster_status[i].core_num)
 			cluster_status[i].freq_idx = -1;
@@ -151,7 +157,7 @@ static int ppm_thermal_limit_proc_show(struct seq_file *m, void *v)
 static ssize_t ppm_thermal_limit_proc_write(struct file *file,
 	const char __user *buffer, size_t count, loff_t *pos)
 {
-	unsigned int limited_power;
+	unsigned int limited_power = 0;
 
 	char *buf = ppm_copy_from_user_for_proc(buffer, count);
 
