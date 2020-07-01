@@ -31,16 +31,6 @@
 #define CONNADP_LOG_WARN    1
 #define CONNADP_LOG_ERR     0
 
-#if defined(CONFIG_MACH_MT6768)
-#include <clk-mt6768-pg.h>
-#define DUMP_CLOCK_FAIL_CALLBACK 1
-#endif
-
-#if defined(CONFIG_MACH_MT6785)
-#include <clk-mt6785-pg.h>
-#define DUMP_CLOCK_FAIL_CALLBACK 1
-#endif
-
 /*******************************************************************************
  * Connsys adaptation layer logging utility
  ******************************************************************************/
@@ -78,18 +68,6 @@ do { \
  ******************************************************************************/
 static struct wmt_platform_bridge bridge;
 
-#ifdef DUMP_CLOCK_FAIL_CALLBACK
-static void wmt_clock_debug_dump(enum subsys_id sys)
-{
-	if (sys == SYS_CONN)
-		mtk_wcn_cmb_stub_clock_fail_dump();
-}
-
-static struct pg_callbacks wmt_clk_subsys_handle = {
-	.debug_dump = wmt_clock_debug_dump
-};
-#endif
-
 void wmt_export_platform_bridge_register(struct wmt_platform_bridge *cb)
 {
 	if (unlikely(!cb))
@@ -97,9 +75,6 @@ void wmt_export_platform_bridge_register(struct wmt_platform_bridge *cb)
 	bridge.thermal_query_cb = cb->thermal_query_cb;
 	bridge.trigger_assert_cb = cb->trigger_assert_cb;
 	bridge.clock_fail_dump_cb = cb->clock_fail_dump_cb;
-#ifdef DUMP_CLOCK_FAIL_CALLBACK
-	register_pg_callback(&wmt_clk_subsys_handle);
-#endif
 	CONNADP_INFO_FUNC("\n");
 }
 EXPORT_SYMBOL(wmt_export_platform_bridge_register);
@@ -202,18 +177,15 @@ static irqreturn_t mtk_wcn_cmb_sdio_eirq_handler_stub(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler,
-					  void *data)
+void mtk_wcn_cmb_sdio_request_eirq_by_wmt(void)
 {
 #ifdef CONFIG_OF
-	struct device_node *node;
 	int ret = -EINVAL;
+	struct device_node *node;
 
 	CONNADP_INFO_FUNC("enter\n");
 	_mtk_wcn_sdio_irq_flag_set(0);
 	atomic_set(&irq_enable_flag, 1);
-	mtk_wcn_cmb_sdio_eirq_data = data;
-	mtk_wcn_cmb_sdio_eirq_handler = irq_handler;
 
 	node = (struct device_node *)of_find_compatible_node(NULL, NULL,
 					"mediatek,connectivity-combo");
@@ -229,6 +201,20 @@ static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler,
 			mtk_wcn_cmb_sdio_disable_eirq();/*state:power off*/
 	} else
 		CONNADP_WARN_FUNC("can't find connectivity compatible node\n");
+
+	CONNADP_INFO_FUNC("exit\n");
+	return;
+#endif
+}
+EXPORT_SYMBOL(mtk_wcn_cmb_sdio_request_eirq_by_wmt);
+
+static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler,
+					  void *data)
+{
+#ifdef CONFIG_OF
+	CONNADP_INFO_FUNC("enter\n");
+	mtk_wcn_cmb_sdio_eirq_data = data;
+	mtk_wcn_cmb_sdio_eirq_handler = irq_handler;
 
 	CONNADP_INFO_FUNC("exit\n");
 #else
@@ -250,7 +236,7 @@ static void mtk_wcn_cmb_sdio_enable_eirq(void)
 		CONNADP_DBG_FUNC("wifi eint has been enabled\n");
 	else {
 		atomic_set(&irq_enable_flag, 1);
-		if (wifi_irq != 0xfffffff) {
+		if (wifi_irq != 0xffffffff) {
 			enable_irq(wifi_irq);
 			CONNADP_DBG_FUNC(" enable WIFI EINT %d!\n", wifi_irq);
 		}
@@ -262,7 +248,7 @@ static void mtk_wcn_cmb_sdio_disable_eirq(void)
 	if (!atomic_read(&irq_enable_flag))
 		CONNADP_DBG_FUNC("wifi eint has been disabled!\n");
 	else {
-		if (wifi_irq != 0xfffffff) {
+		if (wifi_irq != 0xffffffff) {
 			disable_irq_nosync(wifi_irq);
 			CONNADP_DBG_FUNC("disable WIFI EINT %d!\n", wifi_irq);
 		}

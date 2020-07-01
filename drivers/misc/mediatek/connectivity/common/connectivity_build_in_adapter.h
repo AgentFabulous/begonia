@@ -61,12 +61,16 @@
 	defined(CONFIG_MACH_KIBOPLUS) || \
 	defined(CONFIG_MACH_ELBRUS)
 #define CONNADP_HAS_CLOCK_BUF_CTRL
+#define KERNEL_CLK_BUF_CHIP_NOT_SUPPORT -7788
 #define KERNEL_clk_buf_ctrl connectivity_export_clk_buf_ctrl
 #define KERNEL_clk_buf_show_status_info \
 		connectivity_export_clk_buf_show_status_info
+#define KERNEL_clk_buf_get_xo_en_sta \
+		connectivity_export_clk_buf_get_xo_en_sta
 enum clk_buf_id;
 void connectivity_export_clk_buf_ctrl(enum clk_buf_id id, bool onoff);
 void connectivity_export_clk_buf_show_status_info(void);
+int connectivity_export_clk_buf_get_xo_en_sta(/*enum xo_id id*/ int id);
 #endif
 
 /*******************************************************************************
@@ -164,7 +168,9 @@ void connectivity_export_mt6306_set_gpio_dir(unsigned long pin,
 #ifdef CONFIG_MACH_MT6799
 #define CPU_BOOST y
 #endif
-
+#ifdef CONFIG_MACH_MT6739
+#define CPU_BOOST y
+#endif
 #ifdef CPU_BOOST
 #include "mtk_ppm_api.h"
 #include "mtk_spm_resource_req.h"
@@ -241,7 +247,7 @@ void connectivity_arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
  *
  * event_trace_printk()
  *********************************************/
-
+#ifndef CONFIG_MACH_MT6739
 #define KERNEL_event_trace_printk(ip, fmt, args...)               \
 do {                                                              \
 	__trace_printk_check_format(fmt, ##args);                 \
@@ -254,7 +260,7 @@ do {                                                              \
 	} else                                                    \
 		__trace_printk(ip, fmt, ##args);                  \
 } while (0)
-
+#endif
 /******************************************************************************
  * GPIO dump information
  ******************************************************************************/
@@ -265,5 +271,13 @@ void connectivity_export_dump_gpio_info(int start, int end);
 #endif
 
 int connectivity_export_gpio_get_tristate_input(unsigned int pin);
+
+#if defined(CONFIG_MACH_MT8167)
+#define CONNADP_HAS_UPMU_VCN_CTRL
+#define KERNEL_upmu_set_vcn35_on_ctrl_bt conn_upmu_set_vcn35_on_ctrl_bt
+#define KERNEL_upmu_set_vcn35_on_ctrl_wifi conn_upmu_set_vcn35_on_ctrl_wifi
+void conn_upmu_set_vcn35_on_ctrl_bt(unsigned int val);
+void conn_upmu_set_vcn35_on_ctrl_wifi(unsigned int val);
+#endif
 
 #endif /* CONNECTIVITY_BUILD_IN_ADAPTER_H */

@@ -32,7 +32,12 @@
 #include <linux/of_reserved_mem.h>
 
 #include <linux/interrupt.h>
+#ifdef CONFIG_PINCTRL_MTK_PARIS
 #include <pinctrl-mtk-common-v2_debug.h>
+#else
+#include <linux/gpio.h>
+#endif
+
 #ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
 #include <mtk_6306_gpio.h>
 #endif
@@ -179,9 +184,27 @@ EXPORT_SYMBOL(connectivity_export_clk_buf_ctrl);
 
 void connectivity_export_clk_buf_show_status_info(void)
 {
+#if defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT6785) || \
+	defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT6739)
 	clk_buf_show_status_info();
+#endif
 }
 EXPORT_SYMBOL(connectivity_export_clk_buf_show_status_info);
+
+int connectivity_export_clk_buf_get_xo_en_sta(/*enum xo_id id*/ int id)
+{
+#if defined(CONFIG_MACH_MT6768) || \
+	defined(CONFIG_MACH_MT6785) || \
+	defined(CONFIG_MACH_MT6771) || \
+	defined(CONFIG_MACH_MT6739)
+	return clk_buf_get_xo_en_sta(id);
+#else
+	return KERNEL_CLK_BUF_CHIP_NOT_SUPPORT;
+#endif
+}
+EXPORT_SYMBOL(connectivity_export_clk_buf_get_xo_en_sta);
 #endif
 
 /*******************************************************************************
@@ -222,13 +245,21 @@ EXPORT_SYMBOL(connectivity_export_pmic_read_interface);
 
 void connectivity_export_pmic_set_register_value(int flagname, unsigned int val)
 {
+#ifdef CONNADP_HAS_UPMU_VCN_CTRL
+	upmu_set_reg_value(flagname, val);
+#else
 	pmic_set_register_value(flagname, val);
+#endif
 }
 EXPORT_SYMBOL(connectivity_export_pmic_set_register_value);
 
 unsigned short connectivity_export_pmic_get_register_value(int flagname)
 {
+#ifdef CONNADP_HAS_UPMU_VCN_CTRL
+	return upmu_get_reg_value(flagname);
+#else
 	return pmic_get_register_value(flagname);
+#endif
 }
 EXPORT_SYMBOL(connectivity_export_pmic_get_register_value);
 
@@ -360,6 +391,24 @@ EXPORT_SYMBOL(connectivity_export_dump_thread_state);
 
 int connectivity_export_gpio_get_tristate_input(unsigned int pin)
 {
+#ifdef CONFIG_PINCTRL_MTK_PARIS
 	return gpio_get_tristate_input(pin);
+#else
+	return gpio_get_value(pin);
+#endif
 }
 EXPORT_SYMBOL(connectivity_export_gpio_get_tristate_input);
+
+#ifdef CONNADP_HAS_UPMU_VCN_CTRL
+void conn_upmu_set_vcn35_on_ctrl_bt(unsigned int val)
+{
+	upmu_set_vcn35_on_ctrl_bt(val);
+}
+EXPORT_SYMBOL(conn_upmu_set_vcn35_on_ctrl_bt);
+
+void conn_upmu_set_vcn35_on_ctrl_wifi(unsigned int val)
+{
+	upmu_set_vcn35_on_ctrl_wifi(val);
+}
+EXPORT_SYMBOL(conn_upmu_set_vcn35_on_ctrl_wifi);
+#endif
