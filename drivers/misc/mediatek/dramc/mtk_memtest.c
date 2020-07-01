@@ -304,7 +304,7 @@ int dramc_dram_address_get(phys_addr_t phys_addr,
 			ch_width++;
 		}
 
-		temp = (phys_addr&~((((0x1<<ch_width)-1)<<ch_pos)-1))>>ch_width;
+		temp = (phys_addr & ~(((0x1<<ch_width)-1)<<ch_pos)) >> ch_width;
 		phys_addr = temp | (phys_addr & ((0x1<<ch_pos)-1));
 	}
 
@@ -452,7 +452,6 @@ static ssize_t test_result_read(struct file *file,
 		if (test_fail_region[FAIL_REGION_VIRT])
 			sz2 += snprintf(buf + sz2, sizeof(buf) - sz2,
 					"virtual\n");
-
 		aee_kernel_warning("DRAM_MEMTEST", buf);
 	}
 
@@ -524,30 +523,30 @@ static phys_addr_t memtest_user_v2p(unsigned long va)
 	phys_addr_t pa;
 
 	if (current == NULL) {
-		pr_info("warning: %s , current is NULL!\n", __func__);
+		pr_info("warning: memorytest_user_v2p, current is NULL!\n");
 		return 0;
 	}
 	if (current->mm == NULL) {
-		pr_info("warning: %s, current->mm is NULL!\n", __func__);
+		pr_info("warning: memorytest_user_v2p, current->mm is NULL!\n");
 		pr_info("tgid=0x%x, name=%s\n", current->tgid, current->comm);
 		return 0;
 	}
 
 	pgd = pgd_offset(current->mm, va);       /* what is tsk->mm */
 	if (pgd_none(*pgd) || pgd_bad(*pgd)) {
-		pr_info("%s, va=0x%lx, pgd invalid!\n", __func__, va);
+		pr_info("memorytest_user_v2p, va=0x%lx, pgd invalid!\n", va);
 		return 0;
 	}
 
 	pud = pud_offset(pgd, va);
 	if (pud_none(*pud) || pud_bad(*pud)) {
-		pr_info("%s, va=0x%lx, pud invalid!\n", __func__, va);
+		pr_info("memorytest_user_v2p, va=0x%lx, pud invalid!\n", va);
 		return 0;
 	}
 
 	pmd = pmd_offset(pud, va);
 	if (pmd_none(*pmd) || pmd_bad(*pmd)) {
-		pr_info("( %s , va=0x%lx, pmd invalid!\n", __func__, va);
+		pr_info("(memorytest_user_v2p, va=0x%lx, pmd invalid!\n", va);
 		return 0;
 	}
 
@@ -562,7 +561,7 @@ static phys_addr_t memtest_user_v2p(unsigned long va)
 
 	pte_unmap(pte);
 
-	pr_info(" %s, va=0x%lx, pte invalid!\n", __func__, va);
+	pr_info("memorytest_user_v2p, va=0x%lx, pte invalid!\n", va);
 	return 0;
 }
 
@@ -824,7 +823,7 @@ static int __init dram_memtest_interface_init(void)
 
 	if (memtest_rank0_addr) {
 		memtest_mem0 = debugfs_create_file("mem0",
-				0666,
+				0664,
 				memtest_dir, (void *) 0, &test_mem_fops);
 		if (!memtest_mem0) {
 			pr_info("%s: create mem0 interface fail\n", __func__);
@@ -834,7 +833,7 @@ static int __init dram_memtest_interface_init(void)
 
 	if (memtest_rank1_addr) {
 		memtest_mem1 = debugfs_create_file("mem1",
-				0666,
+				0664,
 				memtest_dir, (void *) 1, &test_mem_fops);
 		if (!memtest_mem1) {
 			pr_info("%s: create mem1 interface fail\n", __func__);
