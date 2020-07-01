@@ -37,6 +37,7 @@
 #include "ccci_hif.h"
 #include "ccci_port.h"
 #include "port_proxy.h"
+#include "port_udc.h"
 #define TAG PORT
 #define CCCI_DEV_NAME "ccci"
 
@@ -78,8 +79,11 @@ int port_dev_open(struct inode *inode, struct file *file)
 	struct port_t *port;
 
 	port = port_get_by_node(major, minor);
-	if (port->rx_ch != CCCI_CCB_CTRL && atomic_read(&port->usage_cnt))
+	if (port->rx_ch != CCCI_CCB_CTRL && atomic_read(&port->usage_cnt)) {
+		CCCI_ERROR_LOG(port->md_id, CHAR,
+			"port %s open fail with EBUSY\n", port->name);
 		return -EBUSY;
+	}
 	md_id = port->md_id;
 	CCCI_NORMAL_LOG(md_id, CHAR,
 		"port %s open with flag %X by %s\n", port->name, file->f_flags,
@@ -114,16 +118,16 @@ int port_dev_close(struct inode *inode, struct file *file)
 	port_ask_more_req_to_md(port);
 	spin_unlock_irqrestore(&port->rx_skb_list.lock, flags);
 	CCCI_NORMAL_LOG(md_id, CHAR,
-		"port %s close rx_len=%d empty=%d, clear_cnt=%d, drop=%d\n",
-		port->name, port->rx_skb_list.qlen,
+		"port %s close by %s rx_len=%d empty=%d, clear_cnt=%d, drop=%d usagecnt=%d\n",
+		port->name, current->comm, port->rx_skb_list.qlen,
 		skb_queue_empty(&port->rx_skb_list),
-		clear_cnt, port->rx_drop_cnt);
+		clear_cnt, port->rx_drop_cnt, atomic_read(&port->usage_cnt));
 	ccci_event_log(
-		"md%d: port %s close rx_len=%d empty=%d, clear_cnt=%d, drop=%d\n",
-		md_id, port->name,
+		"md%d: port %s close close by %s rx_len=%d empty=%d, clear_cnt=%d, drop=%d, usagecnt=%d\n",
+		md_id, port->name, current->comm,
 		port->rx_skb_list.qlen,
 		skb_queue_empty(&port->rx_skb_list),
-		clear_cnt, port->rx_drop_cnt);
+		clear_cnt, port->rx_drop_cnt, atomic_read(&port->usage_cnt));
 	port_user_unregister(port);
 
 	return 0;
@@ -407,6 +411,8 @@ static inline void port_struct_init(struct port_t *port,
 	INIT_LIST_HEAD(&port->exp_entry);
 	INIT_LIST_HEAD(&port->queue_entry);
 	skb_queue_head_init(&port->rx_skb_list);
+	if (port->tx_ch == CCCI_UDC_TX)
+		skb_queue_head_init(&port->rx_skb_list_hp);
 	init_waitqueue_head(&port->rx_wq);
 	port->tx_busy_count = 0;
 	port->rx_busy_count = 0;
@@ -614,6 +620,7 @@ int port_recv_skb(struct port_t *port, struct sk_buff *skb)
 			port->skb_handler(port, skb);
 		else
 			__skb_queue_tail(&port->rx_skb_list, skb);
+
 		port->rx_pkg_cnt++;
 		spin_unlock_irqrestore(&port->rx_skb_list.lock, flags);
 		__pm_wakeup_event(&port->rx_wakelock, jiffies_to_msecs(HZ/2));
@@ -1074,7 +1081,8 @@ static inline int proxy_dispatch_recv_skb(struct port_proxy *proxy_p,
 		if (channel == CCCI_CONTROL_RX)
 			CCCI_ERROR_LOG(md_id, CORE,
 				"drop on channel %d, ret %d\n", channel, ret);
-		ccci_free_skb(skb);
+		if (skb)
+			ccci_free_skb(skb);
 		ret = -CCCI_ERR_DROP_PACKET;
 	}
 
@@ -1385,6 +1393,7 @@ static inline void user_broadcast_wrapper(int md_id, unsigned int state)
 
 	switch (state) {
 	case GATED:
+		mapped_event = MD_STA_EV_STOP;
 		break;
 	case BOOT_WAITING_FOR_HS1:
 		break;

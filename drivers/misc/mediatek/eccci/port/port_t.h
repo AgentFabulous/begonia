@@ -36,6 +36,9 @@
 #define PORT_F_TX_DATA_FULLED	(1<<1)
 #define PORT_F_TX_ACK_FULLED	(1<<8)
 
+/*Can be clean when MD is invalid*/
+#define PORT_F_CLEAN            (1<<9)
+
 enum {
 	PORT_DBG_DUMP_RILD = 0,
 	PORT_DBG_DUMP_AUDIO,
@@ -101,6 +104,8 @@ struct port_t {
 	 * Rx list to hold packets.
 	 */
 	struct sk_buff_head rx_skb_list;
+	/* add high prio rx list for udc */
+	struct sk_buff_head rx_skb_list_hp;
 	unsigned char skb_from_pool;
 	spinlock_t rx_req_lock;
 	wait_queue_head_t rx_wq;	/* for uplayer user */

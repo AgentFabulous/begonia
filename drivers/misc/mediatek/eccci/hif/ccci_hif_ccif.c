@@ -293,6 +293,9 @@ static int ccci_ch_to_c2k_ch(int md_state, int ccci_ch, int direction)
 	u16 channel_map;
 	int i = 0;
 
+	if (md_state == INVALID)
+		goto md_state_invalid;
+
 	ccci_channel_id = (u16) ccci_ch;
 	for (i = 0; i < (sizeof(c2k_ports) / sizeof(struct c2k_port)); i++) {
 		channel_map = (direction == OUT) ? c2k_ports[i].tx_ch_mapping :
@@ -306,6 +309,8 @@ static int ccci_ch_to_c2k_ch(int md_state, int ccci_ch, int direction)
 				c2k_ports[i].excp_ch;
 		}
 	}
+
+md_state_invalid:
 
 	CCCI_ERROR_LOG(MD_SYS3, TAG,
 		"%s:ERR cannot find mapped ccci ch ID(%d)\n",
@@ -878,16 +883,12 @@ void md_ccif_reset_queue(unsigned char hif_id, unsigned char for_start)
 	struct md_ccif_ctrl *md_ctrl =
 		(struct md_ccif_ctrl *)ccci_hif_get_by_id(hif_id);
 	unsigned long flags;
-	int ccif_id = md_ctrl->md_id ==
-		MD_SYS1 ? AP_MD1_CCIF : AP_MD3_CCIF;
 
 	if (for_start) {
 		mod_timer(&md_ctrl->traffic_monitor,
 			jiffies + CCIF_TRAFFIC_MONITOR_INTERVAL * HZ);
 	} else {
 		del_timer(&md_ctrl->traffic_monitor);
-		ccci_reset_ccif_hw(md_ctrl->md_id,
-			ccif_id, md_ctrl->ccif_ap_base, md_ctrl->ccif_md_base);
 	}
 
 	CCCI_NORMAL_LOG(md_ctrl->md_id, TAG, "%s\n", __func__);
@@ -1462,7 +1463,9 @@ static int md_ccif_op_dump_status(unsigned char hif_id,
 	if (flag & DUMP_FLAG_IRQ_STATUS) {
 		CCCI_NORMAL_LOG(md_ctrl->md_id, TAG,
 		"Dump AP CCIF IRQ status\n");
+#ifdef CONFIG_MTK_GIC_V3_EXT
 		mt_irq_dump_status(md_ctrl->ccif_irq_id);
+#endif
 	}
 	if (flag & DUMP_FLAG_QUEUE_0)
 		md_ccif_dump_queue_history(hif_id, 0);

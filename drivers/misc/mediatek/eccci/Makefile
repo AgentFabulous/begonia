@@ -33,6 +33,7 @@ endif
 obj-y += fsm/
 obj-y += hif/
 obj-y += port/
+obj-y += udc/
 obj-$(CONFIG_MTK_MIX_DEVICES) +=  mixdev/
 
 ifeq ($(CONFIG_MTK_ECCCI_C2K), y)

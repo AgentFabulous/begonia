@@ -483,6 +483,8 @@ enum CCCI_CH {
 	CCCI_XCAP_TX			= 174,
 	CCCI_BIP_RX			= 175,
 	CCCI_BIP_TX			= 176,
+	CCCI_UDC_RX			= 177,
+	CCCI_UDC_TX			= 178,
 
 	CCCI_TCHE_RX			= 181,
 	CCCI_TCHE_TX			= 182,
@@ -573,6 +575,7 @@ enum md_bc_event {
 	MD_STA_EV_HS1,
 	MD_STA_EV_READY,
 	MD_STA_EV_EXCEPTION,
+	MD_STA_EV_STOP,
 };
 
 /* ========================================================================= */

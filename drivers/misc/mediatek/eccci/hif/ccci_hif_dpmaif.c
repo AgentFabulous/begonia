@@ -94,6 +94,13 @@ TRACE_EVENT(ccci_skb_rx,
 
 static void dpmaif_dump_register(struct hif_dpmaif_ctrl *hif_ctrl, int buf_type)
 {
+	if (hif_ctrl->dpmaif_state == HIFDPMAIF_STATE_PWROFF
+		|| hif_ctrl->dpmaif_state == HIFDPMAIF_STATE_MIN) {
+		CCCI_MEM_LOG_TAG(hif_ctrl->md_id, TAG,
+			"DPMAIF not power on, skip dump\n");
+		return;
+	}
+
 	CCCI_BUF_LOG_TAG(hif_ctrl->md_id, buf_type, TAG,
 		"dump AP DPMAIF Tx pdn register\n");
 	ccci_util_mem_dump(hif_ctrl->md_id, buf_type,
@@ -327,7 +334,9 @@ static int dpmaif_dump_status(unsigned char hif_id,
 	if (flag & DUMP_FLAG_IRQ_STATUS) {
 		CCCI_NORMAL_LOG(hif_ctrl->md_id, TAG,
 			"Dump AP DPMAIF IRQ status\n");
+#ifdef CONFIG_MTK_GIC_V3_EXT
 		mt_irq_dump_status(hif_ctrl->dpmaif_irq_id);
+#endif
 	}
 
 	return 0;
@@ -1067,6 +1076,7 @@ static int ccci_skb_to_list(struct ccci_skb_queue *queue, struct sk_buff *newsk)
 			queue->max_history = queue->skb_list.qlen;
 
 	} else {
+		spin_unlock_irqrestore(&queue->skb_list.lock, flags);
 		return -1;
 	}
 	spin_unlock_irqrestore(&queue->skb_list.lock, flags);
@@ -2684,7 +2694,9 @@ int dpmaif_start(unsigned char hif_id)
 	struct dpmaif_tx_queue *txq;
 	int i, ret = 0;
 
-	if (dpmaif_ctrl->dpmaif_state == HIFDPMAIF_STATE_MIN)
+	if (dpmaif_ctrl->dpmaif_state == HIFDPMAIF_STATE_PWRON)
+		return 0;
+	else if (dpmaif_ctrl->dpmaif_state == HIFDPMAIF_STATE_MIN)
 		dpmaif_late_init(hif_id);
 #ifdef DPMAIF_DEBUG_LOG
 	CCCI_HISTORY_TAG_LOG(-1, TAG, "dpmaif:start\n");
@@ -3080,6 +3092,9 @@ void dpmaif_hw_reset(unsigned char md_id)
 
 int dpmaif_stop(unsigned char hif_id)
 {
+	if (dpmaif_ctrl->dpmaif_state == HIFDPMAIF_STATE_PWROFF
+		|| dpmaif_ctrl->dpmaif_state == HIFDPMAIF_STATE_MIN)
+		return 0;
 #ifdef DPMAIF_DEBUG_LOG
 	CCCI_HISTORY_LOG(-1, TAG, "dpmaif:stop\n");
 #else

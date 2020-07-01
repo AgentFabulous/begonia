@@ -43,7 +43,11 @@
 #define DATA_AT_CMD_Q	5
 #endif
 
+#if (MD_GENERATION >= 6295)
 #define DATA_TCHE	8
+#else
+#define DATA_TCHE	2
+#endif
 
 
 #define SMEM_Q			AP_MD_CCB_WAKEUP
@@ -130,7 +134,7 @@ static struct port_t md1_ccci_ports[] = {
 		MD1_NORMAL_HIF, PORT_F_WITH_CHAR_NODE,
 		&char_port_ops, 3, "ttyC0",},
 	{CCCI_FS_TX, CCCI_FS_RX, DATA_FSD_Q, DATA_FSD_Q, 1, 1, MD1_NORMAL_HIF,
-		PORT_F_USER_HEADER | PORT_F_WITH_CHAR_NODE,
+		PORT_F_USER_HEADER | PORT_F_WITH_CHAR_NODE | PORT_F_CLEAN,
 		&char_port_ops, 4, "ccci_fs",},
 	{CCCI_IPC_UART_TX, CCCI_IPC_UART_RX, 1, 1, 0xFF, 0xFF,
 		MD1_NORMAL_HIF, PORT_F_WITH_CHAR_NODE,
@@ -204,6 +208,9 @@ static struct port_t md1_ccci_ports[] = {
 	{CCCI_BIP_TX, CCCI_BIP_RX, 1, 1, 0xFF, 0xFF,
 		MD1_NORMAL_HIF, PORT_F_WITH_CHAR_NODE,
 		&char_port_ops, 27, "ccci_bip",},
+	{CCCI_UDC_TX, CCCI_UDC_RX, 1, 1, 0xFF, 0xFF,
+		MD1_NORMAL_HIF, 0,
+		&ccci_udc_port_ops, 0, "ccci_udc",},
 
 /* IPC char port minor= minor idx + CCCI_IPC_MINOR_BASE(100) */
 	{CCCI_IPC_TX, CCCI_IPC_RX, 1, 1, 0xFF, 0xFF,
