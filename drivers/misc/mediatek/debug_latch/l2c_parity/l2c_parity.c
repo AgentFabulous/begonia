@@ -21,6 +21,7 @@
 #include <linux/of_irq.h>
 #include <linux/irqreturn.h>
 #include <linux/platform_device.h>
+#include <linux/bug.h>
 #include <mt-plat/aee.h>
 
 void __iomem *parity_debug_base;
@@ -28,20 +29,18 @@ unsigned int l2_err_status_offset;
 unsigned int l3_err_status_offset;
 
 #define PRINT_L2C_DBG \
-	"%s%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x\n \
-	%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x\n \
-	%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x\n \
-	%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x\n"
+	"%s%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x\n" \
+	"%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x\n" \
+	"%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x\n" \
+	"%s = 0x%x,%s = 0x%x,%s = 0x%x,%s = 0x%x\n"
 
 static irqreturn_t l2c_parity_interrupt(int irq, void *dev_id)
 {
-#ifndef CONFIG_MTK_ENG_BUILD
 	unsigned int l2c_reg[17];
 	int i;
-#endif
+
 	pr_debug(">>> L2 Parity Error!! <<<\n");
 
-#ifndef CONFIG_MTK_ENG_BUILD
 	if (l2_err_status_offset) {
 		for (i = 0; i < 17; i++)
 			l2c_reg[i] = readl(parity_debug_base +
@@ -77,8 +76,8 @@ static irqreturn_t l2c_parity_interrupt(int irq, void *dev_id)
 			"CPU6 info1", l2c_reg[13], "CPU6 info2", l2c_reg[14],
 			"CPU7 info1", l2c_reg[15], "CPU7 info2", l2c_reg[16]);
 	}
-#else
-	BUG();
+#ifdef CONFIG_MTK_ENG_BUILD
+	WARN_ON(1);
 #endif
 	return IRQ_NONE;
 }
@@ -87,7 +86,6 @@ static irqreturn_t l3c_parity_interrupt(int irq, void *dev_id)
 {
 	pr_debug(">>> L3 Parity Error!! <<<\n");
 
-#ifndef CONFIG_MTK_ENG_BUILD
 	if (l3_err_status_offset) {
 		pr_debug("%s%s = 0x%x,%s = 0x%x,%s = 0x%x,\n",
 			"L2C parity error.\n", "L3 parity 1",
@@ -111,8 +109,8 @@ static irqreturn_t l3c_parity_interrupt(int irq, void *dev_id)
 		writel(0x0, parity_debug_base + l3_err_status_offset + 8);
 		dsb(sy);
 	}
-#else
-	BUG();
+#ifdef CONFIG_MTK_ENG_BUILD
+	WARN_ON(1);
 #endif
 	return IRQ_NONE;
 }
