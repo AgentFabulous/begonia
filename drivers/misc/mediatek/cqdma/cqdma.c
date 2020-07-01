@@ -191,7 +191,7 @@ int mt_req_gdma(int chan)
 
 	if (clk_cqdma && !keep_clock_ao) {
 		if (clk_prepare_enable(clk_cqdma)) {
-			pr_err("enable CQDMA clk fail!\n");
+			pr_info("enable CQDMA clk fail!\n");
 			return -DMA_ERR_NO_FREE_CH;
 		}
 	}
@@ -285,7 +285,7 @@ int mt_polling_gdma(int channel, unsigned long timeout)
 
 	do {
 		if (time_after(jiffies, timeout)) {
-			pr_err("GDMA_%d polling timeout !!\n", channel);
+			pr_info("GDMA_%d polling timeout !!\n", channel);
 			mt_dump_gdma(channel);
 			return 1;
 		}
@@ -344,23 +344,23 @@ int mt_config_gdma(int channel, struct mt_gdma_conf *config, int flag)
 		return -DMA_ERR_INV_CONFIG;
 
 	if (config->sfix) {
-		pr_err("GMDA fixed address mode doesn't support\n");
+		pr_info("GMDA fixed address mode doesn't support\n");
 		return -DMA_ERR_INV_CONFIG;
 	}
 
 	if (config->dfix) {
-		pr_err("GMDA fixed address mode doesn't support\n");
+		pr_info("GMDA fixed address mode doesn't support\n");
 		return -DMA_ERR_INV_CONFIG;
 	}
 
 	if (config->count > MAX_TRANSFER_LEN1) {
-		pr_err("GDMA transfer length cannot exceeed 0x%x.\n",
+		pr_info("GDMA transfer length cannot exceeed 0x%x.\n",
 				MAX_TRANSFER_LEN1);
 		return -DMA_ERR_INV_CONFIG;
 	}
 
 	if (config->limiter > MAX_SLOW_DOWN_CNTER) {
-		pr_err("GDMA slow down counter cannot exceeed 0x%x.\n",
+		pr_info("GDMA slow down counter cannot exceeed 0x%x.\n",
 				MAX_SLOW_DOWN_CNTER);
 		return -DMA_ERR_INV_CONFIG;
 	}
@@ -690,7 +690,7 @@ static int cqdma_probe(struct platform_device *pdev)
 	of_property_read_u32(pdev->dev.of_node,
 			"nr_channel", &nr_cqdma_channel);
 	if (!nr_cqdma_channel) {
-		pr_err("[CQDMA] no channel found\n");
+		pr_info("[CQDMA] no channel found\n");
 		return -ENODEV;
 	}
 	pr_debug("[CQDMA] DMA channel = %d\n", nr_cqdma_channel);
@@ -716,7 +716,7 @@ static int cqdma_probe(struct platform_device *pdev)
 		env_info[i].irq = platform_get_irq(pdev, i);
 
 		if (IS_ERR(env_info[i].base) || (env_info[i].irq <= 0)) {
-			pr_err("unable to map CQDMA%d base reg and irq=%d!\n",
+			pr_info("unable to map CQDMA%d base reg and irq=%d!\n",
 					i, irq);
 			return -EINVAL;
 		}
@@ -730,7 +730,7 @@ static int cqdma_probe(struct platform_device *pdev)
 		ret = request_irq(env_info[i].irq, gdma1_irq_handler,
 				IRQF_TRIGGER_NONE, "CQDMA", &dma_ctrl);
 		if (ret > 0)
-			pr_err("GDMA%d IRQ LINE NOT AVAILABLE,ret 0x%x!!\n",
+			pr_info("GDMA%d IRQ LINE NOT AVAILABLE,ret 0x%x!!\n",
 					i, ret);
 
 #ifdef CONFIG_PM_WAKELOCKS
@@ -743,7 +743,7 @@ static int cqdma_probe(struct platform_device *pdev)
 
 	clk_cqdma = devm_clk_get(&pdev->dev, "cqdma");
 	if (IS_ERR(clk_cqdma)) {
-		pr_err("can not get CQDMA clock fail!\n");
+		pr_info("can not get CQDMA clock fail!\n");
 		return PTR_ERR(clk_cqdma);
 	}
 
@@ -784,7 +784,7 @@ static int __init init_cqdma(void)
 
 	ret = platform_driver_register(&mtk_cqdma_driver);
 	if (ret)
-		pr_err("CQDMA init FAIL, ret 0x%x!!!\n", ret);
+		pr_info("CQDMA init FAIL, ret 0x%x!!!\n", ret);
 
 	return ret;
 }
