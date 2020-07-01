@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,7 +35,11 @@
 #define VOW_DEVNAME                    "vow"
 #define VOW_IOC_MAGIC                  'V'
 #define VOW_PRE_LEARN_MODE             1
+#ifdef CONFIG_MTK_VOW_2E2K_SUPPORT
 #define MAX_VOW_SPEAKER_MODEL          2
+#else
+#define MAX_VOW_SPEAKER_MODEL          1
+#endif
 #define VOW_WAITCHECK_INTERVAL_MS      1
 #define MAX_VOW_INFO_LEN               6
 #define VOW_VOICE_RECORD_THRESHOLD     2560 /* 80ms */
@@ -54,6 +58,7 @@
 #define VOW_STOP_DUMP_WAIT             50
 #define FRAME_BUF_SIZE                 8192
 #define RESERVED_DATA                  4
+#define VOW_RECOVERY_WAIT              100
 
 /* length limitation sync by audio hal */
 #ifdef CONFIG_MTK_VOW_DUAL_MIC_SUPPORT
@@ -95,7 +100,7 @@
 #define VOW_BARGEIN_DUMP_SIZE    0x3C00
 #endif  /* #ifdef CONFIG_MTK_VOW_BARGE_IN_SUPPORT */
 
-#define KERNEL_VOW_DRV_VER "1.0.0"
+#define KERNEL_VOW_DRV_VER "1.0.3"
 struct dump_package_t {
 	uint32_t dump_data_type;
 	uint32_t mic_offset;
