@@ -376,7 +376,7 @@ int ccu_pop_command_from_queue(struct ccu_user_s *user, struct ccu_cmd_s **rcmd)
 int ccu_delete_user(struct ccu_user_s *user)
 {
 
-	if (!user) {
+	if (IS_ERR_OR_NULL(user)) {
 		LOG_ERR("delete empty user!\n");
 		return -1;
 	}
@@ -416,17 +416,19 @@ int ccu_set_power(struct ccu_power_s *power)
 static int ccu_open(struct inode *inode, struct file *flip)
 {
 	int ret = 0;
-
 	struct ccu_user_s *user;
 
+	LOG_INF_MUST("%s +", __func__);
+	user = NULL;
 	ccu_create_user(&user);
+	flip->private_data = user;
+
 	if (IS_ERR_OR_NULL(user)) {
 		LOG_ERR("fail to create user\n");
 		return -ENOMEM;
 	}
 
-	flip->private_data = user;
-
+	LOG_INF_MUST("%s -", __func__);
 	return ret;
 }
 
@@ -434,7 +436,6 @@ static int ccu_open(struct inode *inode, struct file *flip)
 static long ccu_compat_ioctl(struct file *flip, unsigned int cmd,
 	unsigned long arg)
 {
-	/*<<<<<<<<<< debug 32/64 compat check*/
 	struct compat_ccu_power_s __user *ptr_power32;
 	struct ccu_power_s __user *ptr_power64;
 
@@ -983,6 +984,7 @@ static int ccu_release(struct inode *inode, struct file *flip)
 
 	ccu_force_powerdown();
 
+	flip->private_data = NULL;
 	LOG_INF_MUST("%s -", __func__);
 
 	return 0;
@@ -1191,7 +1193,7 @@ static int ccu_probe(struct platform_device *pdev)
 			phy_addr = ccu_hw_base;
 			phy_size = 0x1000;
 			g_ccu_device->ccu_base =
-				(unsigned long)ioremap_wc(phy_addr, phy_size);
+				(unsigned long)ioremap(phy_addr, phy_size);
 			LOG_INF("ccu_base pa: 0x%x, size: 0x%x\n",
 				phy_addr, phy_size);
 			LOG_INF("ccu_base va: 0x%lx\n",
@@ -1201,7 +1203,7 @@ static int ccu_probe(struct platform_device *pdev)
 			phy_addr = CCU_DMEM_BASE;
 			phy_size = CCU_DMEM_SIZE;
 			g_ccu_device->dmem_base =
-				(unsigned long)ioremap_wc(phy_addr, phy_size);
+				(unsigned long)ioremap(phy_addr, phy_size);
 			LOG_INF("dmem_base pa: 0x%x, size: 0x%x\n",
 				phy_addr, phy_size);
 			LOG_INF("dmem_base va: 0x%lx\n",
@@ -1211,7 +1213,7 @@ static int ccu_probe(struct platform_device *pdev)
 			phy_addr = CCU_CAMSYS_BASE;
 			phy_size = CCU_CAMSYS_SIZE;
 			g_ccu_device->camsys_base =
-				(unsigned long)ioremap_wc(phy_addr, phy_size);
+				(unsigned long)ioremap(phy_addr, phy_size);
 			LOG_INF("camsys_base pa: 0x%x, size: 0x%x\n",
 				phy_addr, phy_size);
 			LOG_INF("camsys_base va: 0x%lx\n",
@@ -1221,7 +1223,7 @@ static int ccu_probe(struct platform_device *pdev)
 			phy_addr = CCU_N3D_A_BASE;
 			phy_size = CCU_N3D_A_SIZE;
 			g_ccu_device->n3d_a_base =
-				(unsigned long)ioremap_wc(phy_addr, phy_size);
+				(unsigned long)ioremap(phy_addr, phy_size);
 			LOG_INF("n3d_a_base pa: 0x%x, size: 0x%x\n",
 				phy_addr, phy_size);
 			LOG_INF("n3d_a_base va: 0x%lx\n",

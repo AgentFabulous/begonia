@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,6 +18,7 @@
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
 #include "ccu_drv.h"
+#include "ccu_i2c.h"
 
 #ifdef MTK_CCU_EMULATOR
 /*#define CCUI_OF_M4U_PORT M4U_PORT_CAM_IMGI*/
@@ -26,9 +26,9 @@
 /*#define CCUO_OF_M4U_PORT M4U_PORT_CAM_CCUO*/
 /*#define CCUG_OF_M4U_PORT M4U_PORT_CAM_CCUG*/
 #else
-#define CCUI_OF_M4U_PORT M4U_PORT_CCUI
-#define CCUO_OF_M4U_PORT M4U_PORT_CCUO
-#define CCUG_OF_M4U_PORT M4U_PORT_CCUG
+#define CCUI_OF_M4U_PORT M4U_PORT_CAM_CCUI
+#define CCUO_OF_M4U_PORT M4U_PORT_CAM_CCUO
+#define CCUG_OF_M4U_PORT M4U_PORT_CAM_CCUG
 #endif
 
 /* Common Structure */
@@ -48,8 +48,7 @@ struct ccu_device_s {
 	unsigned long n3d_a_base;
 	unsigned int irq_num;
 	struct mutex user_mutex;
-	struct mutex ion_client_mutex;
-	/* list of vlist_type(ccu_user_t) */
+	/* list of vlist_type(struct ccu_user_s) */
 	struct list_head user_list;
 	/* notify enque thread */
 	wait_queue_head_t cmd_wait;
@@ -64,7 +63,7 @@ struct ccu_user_s {
 
 	bool running;
 	bool flush;
-	/* list of vlist_type(ccu_cmd_st) */
+	/* list of vlist_type(struct ccu_cmd_s) */
 	struct list_head enque_ccu_cmd_list;
 	struct list_head deque_ccu_cmd_list;
 	wait_queue_head_t deque_wait;
@@ -122,11 +121,11 @@ struct ccu_cmd_s_list {
 	struct list_head link;
 };
 
-/* ========================== define in ccu_hw.c  ========================== */
+/* ======================== define in ccu_hw.c  ========================= */
 
 /**
  * ccu_init_hw - init the procedure related to hw,
- * include irq register and enque thread
+ *               include irq register and enque thread
  * @device:     the pointer of ccu_device.
  */
 int ccu_init_hw(struct ccu_device_s *device);
@@ -146,6 +145,8 @@ int ccu_mmap_hw(struct file *filp, struct vm_area_struct *vma);
  * @cmd:        the pointer to command
  */
 int ccu_send_command(struct ccu_cmd_s *pCmd);
+int ccu_kenrel_fast_cmd_enque(struct ccu_cmd_s *cmd);
+struct ccu_cmd_s *ccu_kenrel_fast_cmd_deque(void);
 
 /**
  * ccu_power - config ccu power.
@@ -176,7 +177,15 @@ int ccu_AFwaitirq(struct CCU_WAIT_IRQ_STRUCT *WaitIrq, int tg_num);
  */
 int ccu_flushLog(int argc, int *argv);
 
+/**
+ * ccu_i2c_ctrl - i2c control.
+ * @argc:          TBD.
+ * @argv:          TBD.
+ */
+int ccu_i2c_ctrl(unsigned char i2c_write_id, int transfer_len);
 
+int ccu_get_i2c_dma_buf_addr(uint32_t *mva, uint32_t *pa_h,
+	uint32_t *pa_l, uint32_t *i2c_id);
 
 int ccu_memcpy(void *dest, void *src, int length);
 
@@ -184,10 +193,16 @@ int ccu_memclr(void *dest, int length);
 
 int ccu_read_info_reg(int regNo);
 
+int32_t ccu_get_current_fps(void);
+
+void ccu_get_sensor_i2c_info(struct ccu_i2c_info *sensor_info);
+
+void ccu_get_sensor_name(char **sensor_name);
+
 int ccu_query_power_status(void);
 
 
-/* ========================== define in ccu_drv.c  ========================== */
+/* ======================== define in ccu_drv.c  ======================== */
 
 /**
  * ccu_create_user - create ccu user, and add to user list
@@ -204,10 +219,6 @@ int ccu_delete_user(struct ccu_user_s *user);
 int ccu_lock_user_mutex(void);
 
 int ccu_unlock_user_mutex(void);
-
-int ccu_lock_ion_client_mutex(void);
-
-int ccu_unlock_ion_client_mutex(void);
 
 /**
  * ccu_push_command_to_queue - add a command to user's queue
@@ -247,42 +258,48 @@ void ccu_clock_disable(void);
 
 /* LOG & AEE */
 #define CCU_TAG "[ccu]"
-/* ========================== define in ccu_drv.c  ========================== */
+
 #define LOG_DBG_MUST(format, args...) \
 	pr_debug(CCU_TAG "[%s] " format, __func__, ##args)
+
 #define LOG_INF_MUST(format, args...) \
 	pr_info(CCU_TAG "[%s] " format, __func__, ##args)
+
 #define LOG_DBG(format, args...)
 #define LOG_INF(format, args...)
+
 #define LOG_WARN(format, args...) \
 	pr##_##warn(CCU_TAG "[%s] " format, __func__, ##args)
+
 #define LOG_ERR(format, args...) \
 	pr##_##err(CCU_TAG "[%s] " format, __func__, ##args)
+
 #define LOG_DERR(device, format, args...) \
 	dev##_##err(device, CCU_TAG "[%s] " format, __func__, ##args)
 
 #define ccu_print_seq(seq_file, fmt, args...) \
-		do {\
-			if (seq_file)\
-				seq_printf(seq_file, fmt, ##args);\
-			else\
-				pr_debug(fmt, ##args);\
-		} while (0)
+	do {\
+		if (seq_file)\
+			seq_printf(seq_file, fmt, ##args);\
+		else\
+			pr_debug(fmt, ##args);\
+	} while (0)
 
 #define ccu_error(format, args...) \
-		do {\
-			LOG_ERR(CCU_TAG " error:"format, ##args); \
-			aee_kernel_exception("CCU", \
-				"[CCU] error:"format, ##args); \
-		} while (0)
+	do {\
+		LOG_ERR(CCU_TAG " error:"format, ##args); \
+		aee_kernel_exception("CCU", "[CCU] error:"format, ##args); \
+	} while (0)
 
 #define ccu_aee(format, args...) \
-		do {\
-			char ccu_name[100];\
-			snprintf(ccu_name, 100, CCU_TAG format, ##args); \
-			aee_kernel_warning_api(__FILE__, __LINE__, \
+	do {\
+		char ccu_name[100];\
+		snprintf(ccu_name, 100, CCU_TAG format, ##args); \
+		aee_kernel_warning_api(__FILE__, __LINE__, \
 			DB_OPT_MMPROFILE_BUFFER | DB_OPT_DUMP_DISPLAY, \
-			ccu_name, CCU_TAG "error" format, ##args); \
-			LOG_ERR(CCU_TAG " error:" format, ##args); \
-		} while (0)
+		ccu_name, CCU_TAG "error" format, ##args); \
+		LOG_ERR(CCU_TAG " error:" format, ##args);  \
+	} while (0)
+
+#define IS_KERNEL_32 ((sizeof(uint32_t *) == 4))
 #endif

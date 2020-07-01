@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
- * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,6 +17,7 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 #include "ccu_mailbox_extif.h"
+#include "kd_camera_feature.h"/*for sensoridx enum*/
 
 #ifdef CONFIG_COMPAT
 /*64 bit*/
@@ -56,9 +56,9 @@ struct CCU_IRQ_TIME_STRUCT {
 	unsigned int tLastSig_usec;
 /* time stamp of the latest occurring signal */
 	unsigned int tMark2WaitSig_sec;
-/* time period from marking a signal to user to wait and get the signal */
+/* time period from marking a signal to user try to wait and get the signal */
 	unsigned int tMark2WaitSig_usec;
-/* time period from marking a signal to user to wait and get the signal */
+/* time period from marking a signal to user try to wait and get the signal */
 	unsigned int tLastSig2GetSig_sec;
 /* time period from latest signal to user try to wait and get the signal */
 	unsigned int tLastSig2GetSig_usec;
@@ -109,14 +109,15 @@ struct CCU_REG_IO_STRUCT {
 };
 
 struct CCU_IRQ_INFO_STRUCT {
+	/* Add an extra index for status type in Ever -> signal or dma */
 	unsigned int Status[CCU_IRQ_TYPE_AMOUNT][CCU_IRQ_ST_AMOUNT]
-			[IRQ_USER_NUM_MAX];
+					[IRQ_USER_NUM_MAX];
 	unsigned int Mask[CCU_IRQ_TYPE_AMOUNT][CCU_IRQ_ST_AMOUNT];
 	unsigned int ErrMask[CCU_IRQ_TYPE_AMOUNT][CCU_IRQ_ST_AMOUNT];
 	signed int WarnMask[CCU_IRQ_TYPE_AMOUNT][CCU_IRQ_ST_AMOUNT];
 	/* flag for indicating that user do mark for a interrupt or not */
 	unsigned int MarkedFlag[CCU_IRQ_TYPE_AMOUNT][CCU_IRQ_ST_AMOUNT]
-			[IRQ_USER_NUM_MAX];
+					[IRQ_USER_NUM_MAX];
 	/* time for marking a specific interrupt */
 	unsigned int MarkedTime_sec[CCU_IRQ_TYPE_AMOUNT][32][IRQ_USER_NUM_MAX];
 	/* time for marking a specific interrupt */
@@ -134,14 +135,14 @@ struct CCU_IRQ_INFO_STRUCT {
 #define INT_ERR_WARN_TIMER_THREAS 1000
 #define INT_ERR_WARN_MAX_TIME 3
 struct CCU_IRQ_ERR_WAN_CNT_STRUCT {
-	/* cnt for each err int # */
 	unsigned int m_err_int_cnt[CCU_IRQ_TYPE_AMOUNT][CCU_ISR_MAX_NUM];
-	/* cnt for each warning int # */
+	/* cnt for each err int # */
 	unsigned int m_warn_int_cnt[CCU_IRQ_TYPE_AMOUNT][CCU_ISR_MAX_NUM];
-	/* mark for err int, where its cnt > threshold */
+	/* cnt for each warning int # */
 	unsigned int m_err_int_mark[CCU_IRQ_TYPE_AMOUNT];
-	/* mark for warn int, where its cnt > threshold */
+	/* mark for err int, where its cnt > threshold */
 	unsigned int m_warn_int_mark[CCU_IRQ_TYPE_AMOUNT];
+	/* mark for warn int, where its cnt > threshold */
 	unsigned long m_int_usec[CCU_IRQ_TYPE_AMOUNT];
 };
 
@@ -183,12 +184,10 @@ struct CCU_INFO_STRUCT {
 	spinlock_t SpinLockRTBC;
 	spinlock_t SpinLockClock;
 	spinlock_t SpinLockI2cPower;
-	unsigned int IsI2cPowerDisabling;
-	unsigned int IsI2cPoweredOn;
 	unsigned int IsCcuPoweredOn;
 
 	wait_queue_head_t WaitQueueHead;
-	wait_queue_head_t AFWaitQueueHead[2];
+	wait_queue_head_t AFWaitQueueHead[IMGSENSOR_SENSOR_IDX_MAX_NUM];
 	wait_queue_head_t WaitQHeadList[SUPPORT_MAX_IRQ];
 
 	unsigned int UserCount;
@@ -298,6 +297,14 @@ struct ccu_cmd_s {
 struct import_mem_s {
 	uint32_t memID[CCU_IMPORT_BUF_NUM];
 };
+
+/*---------------------------------------------------------------------------*/
+/*  CAM FREQ                                                                 */
+/*---------------------------------------------------------------------------*/
+#define CCU_REQ_CAM_FREQ_HIGH 2
+#define CCU_REQ_CAM_FREQ_MID  1
+#define CCU_REQ_CAM_FREQ_NONE 0
+
 /*---------------------------------------------------------------------------*/
 /*  IOCTL Command                                                            */
 /*---------------------------------------------------------------------------*/
@@ -327,5 +334,7 @@ struct import_mem_s {
 #define CCU_IOCTL_GET_SENSOR_NAME           _IOR(CCU_MAGICNO,  25, int)
 #define CCU_IOCTL_GET_PLATFORM_INFO         _IOR(CCU_MAGICNO,  26, int)
 #define CCU_IOCTL_IMPORT_MEM		        _IOW(CCU_MAGICNO,  27, int)
+#define CCU_IOCTL_UPDATE_QOS_REQUEST        _IOW(CCU_MAGICNO,  28, int)
+#define CCU_IOCTL_UPDATE_CAM_FREQ_REQUEST	_IOW(CCU_MAGICNO,  29, int)
 
 #endif
