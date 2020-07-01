@@ -204,6 +204,10 @@
 #define MTK_APU_VCORE_CG_CTL \
 	(0x820003E9 | MTK_SIP_SMC_AARCH_BIT)
 
+/* TEEs related SMC call */
+#define MTK_SIP_KERNEL_TEE_CONTROL \
+        (0x82000516 | MTK_SIP_SMC_AARCH_BIT)
+
 /* cmdq related SMC call */
 #define MTK_SIP_CMDQ_CONTROL \
         (0x82000518 | MTK_SIP_SMC_AARCH_BIT)
