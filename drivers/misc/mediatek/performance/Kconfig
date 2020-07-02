@@ -37,6 +37,15 @@ config MTK_PERF_OBSERVER
 	  via notifier. If you are not sure about whether to enable it or not,
 	  please set n.
 
+config MTK_RESYM
+	bool "MTK resource symphony support"
+	default n
+	help
+	  MTK_RESYM define if resource symphony should
+	  be built-in or not. It supports system related usages.
+	  If you are not sure about whether to enable it or not,
+	  please set n.
+
 config MTK_FPSGO_V3
 	bool "Support FPSGO_V3 framework"
 	default n
@@ -48,3 +57,12 @@ config MTK_FPSGO_V3
 	  FPSGO_V3 include AI performance and low power.
 	  If you are not sure about this, set n.
 
+config MTK_EARA_THERMAL
+	bool "MTK eara_thermal support"
+	depends on MTK_FPSGO_V3
+	default n
+	help
+	  MTK_EARA_THERMAL is the kernel config of EARA_THERMAL mechanism.
+	  EARA_THERMAL persuades FPS performance when thermal throttling.
+	  This function depends on MTK_FPSGO_V3.
+	  If you are not sure about this, please set n.

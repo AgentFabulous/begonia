@@ -42,8 +42,6 @@ static int QUANTILE = 50;
 static long long FRAME_TIME_WINDOW_SIZE_US = 1000000;
 static long long ADJUST_INTERVAL_US = 1000000;
 static int margin_mode;
-static int margin_mode_dbnc_a = 9;
-static int margin_mode_dbnc_b = 1;
 
 extern int (*fbt_notifier_cpu_frame_time_fps_stabilizer)(
 	int pid,
@@ -63,12 +61,11 @@ struct FSTB_FRAME_INFO {
 	int pid;
 	int target_fps;
 	int target_fps_margin;
-	int target_fps_margin2;
-	int target_fps_margin_dbnc_a;
-	int target_fps_margin_dbnc_b;
 	int queue_fps;
 	unsigned long long bufid;
+	int asfc_flag;
 	int in_list;
+	int check_asfc;
 	int new_info;
 
 	long long m_c_time;

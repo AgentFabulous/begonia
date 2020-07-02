@@ -24,6 +24,7 @@
 #include <linux/trace_events.h>
 #include <linux/module.h>
 #include <linux/sched/clock.h>
+#include <linux/cpumask.h>
 
 #include <mt-plat/fpsgo_common.h>
 
@@ -36,8 +37,8 @@
 #include "xgf.h"
 #include "fpsgo_base.h"
 
-FPSFO_DECLARE_SYSTRACE(x, irq_entry)
-FPSFO_DECLARE_SYSTRACE(x, irq_exit)
+FPSFO_DECLARE_SYSTRACE(x, irq_handler_entry)
+FPSFO_DECLARE_SYSTRACE(x, irq_handler_exit)
 FPSFO_DECLARE_SYSTRACE(x, softirq_entry)
 FPSFO_DECLARE_SYSTRACE(x, softirq_exit)
 FPSFO_DECLARE_SYSTRACE(x, ipi_raise)
@@ -150,6 +151,18 @@ void xgf_atomic_set(atomic_t *val, int i)
 	atomic_set(val, i);
 }
 EXPORT_SYMBOL(xgf_atomic_set);
+
+unsigned int xgf_cpumask_next(int cpu,  const struct cpumask *srcp)
+{
+	return cpumask_next(cpu, srcp);
+}
+EXPORT_SYMBOL(xgf_cpumask_next);
+
+int xgf_num_possible_cpus(void)
+{
+	return num_possible_cpus();
+}
+EXPORT_SYMBOL(xgf_num_possible_cpus);
 
 int xgf_get_task_wake_cpu(struct task_struct *t)
 {

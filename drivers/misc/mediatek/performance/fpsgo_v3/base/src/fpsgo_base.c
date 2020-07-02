@@ -273,6 +273,9 @@ void fpsgo_delete_render_info(int pid)
 	list_del(&(data->bufferid_list));
 	fpsgo_base2fbt_item_del(data->pLoading, data->p_blc,
 		data->dep_arr, data);
+	data->pLoading = NULL;
+	data->p_blc = NULL;
+	data->dep_arr = NULL;
 
 	if (data->boost_info.proc.jerks[0].jerking == 0
 		&& data->boost_info.proc.jerks[1].jerking == 0)
@@ -394,6 +397,9 @@ void fpsgo_check_thread_status(void)
 			list_del(&(iter->bufferid_list));
 			fpsgo_base2fbt_item_del(iter->pLoading, iter->p_blc,
 				iter->dep_arr, iter);
+			iter->pLoading = NULL;
+			iter->p_blc = NULL;
+			iter->dep_arr = NULL;
 			n = rb_first(&render_pid_tree);
 
 			if (iter->boost_info.proc.jerks[0].jerking == 0
@@ -456,6 +462,9 @@ void fpsgo_clear(void)
 		list_del(&(iter->bufferid_list));
 		fpsgo_base2fbt_item_del(iter->pLoading, iter->p_blc,
 			iter->dep_arr, iter);
+		iter->pLoading = NULL;
+		iter->p_blc = NULL;
+		iter->dep_arr = NULL;
 		n = rb_first(&render_pid_tree);
 
 		if (iter->boost_info.proc.jerks[0].jerking == 0
@@ -535,7 +544,7 @@ static unsigned long long fpsgo_gen_unique_key(int pid,
 }
 
 struct BQ_id *fpsgo_find_BQ_id(int pid, int tgid,
-		long long identifier, int action, unsigned long long buffer_id)
+		long long identifier, int action)
 {
 	struct rb_node *n;
 	struct rb_node *next;
@@ -575,19 +584,10 @@ struct BQ_id *fpsgo_find_BQ_id(int pid, int tgid,
 				kfree(pos);
 				done = 1;
 				break;
-			} else if (pos->buffer_id == buffer_id &&
-					pos->identifier == identifier) {
-				FPSGO_LOGI(
-					"find del pid %d, id %llu, BQ %llu\n",
-					pid, identifier, buffer_id);
-				rb_erase(n, &BQ_id_list);
-				kfree(pos);
-				done = 1;
-				break;
 			}
 		}
 		if (!done)
-			FPSGO_LOGI("del fail key %llu\n", key);
+			FPSGO_LOGE("del fail key %llu\n", key);
 		return NULL;
 	case ACTION_DEL_PID:
 		FPSGO_LOGI("del BQid pid %d\n", pid);
@@ -606,7 +606,7 @@ int fpsgo_get_BQid_pair(int pid, int tgid, long long identifier,
 
 	fpsgo_lockprove(__func__);
 
-	pair = fpsgo_find_BQ_id(pid, tgid, identifier, ACTION_FIND, 0LL);
+	pair = fpsgo_find_BQ_id(pid, tgid, identifier, ACTION_FIND);
 
 	if (pair) {
 		*buffer_id = pair->buffer_id;

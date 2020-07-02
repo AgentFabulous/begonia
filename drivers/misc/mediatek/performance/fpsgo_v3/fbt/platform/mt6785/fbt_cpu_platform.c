@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -101,3 +100,12 @@ int fbt_get_L_cluster_num(void)
 	return 0;
 }
 
+int fbt_get_L_min_ceiling(void)
+{
+	return 0;
+}
+
+int fbt_get_default_boost_ta(void)
+{
+	return 0;
+}
