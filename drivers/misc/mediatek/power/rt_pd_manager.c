@@ -149,6 +149,11 @@ enum {
 	SINK_TYPE_REQUEST,
 };
 
+void __attribute__((weak)) usb_dpdm_pulldown(bool enable)
+{
+	pr_notice("%s is not defined\n", __func__);
+}
+
 bool mtk_is_pep30_en_unlock(void)
 {
 	return false;
@@ -290,9 +295,6 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 	case TCP_NOTIFY_CABLE_TYPE:
 		pr_info("%s cable type = %d\n", __func__,
 			noti->cable_type.type);
-		break;
-	case TCP_NOTIFY_TYPEC_OTP:
-		pr_notice("%s typec otp = %d\n", __func__, noti->typec_otp.otp);
 		break;
 	case TCP_NOTIFY_PLUG_OUT:
 		pr_info("%s typec plug out\n", __func__);
