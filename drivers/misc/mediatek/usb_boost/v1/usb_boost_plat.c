@@ -17,11 +17,13 @@
 #include "mtk_ppm_api.h"
 #include "cpu_ctrl.h"
 #include "usb_boost.h"
-#include <mtk_vcorefs_manager.h>
+//#include <mtk_vcorefs_manager.h>
 #include <helio-dvfsrc-opp.h>
 
 /* platform specific parameter here */
-#if defined(CONFIG_MACH_MT6785)
+#if defined(CONFIG_MACH_MT6771) || defined(CONFIG_MACH_MT6768) \
+				|| defined(CONFIG_MACH_MT6785)
+
 static int cpu_freq_test_para[] = {1, 5, 500, 0};
 static int cpu_core_test_para[] = {1, 5, 500, 0};
 static int dram_vcore_test_para[] = {1, 5, 500, 0};
@@ -30,7 +32,25 @@ static int dram_vcore_test_para[] = {1, 5, 500, 0};
 struct act_arg_obj cpu_freq_test_arg = {2500000, -1, -1};
 struct act_arg_obj cpu_core_test_arg = {4, -1, -1};
 struct act_arg_obj dram_vcore_test_arg = {DDR_OPP_0, -1, -1};
-#elif defined(CONFIG_MACH_MT6XXX)
+#elif defined(CONFIG_MACH_MT6739)
+static int cpu_freq_test_para[] = {1, 5, 500, 0};
+static int cpu_core_test_para[] = {1, 5, 500, 0};
+static int dram_vcore_test_para[] = {1, 5, 500, 0};
+
+/* -1 denote not used*/
+struct act_arg_obj cpu_freq_test_arg = {1500000, -1, -1};
+struct act_arg_obj cpu_core_test_arg = {4, -1, -1};
+struct act_arg_obj dram_vcore_test_arg = {DDR_OPP_0, -1, -1};
+#elif defined(CONFIG_MACH_MT6765)
+static int cpu_freq_test_para[] = {1, 5, 500, 0};
+static int cpu_core_test_para[] = {1, 5, 500, 0};
+static int dram_vcore_test_para[] = {1, 5, 500, 0};
+
+/* -1 denote not used*/
+struct act_arg_obj cpu_freq_test_arg = {2500000, -1, -1};
+struct act_arg_obj cpu_core_test_arg = {4, -1, -1};
+struct act_arg_obj dram_vcore_test_arg = {DDR_OPP_0, -1, -1};
+#elif defined(CONFIG_ARCH_MT6XXX)
 /* add new here */
 #endif
 
@@ -38,6 +58,7 @@ static struct pm_qos_request pm_qos_req;
 static struct pm_qos_request pm_qos_ddr_req;
 static struct ppm_limit_data *freq_to_set;
 static int cluster_num;
+
 
 static int freq_hold(struct act_arg_obj *arg)
 {
@@ -128,6 +149,7 @@ static int __init usbboost(void)
 
 	pm_qos_add_request(&pm_qos_ddr_req, PM_QOS_DDR_OPP,
 		PM_QOS_DDR_OPP_DEFAULT_VALUE);
+
 
 	/* init freq ppm data */
 	cluster_num = arch_get_nr_clusters();
