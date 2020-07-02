@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
@@ -95,12 +96,16 @@ static unsigned int amms_force_timeout;
 static unsigned int amms_alloc_count;
 static unsigned int amms_dealloc_count;
 static unsigned int amms_irq_count;
+#ifdef CONFIG_MTK_CPU_FREQ
 static unsigned int amms_pos_stress_operation;
+#endif
 
 //static int amms_bind_cpu = -1;
 static struct device *amms_dev;
 static int amms_irq_num;
+#ifdef CONFIG_MTK_CPU_FREQ
 static struct timer_list amms_pos_stress_timer;
+#endif
 
 static struct cma *ccci_share_cma;
 int ccci_share_cma_init;
@@ -325,7 +330,7 @@ module_param(amms_irq_count, uint, 0644);
 void amms_pos_stress_timer_call_back(unsigned long data)
 {
 	pr_info("%s:%d\n", __func__, __LINE__);
-	/*mt_secure_call(MTK_SIP_KERNEL_AMMS_POS_STRESS_TOUCH, 0, 0, 0, 0);*/
+	mt_secure_call(MTK_SIP_KERNEL_AMMS_POS_STRESS_TOUCH, 0, 0, 0, 0);
 	if (mod_timer(&amms_pos_stress_timer,
 		jiffies + msecs_to_jiffies(1000*60)))
 		pr_info("%s:Error\n", __func__);
@@ -718,7 +723,7 @@ static int __init amms_probe(struct platform_device *pdev)
 
 	if (request_irq(amms_irq_num, (irq_handler_t)amms_irq_handler,
 		IRQF_TRIGGER_NONE, "amms_irq", NULL) != 0) {
-		pr_crit("Fail to request amms_irq interrupt!\n");
+		pr_info("Fail to request amms_irq interrupt!\n");
 		return -EBUSY;
 	}
 
@@ -817,4 +822,4 @@ module_init(amms_sysfs_init);
 #endif
 
 MODULE_DESCRIPTION("MEDIATEK Module AMMS Driver");
-MODULE_AUTHOR("<johnson.lin@mediatek.com>");
+MODULE_AUTHOR("<Johnson.Lin@mediatek.com>");
