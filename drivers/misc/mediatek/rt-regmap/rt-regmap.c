@@ -1,6 +1,5 @@
 /*
  *  Copyright (C) 2017 MediaTek Inc.
- *  Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -374,6 +373,11 @@ static int rt_cache_block_write(struct rt_regmap_device *rd, u32 reg,
 					rm->addr+rio.offset,
 					size,
 					&wdata[count]);
+			if (ret < 0) {
+				dev_notice(&rd->dev,
+					   "rd->rt_block_write fail\n");
+				goto ERR;
+			}
 			count += size;
 		} else {
 			blk_index = (rd->props.rt_regmap_mode &
@@ -788,7 +792,7 @@ static int _rt_asyn_regmap_reg_write(struct rt_regmap_device *rd,
 {
 	const rt_register_map_t *rm = rd->props.rm;
 	struct reg_index_offset rio;
-	int ret, tmp_data;
+	int ret, tmp_data = 0;
 
 	rio = find_register_index(rd, rrd->reg);
 	if (rio.index < 0 || rio.offset != 0) {
@@ -1488,7 +1492,7 @@ static ssize_t general_write(struct file *file, const char __user *ubuf,
 	struct rt_debug_st *st = file->private_data;
 	struct rt_regmap_device *rd = st->info;
 	struct reg_index_offset rio;
-	long int param[5];
+	long int param[5] = {0};
 	unsigned char *reg_data;
 	int rc, size = 0;
 	char lbuf[128];
