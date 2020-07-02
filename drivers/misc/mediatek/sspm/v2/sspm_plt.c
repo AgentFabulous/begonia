@@ -40,15 +40,11 @@
 #include <mt-plat/sync_write.h>
 #include "sspm_define.h"
 #include "sspm_helper.h"
-#include "sspm_ipi.h"
-#include "sspm_excep.h"
+#include "sspm_ipi_id.h"
 #include "sspm_reservedmem.h"
 #include "sspm_reservedmem_define.h"
 #if SSPM_LOGGER_SUPPORT
 #include "sspm_logger.h"
-#endif
-#if SSPM_TIMESYNC_SUPPORT
-#include "sspm_timesync.h"
 #endif
 #include "sspm_sysfs.h"
 
@@ -61,63 +57,23 @@ struct plt_ctrl_s {
 #if SSPM_LOGGER_SUPPORT
 	unsigned int logger_ofs;
 #endif
-#if SSPM_COREDUMP_SUPPORT
-	unsigned int coredump_ofs;
-#endif
-#if SSPM_TIMESYNC_SUPPORT
-	unsigned int ts_ofs;
-#endif
-
 };
-
-#if (SSPM_COREDUMP_SUPPORT || SSPM_LASTK_SUPPORT)
-/* dont send any IPI from this thread, use workqueue instead */
-static int sspm_recv_thread(void *userdata)
-{
-	struct plt_ipi_data_s data;
-	struct ipi_action dev;
-	unsigned int rdata, ret;
-
-	dev.data = &data;
-
-	ret = sspm_ipi_recv_registration(IPI_ID_PLATFORM, &dev);
-
-	do {
-		rdata = 0;
-		sspm_ipi_recv_wait(IPI_ID_PLATFORM);
-
-		switch (data.cmd) {
-#if SSPM_LASTK_SUPPORT
-		case PLT_LASTK_READY:
-			sspm_log_lastk_recv(data.u.logger.enable);
-			break;
-#endif
-#if SSPM_COREDUMP_SUPPORT
-		case PLT_COREDUMP_READY:
-			sspm_log_coredump_recv(data.u.coredump.exists);
-			break;
-#endif
-		}
-		sspm_ipi_send_ack(IPI_ID_PLATFORM, &rdata);
-	} while (!kthread_should_stop());
-
-	return 0;
-}
-#endif
 
 static ssize_t sspm_alive_show(struct device *kobj,
 	struct device_attribute *attr, char *buf)
 {
 
 	struct plt_ipi_data_s ipi_data;
-	int ackdata = 0;
+	int ret;
 
 	ipi_data.cmd = 0xDEAD;
+	sspm_plt_ackdata = 0;
 
-	sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_WAIT,
-		&ipi_data, sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata, 1);
+	ret = mtk_ipi_send_compl(&sspm_ipidev, IPIS_C_PLATFORM, IPI_SEND_WAIT,
+		&ipi_data, sizeof(ipi_data) / SSPM_MBOX_SLOT_SIZE, 10);
 
-	return snprintf(buf, PAGE_SIZE, "%s\n", ackdata ? "Alive" : "Dead");
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+		sspm_plt_ackdata ? "Alive" : "Dead");
 }
 DEVICE_ATTR(sspm_alive, 0444, sspm_alive_show, NULL);
 
@@ -127,12 +83,9 @@ int __init sspm_plt_init(void)
 	phys_addr_t phys_addr, virt_addr, mem_sz;
 	struct plt_ipi_data_s ipi_data;
 	struct plt_ctrl_s *plt_ctl;
-#if (SSPM_COREDUMP_SUPPORT || SSPM_LASTK_SUPPORT)
-	struct task_struct *sspm_task;
-#endif
-	int ret, ackdata;
+	int ret;
 	unsigned int last_ofs;
-#if (SSPM_COREDUMP_SUPPORT || SSPM_LOGGER_SUPPORT || SSPM_TIMESYNC_SUPPORT)
+#if SSPM_LOGGER_SUPPORT
 	unsigned int last_sz;
 #endif
 	unsigned int *mark;
@@ -162,9 +115,6 @@ int __init sspm_plt_init(void)
 		goto error;
 	}
 
-#if (SSPM_COREDUMP_SUPPORT || SSPM_LASTK_SUPPORT)
-	sspm_task = kthread_run(sspm_recv_thread, NULL, "sspm_recv");
-#endif
 	b = (unsigned char *) (uintptr_t)virt_addr;
 	for (last_ofs = 0; last_ofs < sizeof(*plt_ctl); last_ofs++)
 		b[last_ofs] = 0x0;
@@ -198,54 +148,25 @@ int __init sspm_plt_init(void)
 	pr_debug("SSPM: %s(): after logger, ofs=%u\n", __func__, last_ofs);
 #endif
 
-#if SSPM_COREDUMP_SUPPORT
-	plt_ctl->coredump_ofs = last_ofs;
-	last_sz = sspm_coredump_init(virt_addr + last_ofs, mem_sz - last_ofs);
-
-	if (last_sz == 0) {
-		pr_err("SSPM: sspm_coredump_init return fail\n");
-		goto error;
-	}
-
-	last_ofs += last_sz;
-	pr_debug("SSPM: %s(): after coredump, ofs=%u\n", __func__, last_ofs);
-#endif
-
-#if SSPM_TIMESYNC_SUPPORT
-	plt_ctl->ts_ofs = last_ofs;
-	last_sz = sspm_timesync_init(virt_addr + last_ofs, mem_sz - last_ofs);
-
-	if (last_sz == 0) {
-		pr_err("SSPM: sspm_timesync_init return fail\n");
-		goto error;
-	}
-
-	last_ofs += last_sz;
-	pr_debug("SSPM: %s(): after timesync, ofs=%u\n", __func__, last_ofs);
-#endif
-
 	ipi_data.cmd = PLT_INIT;
 	ipi_data.u.ctrl.phys = phys_addr;
 	ipi_data.u.ctrl.size = mem_sz;
+	sspm_plt_ackdata = 0;
 
-	ret = sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_POLLING, &ipi_data,
-			sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata, 1);
-	if (ret != 0) {
-		pr_err("SSPM: logger IPI fail ret=%d\n", ret);
+	ret = mtk_ipi_send_compl(&sspm_ipidev, IPIS_C_PLATFORM,
+		IPI_SEND_POLLING, &ipi_data,
+		sizeof(ipi_data) / SSPM_MBOX_SLOT_SIZE, 10);
+	if (ret) {
+		pr_err("SSPM: plt IPI fail ret=%d\n", ret);
 		goto error;
 	}
 
-	if (!ackdata) {
-		pr_err("SSPM: logger IPI init fail, ret=%d\n", ackdata);
+	if (!sspm_plt_ackdata) {
+		pr_err("SSPM: plt IPI init fail, ackdata=%d\n",
+		sspm_plt_ackdata);
 		goto error;
 	}
 
-#if SSPM_TIMESYNC_SUPPORT
-	sspm_timesync_init_done();
-#endif
-#if SSPM_COREDUMP_SUPPORT
-	sspm_coredump_init_done();
-#endif
 #if SSPM_LOGGER_SUPPORT
 	sspm_logger_init_done();
 #endif

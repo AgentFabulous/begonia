@@ -37,8 +37,8 @@
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
 #include <mtk_sys_timer_mbox.h>
 #include <sspm_define.h>
-#include <sspm_ipi.h>
-#include <sspm_mbox.h>
+#include <v1/sspm_ipi.h>
+#include <v1/sspm_mbox.h>
 #endif
 
 #ifdef CONFIG_MTK_AUDIODSP_SUPPORT
