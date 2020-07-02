@@ -44,6 +44,8 @@
 #include <linux/pm_wakeup.h>
 #include <linux/version.h>
 #include <linux/clk.h>
+#include <mt-plat/charger_type.h>
+
 #if defined(CONFIG_MTK_CHARGER)
 extern enum charger_type mt_get_charger_type(void);
 #endif
@@ -73,6 +75,8 @@ extern bool musb_host_db_workaround1;
 extern bool musb_host_db_workaround2;
 extern long musb_host_db_delay_ns;
 extern long musb_host_db_workaround_cnt;
+extern int mtk_host_audio_free_ep_udelay;
+
 extern struct musb *mtk_musb;
 extern bool mtk_usb_power;
 extern ktime_t ktime_ready;
@@ -133,6 +137,10 @@ extern void musb_bug(void);
 #ifdef CONFIG_PROC_FS
 #include <linux/fs.h>
 #define MUSB_CONFIG_PROC_FS
+#endif
+
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+extern bool musb_shutted;
 #endif
 
 /****************************** PERIPHERAL ROLE *****************************/
@@ -356,6 +364,7 @@ struct musb {
 	struct work_struct otg_notifier_work;
 	u16 hwvers;
 	struct delayed_work id_pin_work;
+	struct delayed_work host_work;
 #ifdef CONFIG_MTK_MUSB_CARPLAY_SUPPORT
 	struct delayed_work carplay_work;
 #endif

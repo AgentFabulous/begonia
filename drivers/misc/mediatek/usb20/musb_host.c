@@ -318,6 +318,9 @@ void musb_host_free_ep_fifo(struct musb *musb, struct musb_qh *qh, u8 is_in)
 	for (i = 0; i < fifo_unit_nr; i++)
 		musb_host_dynamic_fifo_usage_msk &= ~(1 << (idx_start + i));
 
+	if (mtk_host_audio_free_ep_udelay && qh->type == USB_ENDPOINT_XFER_ISOC)
+		udelay(mtk_host_audio_free_ep_udelay);
+
 	if (is_in) {
 		musb_write_rxfifosz(mbase, 0);
 		musb_write_rxfifoadd(mbase, 0);
@@ -3131,10 +3134,12 @@ static int musb_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 				is_in ? "in" : "out",
 				qh);
 
-	snprintf(info + pos, 256, ",rdy<%d>,prev<%d>,cur<%d>",
+	if (pos < 256) {
+		snprintf(info + pos, 256 - pos, ",rdy<%d>,prev<%d>,cur<%d>",
 				qh->is_ready,
 				urb->urb_list.prev != &qh->hep->urb_list,
 				musb_ep_get_qh(qh->hw_ep, is_in) == qh);
+	}
 
 	if (strstr(current->comm, "usb_call"))
 		DBG_LIMIT(5, "%s", info);
