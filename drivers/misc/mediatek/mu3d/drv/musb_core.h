@@ -57,10 +57,6 @@ enum charger_type {
 	WIRELESS_CHARGER,
 };
 #else
-/*#include <mt-plat/battery_common.h>*/
-#if (CONFIG_MTK_GAUGE_VERSION != 30)
-#include <mt-plat/charging.h>
-#endif
 #if (CONFIG_MTK_GAUGE_VERSION == 30)
 #include <mt-plat/charger_type.h>
 #endif
@@ -76,7 +72,7 @@ extern int fake_CDP;
 extern unsigned int musb_speed;
 
 extern struct musb *_mu3d_musb;
-#if defined(CONFIG_MTK_SMART_BATTERY) && !defined(FOR_BRING_UP)
+#if defined(CONFIG_MTK_CHARGER) && !defined(FOR_BRING_UP)
 extern void BATTERY_SetUSBState(int usb_state_value);
 extern enum charger_type mt_get_charger_type(void);
 #endif

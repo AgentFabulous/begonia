@@ -66,8 +66,7 @@ struct timespec connect_timestamp = { 0, 0 };
 
 void set_connect_timestamp(void)
 {
-	/* k414 FIXME */
-	//connect_timestamp = CURRENT_TIME;
+	connect_timestamp = current_kernel_time();
 	pr_debug("set timestamp = %llu\n", timespec_to_ns(&connect_timestamp));
 }
 
@@ -292,8 +291,8 @@ void mt_usb_reconnect(void)
 #endif
 
 /* to avoid build error due to PMIC module not ready */
-#ifndef CONFIG_MTK_SMART_BATTERY
-/* #define BYPASS_PMIC_LINKAGE */
+#ifndef CONFIG_MTK_CHARGER
+#define BYPASS_PMIC_LINKAGE
 #endif
 
 static enum charger_type mu3d_hal_get_charger_type(void)
@@ -453,7 +452,7 @@ static bool __usb_cable_connected(int ops)
 
 		if (chg_type == STANDARD_HOST || chg_type == CHARGING_HOST)
 			connected = true;
-#if 0
+
 		/* connected according to CONNECTION_OPS */
 		if (ops != CONNECTION_OPS_CHECK)
 			connected = CONNECTION_OPS_CONN ? true : false;
@@ -464,7 +463,6 @@ static bool __usb_cable_connected(int ops)
 				__func__, vbus_exist, chg_type, ops);
 		if (!vbus_exist)
 			connected = false;
-#endif
 	}
 
 	/* CMODE CHECK */
@@ -494,7 +492,7 @@ void musb_sync_with_bat(struct musb *musb, int usb_state)
 	os_printk(K_DEBUG, "musb_sync_with_bat\n");
 
 #ifndef CONFIG_FPGA_EARLY_PORTING
-#if defined(CONFIG_MTK_SMART_BATTERY)
+#if defined(CONFIG_MTK_CHARGER)
 	BATTERY_SetUSBState(usb_state);
 	wake_up_bat();
 #endif
