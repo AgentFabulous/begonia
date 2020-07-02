@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -145,8 +144,8 @@ static int min_chunk_size_check(enum TRUSTED_MEM_TYPE mem_type, u32 *size,
 		pr_debug("change size from 0x%x to 0x%x\n", *size, adjust_size);
 		*size = adjust_size;
 	} else if (*size < cfg->minimal_chunk_size) {
-		pr_err("wrong minimal dev size: 0x%x, expected sz:0x%x\n", *size,
-		       cfg->minimal_chunk_size);
+		pr_err("wrong minimal dev size: 0x%x, expected sz:0x%x\n",
+		       *size, cfg->minimal_chunk_size);
 		return TMEM_INVALID_DEVICE_MIN_CHUNK_SIZE;
 	}
 
@@ -226,9 +225,11 @@ parameter_checks_with_alignment_adjust(enum TRUSTED_MEM_TYPE mem_type,
 	return TMEM_OK;
 }
 
-int tmem_core_alloc_chunk(enum TRUSTED_MEM_TYPE mem_type, u32 alignment,
-			  u32 size, u32 *refcount, u32 *sec_handle, u8 *owner,
-			  u32 id, u32 clean)
+static int tmem_core_alloc_chunk_internal(enum TRUSTED_MEM_TYPE mem_type,
+					  u32 alignment, u32 size,
+					  u32 *refcount, u32 *sec_handle,
+					  u8 *owner, u32 id, u32 clean,
+					  bool do_alignment_check)
 {
 	int ret = TMEM_OK;
 	struct trusted_mem_device *mem_device =
@@ -249,11 +250,13 @@ int tmem_core_alloc_chunk(enum TRUSTED_MEM_TYPE mem_type, u32 alignment,
 	pr_debug("[%d] alloc sz req is %d (0x%x), align 0x%x, clean: %d\n",
 		 mem_type, size, size, alignment, clean);
 
-	mem_cfg = &mem_device->configs;
-	ret = parameter_checks_with_alignment_adjust(mem_type, &alignment,
-						     &size, mem_cfg);
-	if (unlikely(ret))
-		return ret;
+	if (likely(do_alignment_check)) {
+		mem_cfg = &mem_device->configs;
+		ret = parameter_checks_with_alignment_adjust(
+			mem_type, &alignment, &size, mem_cfg);
+		if (unlikely(ret))
+			return ret;
+	}
 
 	ret = regmgr_online(mem_device->reg_mgr, mem_device->mem_type);
 	if (unlikely(ret))
@@ -273,6 +276,24 @@ int tmem_core_alloc_chunk(enum TRUSTED_MEM_TYPE mem_type, u32 alignment,
 	pr_debug("[%d] allocated handle is 0x%x\n", mem_type, *sec_handle);
 	regmgr_region_ref_inc(mem_device->reg_mgr, mem_device->mem_type);
 	return TMEM_OK;
+}
+
+int tmem_core_alloc_chunk(enum TRUSTED_MEM_TYPE mem_type, u32 alignment,
+			  u32 size, u32 *refcount, u32 *sec_handle, u8 *owner,
+			  u32 id, u32 clean)
+{
+	return tmem_core_alloc_chunk_internal(mem_type, alignment, size,
+					      refcount, sec_handle, owner, id,
+					      clean, true);
+}
+
+int tmem_core_alloc_chunk_priv(enum TRUSTED_MEM_TYPE mem_type, u32 alignment,
+			       u32 size, u32 *refcount, u32 *sec_handle,
+			       u8 *owner, u32 id, u32 clean)
+{
+	return tmem_core_alloc_chunk_internal(mem_type, alignment, size,
+					      refcount, sec_handle, owner, id,
+					      clean, false);
 }
 
 int tmem_core_unref_chunk(enum TRUSTED_MEM_TYPE mem_type, u32 sec_handle,

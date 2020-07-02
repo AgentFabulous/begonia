@@ -14,7 +14,7 @@
 #
 config MTK_PROT_MEM_SUPPORT
 	tristate "MTK Protect Memory Support"
-	depends on MTK_GZ_KREE
+	depends on MTK_GZ_KREE && MTK_CAM_SECURITY_SUPPORT
 	default y
 	help
 	  Enable the support of MediaTek protect memory driver.
@@ -108,6 +108,7 @@ config MTK_SDSP_SHARED_MEM_SUPPORT
 choice
 	prompt "MTK VPU/MTEE/MTEE Shared Memory Support"
 	depends on MTK_SDSP_SHARED_MEM_SUPPORT
+	default MTK_SDSP_SHARED_PERM_VPU_TEE if (MACH_MT6771)
 	default MTK_SDSP_SHARED_PERM_MTEE_TEE if (MACH_MT6768)
 	default MTK_SDSP_SHARED_PERM_VPU_MTEE_TEE
 
