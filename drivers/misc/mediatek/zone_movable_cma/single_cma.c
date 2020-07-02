@@ -29,7 +29,13 @@ static struct cma *cma[MAX_CMA_AREAS];
 static phys_addr_t movable_min = ULONG_MAX;
 static phys_addr_t movable_max;
 
+#if defined(CONFIG_MTK_MEMORY_LOWPOWER) || \
+	!defined(CONFIG_ARM64)
 phys_addr_t zmc_max_zone_dma_phys = 0xc0000000ULL;
+#else
+phys_addr_t zmc_max_zone_dma_phys = 0x100000000ULL;
+#endif
+
 bool zmc_reserved_mem_inited;
 
 #define END_OF_REGISTER ((void *)(0x7a6d63))
@@ -132,16 +138,6 @@ static int __init zmc_memory_init(struct reserved_mem *rmem)
 
 	pr_info("%s, name: %s, base: %pa, size: %pa\n", __func__,
 			rmem->name, &rmem->base, &rmem->size);
-
-	if (total_phys_size > 0x80000000ULL &&
-			rmem->base < zmc_max_zone_dma_phys) {
-		pr_info("[Fail] Unsupported memory range under 0x%lx (DMA max range).\n",
-				(unsigned long)zmc_max_zone_dma_phys);
-		pr_info("Abort reserve memory.\n");
-		memblock_free(rmem->base, rmem->size);
-		memblock_add(rmem->base, rmem->size);
-		return -1;
-	}
 
 #ifdef CONFIG_MTK_MEMORY_LOWPOWER
 	if (!zmc_is_the_last(rmem)) {
