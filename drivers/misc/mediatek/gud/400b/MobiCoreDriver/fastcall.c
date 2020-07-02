@@ -35,9 +35,6 @@
 #include "clock.h"	/* mc_clock_enable, mc_clock_disable */
 #include "fastcall.h"
 
-static DEFINE_MUTEX(fastcall_mutex);
-static enum cpuhp_state tee_hp_online;
-
 struct fastcall_work {
 #ifdef MC_FASTCALL_WORKER_THREAD
 	struct kthread_work work;
@@ -215,45 +212,6 @@ static inline int _smc(union mc_fc_generic *mc_fc_generic)
 static int active_cpu;
 
 #ifdef MC_FASTCALL_WORKER_THREAD
-
-#ifdef CONFIG_TRUSTONIC_BIG_CORE_PREFER_BINDING
-static int mc_cpuhp_big_core_preferred(int cpu, unsigned long action,
-					bool cpu_down)
-{
-	int core_num = (COUNT_OF_CPUS - 1);
-	int ret;
-
-#ifdef CONFIG_TRUSTONIC_RESUME_BIG_CORE_PREFER
-	if ((action == CPU_ONLINE_FROZEN) && (cpu != core_num)) {
-		mc_dev_devel("resume: CPU %d is not big core, skip...",
-				cpu);
-		return -1;
-	}
-#endif
-
-	if (cpu_down && (active_cpu != cpu)) {
-		mc_dev_devel("Not active(%d) CPU, cpu=%d (hp:%s), skip...",
-				active_cpu, cpu, cpuhp_info);
-		return 0;
-	}
-
-	for (core_num; core_num >= 0; core_num--) {
-		if (cpu_is_offline(core_num))
-			continue;
-		if (cpu_down && (core_num == cpu))
-			continue;
-		mc_dev_devel("CPU %d is %s, switching to %d", cpu,
-				cpu_down ? "dying" : "active", core_num);
-
-		ret = mc_switch_core(core_num);
-		mc_dev_devel("CPU(%d) migration %s (ret=0x%x)",
-				core_num, ret ? "failed" : "success", ret);
-		return ret;
-	}
-
-	return 0;
-}
-#else
 static int mc_cpu_offline(int cpu)
 {
 	int i;
@@ -276,7 +234,6 @@ static int mc_cpu_offline(int cpu)
 
 	return 0;
 }
-#endif /* CONFIG_TRUSTONIC_BIG_CORE_PREFER_BINDING */
 
 #if KERNEL_VERSION(4, 10, 0) > LINUX_VERSION_CODE
 static int mobicore_cpu_callback(struct notifier_block *nfb,
@@ -286,25 +243,15 @@ static int mobicore_cpu_callback(struct notifier_block *nfb,
 
 	switch (action) {
 	case CPU_ONLINE:
-	case CPU_ONLINE_FROZEN:
 		mc_dev_devel("Cpu %d CPU_ONLINE", cpu);
-#ifdef CONFIG_TRUSTONIC_BIG_CORE_PREFER_BINDING
-		mc_cpuhp_big_core_preferred(cpu, action, false);
-#endif
 		break;
-
 	case CPU_UP_PREPARE:
 		mc_dev_devel("Cpu %d CPU_UP_PREPARE", cpu);
 		break;
-
 	case CPU_DOWN_PREPARE:
 	case CPU_DOWN_PREPARE_FROZEN:
 		mc_dev_devel("Cpu %d is going to die", cpu);
-#ifdef CONFIG_TRUSTONIC_BIG_CORE_PREFER_BINDING
-		mc_cpuhp_big_core_preferred(cpu, action, true);
-#else
 		mc_cpu_offline(cpu);
-#endif
 		break;
 	}
 	return NOTIFY_OK;
@@ -314,26 +261,10 @@ static struct notifier_block mobicore_cpu_notifer = {
 	.notifier_call = mobicore_cpu_callback,
 };
 #else
-static int nq_cpu_up_prep(unsigned int cpu)
-{
-	mc_dev_info("CPU #%d is online", cpu);
-#ifdef CONFIG_TRUSTONIC_BIG_CORE_PREFER_BINDING
-	return mc_cpuhp_big_core_preferred(cpu, CPU_ONLINE, false);
-#else
-	return 0;
-#endif
-}
-
 static int nq_cpu_down_prep(unsigned int cpu)
 {
 	mc_dev_info("CPU #%d is going to die", cpu);
-
-#ifdef CONFIG_TRUSTONIC_BIG_CORE_PREFER_BINDING
-	return mc_cpuhp_big_core_preferred(cpu, CPU_DEAD, true);
-#else
 	return mc_cpu_offline(cpu);
-#endif
-
 }
 #endif
 #endif /* MC_FASTCALL_WORKER_THREAD */
@@ -342,15 +273,7 @@ static cpumask_t mc_exec_core_switch(union mc_fc_generic *mc_fc_generic)
 {
 	cpumask_t cpu;
 	int new_cpu;
-	u32 mpidr = read_cpuid_mpidr();
-	u32 cpu_id_mt[] = CPU_IDS_MT;
-	u32 cpu_id_nmt[] = CPU_IDS;
-	u32 *cpu_id;
-
-	if (mpidr & MPIDR_MT_BITMASK)
-		cpu_id = cpu_id_mt;
-	else
-		cpu_id = cpu_id_nmt;
+	u32 cpu_id[] = CPU_IDS;
 
 	new_cpu = mc_fc_generic->as_in.param[0];
 	mc_fc_generic->as_in.param[0] = cpu_id[mc_fc_generic->as_in.param[0]];
@@ -456,8 +379,6 @@ static void fastcall_work_func(struct work_struct *work)
 
 static bool mc_fastcall(void *data)
 {
-	mutex_lock(&fastcall_mutex);
-
 #ifdef MC_FASTCALL_WORKER_THREAD
 	struct fastcall_work fc_work = {
 		KTHREAD_WORK_INIT(fc_work.work, fastcall_work_func),
@@ -466,13 +387,13 @@ static bool mc_fastcall(void *data)
 
 #if KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE
 	if (!kthread_queue_work(&fastcall_worker, &fc_work.work))
-		goto error;
+		return false;
 
 	/* If work is queued or executing, wait for it to finish execution */
 	kthread_flush_work(&fc_work.work);
 #else
 	if (!queue_kthread_work(&fastcall_worker, &fc_work.work))
-		goto error;
+		return false;
 
 	/* If work is queued or executing, wait for it to finish execution */
 	flush_kthread_work(&fc_work.work);
@@ -484,18 +405,11 @@ static bool mc_fastcall(void *data)
 	INIT_WORK_ONSTACK(&fc_work.work, fastcall_work_func);
 
 	if (!schedule_work_on(0, &fc_work.work))
-		goto error;
+		return false;
 
 	flush_work(&fc_work.work);
 #endif
-
-	mutex_unlock(&fastcall_mutex);
 	return true;
-
-error:
-	mutex_unlock(&fastcall_mutex);
-	return false;
-
 }
 
 int mc_fastcall_init(void)
@@ -533,13 +447,12 @@ int mc_fastcall_init(void)
 #else
 	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
 					"tee/trustonic:online",
-					nq_cpu_up_prep, nq_cpu_down_prep);
+					NULL, nq_cpu_down_prep);
 #endif
 	if (ret < 0) {
 		mc_dev_notice("cpu online callback setup failed: %d", ret);
 		return ret;
 	}
-	tee_hp_online = ret;
 
 	/* Create debugfs structs entry */
 	debugfs_create_file("active_cpu", 0600, g_ctx.debug_dir, NULL,
@@ -557,7 +470,7 @@ void mc_fastcall_exit(void)
 #if KERNEL_VERSION(4, 10, 0) > LINUX_VERSION_CODE
 		unregister_cpu_notifier(&mobicore_cpu_notifer);
 #else
-		cpuhp_remove_state_nocalls(tee_hp_online);
+		cpuhp_remove_state_nocalls(CPUHP_AP_ONLINE_DYN);
 #endif
 #endif
 		kthread_stop(fastcall_thread);

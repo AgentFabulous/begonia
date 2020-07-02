@@ -3,6 +3,7 @@
 #
 config TRUSTONIC_TEE_SUPPORT
 	bool "Enable Trustonic TEE Support"
+	select MTK_TEE_SANITY
 	default n
 	---help---
 	  Enable Trustonic TEE Support.
@@ -13,8 +14,7 @@ config TRUSTONIC_TEE_SUPPORT
 config TRUSTONIC_TEE_VERSION
 	string "TRUSTONIC TEE Version"
 	depends on TRUSTONIC_TEE_SUPPORT
-	default "410" if (MACH_MT6785)
-	default "400b"
+	default "410"
 
 config TRUSTONIC_TEE_DEBUG
 	bool "Trustonic TEE driver debug mode"
@@ -78,26 +78,3 @@ config TRUSTONIC_TRUSTED_UI
 	  Trustonic TUI features was based on Trustonic TEE mechanism to protect
 	  Touch/Display inside TEE, to prevent malicious access of sensitive data
 	  used by APPs like Banking.
-
-config TRUSTONIC_BIG_CORE_PREFER_BINDING
-	tristate "Big Core Binding"
-	depends on TRUSTONIC_TEE_SUPPORT
-	default y if (MACH_MT6768)
-	---help---
-	  Enable Active Core Binding on Big Core.
-	  This option enables mobicore tee_fastcall thread to bind on big core
-	  to enhance ta/t-driver running performance.
-	  Say Y if you would like to enable this feature.
-	  If unsure, say N.
-
-config TRUSTONIC_RESUME_BIG_CORE_PREFER
-	tristate "Resume To Bind Big Core"
-	depends on TRUSTONIC_BIG_CORE_PREFER_BINDING
-	default y
-	---help---
-	  Enable Active Core Binding on Big Core.
-	  This option enables mobicore tee_fastcall thread to bind on big core
-	  to enhance ta/t-driver running performance.
-	  Say Y if you would like to enable this feature.
-	  If unsure, say N.
-
