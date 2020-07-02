@@ -458,12 +458,18 @@ void jpeg_drv_enc_power_on(void)
 
 		#elif defined(PLATFORM_MT6765)
 
-		smi_bus_prepare_enable(SMI_LARB1_REG_INDX,
-			"JPEG", true);
+		smi_bus_prepare_enable(SMI_LARB1, "JPEG");
 		#elif defined(PLATFORM_MT6761)
 
-		smi_bus_prepare_enable(SMI_LARB1_REG_INDX,
-			"JPEG", true);
+		smi_bus_prepare_enable(SMI_LARB1, "JPEG");
+		#elif defined(PLATFORM_MT6739)
+
+		smi_bus_prepare_enable(SMI_LARB1, "JPEG");
+
+		#elif defined(PLATFORM_MT6771)
+
+		smi_bus_prepare_enable(SMI_LARB4, "JPEG");
+
 		#endif
 		if (clk_prepare_enable(gJpegClk.clk_venc_jpgEnc))
 			JPEG_ERR("enable clk_venc_jpgDec fail!");
@@ -525,13 +531,20 @@ void jpeg_drv_enc_power_off(void)
 
 		#elif defined(PLATFORM_MT6765)
 
-		smi_bus_disable_unprepare(SMI_LARB1_REG_INDX,
-		"JPEG", true);
+		smi_bus_disable_unprepare(SMI_LARB1, "JPEG");
 
 		#elif defined(PLATFORM_MT6761)
 
-		smi_bus_disable_unprepare(SMI_LARB1_REG_INDX,
-		"JPEG", true);
+		smi_bus_disable_unprepare(SMI_LARB1, "JPEG");
+
+		#elif defined(PLATFORM_MT6739)
+
+		smi_bus_disable_unprepare(SMI_LARB1, "JPEG");
+
+
+		#elif defined(PLATFORM_MT6771)
+
+		smi_bus_disable_unprepare(SMI_LARB4, "JPEG");
 
 		#endif
 		#else
@@ -1663,7 +1676,6 @@ static int jpeg_probe(struct platform_device *pdev)
 	struct JpegDeviceStruct *jpegDev;
 	struct device_node *node = NULL;
 	void *tmpPtr;
-	int ret;
 
 	new_count = nrJpegDevs + 1;
 	tmpPtr = krealloc(gJpegqDevs,
@@ -1728,13 +1740,13 @@ static int jpeg_probe(struct platform_device *pdev)
 		#endif
 	#endif
 
-	ret = of_property_read_u32(node, "cshot-spec", &cshot_spec_dts);
-	if (ret) {
-		JPEG_ERR("cshot spec read failed:%d\n", ret);
+	#if ENABLE_MMQOS
+	if (of_property_read_u32(node, "cshot-spec", &cshot_spec_dts)) {
+		JPEG_ERR("cshot spec read failed\n");
 		JPEG_ERR("init cshot spec as 0xFFFFFFFF\n");
 		cshot_spec_dts = 0xFFFFFFFF;
 	}
-
+	#endif
 
 	gJpegqDev = *jpegDev;
 
@@ -1775,7 +1787,7 @@ static int jpeg_probe(struct platform_device *pdev)
 	    (struct class_device *)device_create(jenc_class,
 			 NULL, jenc_devno, NULL, JPEG_DEVNAME);
 #else
-	proc_create("mtk_jpeg", 0x644, NULL, &jpeg_fops);
+	proc_create("mtk_jpeg", 0644, NULL, &jpeg_fops);
 #endif
 }
 
