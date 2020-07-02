@@ -162,7 +162,7 @@ void sys_timer_timesync_verify_sspm(void)
 {
 	struct plt_ipi_data_s ipi_data;
 	int ackdata = 0;
-	u32 ts_h, ts_l;
+	u32 ts_h = 0, ts_l = 0;
 	u64 ts_sspm, ts_ap1, ts_ap2, temp_u64[2];
 
 	/* reset debug mbox before test */
@@ -179,7 +179,7 @@ void sys_timer_timesync_verify_sspm(void)
 	ipi_data.cmd = PLT_TIMESYNC_SRAM_TEST;
 
 	sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_WAIT,
-		&ipi_data, sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata, 1);
+		&ipi_data, sizeof(ipi_data) / SSPM_MBOX_SLOT_SIZE, &ackdata, 1);
 
 	/* wait until sspm writes sspm-view timestamp to sram */
 	while (1) {
