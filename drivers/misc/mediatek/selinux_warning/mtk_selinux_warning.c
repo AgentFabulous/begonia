@@ -36,6 +36,8 @@
 
 #define PRINT_BUF_LEN   100
 #define MOD		"SELINUX"
+#define SCONTEXT_FILTER
+#define AV_FILTER
 /* #define ENABLE_CURRENT_NE_CORE_DUMP */
 
 #ifdef ENABLE_CURRENT_NE_CORE_DUMP
@@ -47,45 +49,57 @@ static atomic_t ne_warning_count;
 
 static const char *aee_filter_list[AEE_FILTER_NUM] = {
 	"u:r:bootanim:s0",
-	"u:r:bluetooth:s0",
-	"u:r:binderservicedomain:s0",
-	"u:r:dex2oat:s0",
-	"u:r:dhcp:s0",
-	"u:r:dnsmasq:s0",
-	"u:r:dumpstate:s0",
-	"u:r:gpsd:s0",
-	"u:r:healthd:s0",
-	"u:r:hci_attach:s0",
-	"u:r:hostapd:s0",
-	"u:r:inputflinger:s0",
-	"u:r:isolated_app:s0",
-	"u:r:keystore:s0",
-	"u:r:lmkd:s0",
-	"u:r:mdnsd:s0",
-	"u:r:logd:s0",
-	"u:r:mtp:s0",
-	"u:r:netd:s0",
-	"u:r:nfc:s0",
-	"u:r:ppp:s0",
-	"u:r:racoon:s0",
-	"u:r:recovery:s0",
-	"u:r:rild:s0",
-	"u:r:runas:s0",
-	"u:r:sdcardd:s0",
-	"u:r:shared_relro:s0",
+//	"u:r:bluetooth:s0",
+//	"u:r:binderservicedomain:s0",
+//	"u:r:dex2oat:s0",
+//	"u:r:dhcp:s0",
+//	"u:r:dnsmasq:s0",
+//	"u:r:dumpstate:s0",
+//	"u:r:gpsd:s0",
+//	"u:r:healthd:s0",
+//	"u:r:hci_attach:s0",
+//	"u:r:hostapd:s0",
+//	"u:r:inputflinger:s0",
+//	"u:r:isolated_app:s0",
+//	"u:r:keystore:s0",
+//	"u:r:lmkd:s0",
+//	"u:r:mdnsd:s0",
+//	"u:r:logd:s0",
+//	"u:r:mtp:s0",
+//	"u:r:netd:s0",
+//	"u:r:nfc:s0",
+//	"u:r:ppp:s0",
+//	"u:r:racoon:s0",
+//	"u:r:recovery:s0",
+//	"u:r:rild:s0",
+//	"u:r:runas:s0",
+//	"u:r:sdcardd:s0",
+//	"u:r:shared_relro:s0",
 	"u:r:system_server:s0",
-	"u:r:tee:s0",
-	"u:r:uncrypt:s0",
-	"u:r:watchdogd:s0",
-	"u:r:wpa:s0",
-	"u:r:ueventd:s0",
-	"u:r:vold:s0",
-	"u:r:vdc:s0",
+//	"u:r:tee:s0",
+//	"u:r:uncrypt:s0",
+//	"u:r:watchdogd:s0",
+//	"u:r:wpa:s0",
+//	"u:r:ueventd:s0",
+//	"u:r:vold:s0",
+//	"u:r:vdc:s0",
 	"u:r:zygote:s0",
+};
+
+#define AEE_AV_FILTER_NUM 5
+static const char *aee_av_filter_list[AEE_AV_FILTER_NUM] = {
+	"map",
+	"ioctl"
+};
+
+#define SKIP_PATTERN_NUM 5
+static const char *skip_pattern[SKIP_PATTERN_NUM] = {
+		"scontext=u:r:untrusted_app"
 };
 
 static int mtk_check_filter(char *scontext);
 static int mtk_get_scontext(char *data, char *buf);
+static char *mtk_get_process(char *in);
 static int mtk_check_filter(char *scontext)
 {
 	int i = 0;
@@ -99,6 +113,81 @@ static int mtk_check_filter(char *scontext)
 	return -1;
 }
 
+static bool mtk_check_skip_pattern(char *data)
+{
+	int i = 0;
+
+	/* check whether the log contains specific pattern*/
+	for (i = 0; i < SKIP_PATTERN_NUM && skip_pattern[i] != NULL; i++) {
+		if (strstr(data, skip_pattern[i]) != NULL)
+			return true;
+	}
+
+	return false;
+}
+
+#define AV_LEN 30
+static void mtk_check_av(char *data)
+{
+	char *start = NULL;
+	char *end = NULL;
+	char av_buf[AV_LEN] = { '\0' };
+	char scontext[AEE_FILTER_LEN] = { '\0' };
+	char printbuf[PRINT_BUF_LEN] = { '\0' };
+	char *pname = scontext;
+	char *iter;
+	int i;
+
+	if (!mtk_get_scontext(data, scontext))
+		return;
+
+	pname = mtk_get_process(scontext);
+	if (pname == 0)
+		return;
+
+	start = strstr(data, "denied  { ");
+	end = strstr(data, "}");
+	if (start == NULL || end == NULL || end < start)
+		return;
+
+	start = start+10;
+
+	iter = start;
+	while (iter < end) {
+		if (*iter == ' ' && iter-start > 0 && iter-start < AV_LEN) {
+			strncpy(av_buf, start, iter-start);
+			for (i = 0;
+				i < AEE_AV_FILTER_NUM &&
+				aee_av_filter_list[i] != NULL;
+				++i) {
+
+				if (strcmp(av_buf,
+					aee_av_filter_list[i]) == 0) {
+
+					if (mtk_check_skip_pattern(data))
+						return;
+
+					memset(printbuf, '\0', PRINT_BUF_LEN);
+
+					snprintf(printbuf, PRINT_BUF_LEN-1,
+						"[%s][WARNING]\nCR_DISPATCH_PROCESSNAME:%s\n",
+						MOD, pname);
+
+					if (selinux_enforcing) {
+						aee_kernel_warning_api(
+						__FILE__, __LINE__,
+						DB_OPT_DEFAULT,
+						printbuf, data);
+					}
+				}
+
+			}
+
+			start = iter+1;
+		}
+		iter++;
+	}
+}
 
 static int mtk_get_scontext(char *data, char *buf)
 {
@@ -118,6 +207,9 @@ static int mtk_get_scontext(char *data, char *buf)
 		return 0;
 
 	diff = t2 - t1;
+	if (diff >= AEE_FILTER_LEN)
+		return 0;
+
 	strncpy(buf, t1, diff);
 	return 1;
 }
@@ -148,6 +240,7 @@ static char *mtk_get_process(char *in)
 
 void mtk_audit_hook(char *data)
 {
+#ifdef SCONTEXT_FILTER
 	char scontext[AEE_FILTER_LEN] = { '\0' };
 	char *pname = scontext;
 	int ret = 0;
@@ -206,7 +299,7 @@ void mtk_audit_hook(char *data)
 
 			if (selinux_enforcing) {
 				aee_kernel_warning_api(__FILE__, __LINE__,
-				  DB_OPT_DEFAULT | DB_OPT_NATIVE_BACKTRACE,
+				  DB_OPT_DEFAULT,
 				  printbuf, data);
 			}
 
@@ -232,5 +325,9 @@ void mtk_audit_hook(char *data)
 			#endif
 		}
 	}
+#endif
+#ifdef AV_FILTER
+	mtk_check_av(data);
+#endif
 }
 EXPORT_SYMBOL(mtk_audit_hook);
