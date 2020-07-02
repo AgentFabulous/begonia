@@ -435,9 +435,11 @@ char *mt_irq_dump_status_buf(int irq, char *buf)
 		return NULL;
 
 	ptr += sprintf(ptr, "[mt gic dump] irq = %d\n", irq);
-
+#if defined(CONFIG_ARM_PSCI) || defined(CONFIG_MTK_PSCI)
 	rc = mt_secure_call(MTK_SIP_KERNEL_GIC_DUMP, irq, 0, 0, 0);
-
+#else
+	rc = -1;
+#endif
 	if (rc < 0) {
 		ptr += sprintf(ptr, "[mt gic dump] not allowed to dump!\n");
 		return ptr;
@@ -489,7 +491,11 @@ int mt_irq_dump_cpu(int irq)
 
 	irq = virq_to_hwirq(irq);
 
+#if defined(CONFIG_ARM_PSCI) || defined(CONFIG_MTK_PSCI)
 	rc = mt_secure_call(MTK_SIP_KERNEL_GIC_DUMP, irq, 0, 0, 0);
+#else
+	rc = -1;
+#endif
 
 	if (rc < 0)
 		return rc;
@@ -557,23 +563,11 @@ void _mt_irq_set_polarity(unsigned int hwirq, unsigned int polarity)
 	_mt_set_pol_reg(base + reg*4, value);
 }
 
-#if defined(CONFIG_MACH_MT6785) || defined(CONFIG_MACH_MT6768)
-#define GIC_INT_MASK (MCUSYS_BASE_SWMODE + 0xaa88)
-#define GIC500_ACTIVE_CPU_SHIFT 0
-#define GIC500_ACTIVE_CPU_MASK (0xff << GIC500_ACTIVE_CPU_SHIFT)
-#elif defined(CONFIG_MACH_MT6779)
-#define GIC_INT_MASK (MCUSYS_BASE_SWMODE + 0xa6f0)
-#define GIC500_ACTIVE_SEL_SHIFT 16
-#define GIC500_ACTIVE_SEL_MASK (0x7 << GIC500_ACTIVE_SEL_SHIFT)
-#define GIC500_ACTIVE_CPU_SHIFT 0
-#define GIC500_ACTIVE_CPU_MASK (0xff << GIC500_ACTIVE_CPU_SHIFT)
-#else
 #define GIC_INT_MASK (MCUSYS_BASE_SWMODE + 0x5e8)
 #define GIC500_ACTIVE_SEL_SHIFT 3
 #define GIC500_ACTIVE_SEL_MASK (0x7 << GIC500_ACTIVE_SEL_SHIFT)
 #define GIC500_ACTIVE_CPU_SHIFT 16
 #define GIC500_ACTIVE_CPU_MASK (0xff << GIC500_ACTIVE_CPU_SHIFT)
-#endif
 static spinlock_t domain_lock;
 int print_en;
 
