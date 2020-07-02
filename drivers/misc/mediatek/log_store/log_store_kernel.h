@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,7 +21,9 @@
 #define SRAM_HEADER_SIG (0xabcd1234)
 #define DRAM_HEADER_SIG (0x5678ef90)
 #define LOG_STORE_SIG (0xcdab3412)
-
+#define LOG_EMMC_SIG (0x785690ef)
+#define KEDUMP_ENABLE (0xecab1e)
+#define KEDUMP_DISABLE (0xd15ab1e)
 
 #define MAX_DRAM_COUNT	2
 
@@ -71,19 +74,45 @@ struct dram_buf_header {
 };
 
 /* total 256 bytes */
+#define LAST_PLLK_REGIONS (5)
+/* total 256 bytes */
 struct sram_log_header {
 	u32 sig;
 	u32 reboot_count;
 	u32 save_to_emmc;
 	struct dram_buf_header dram_buf;        // 40 bytes
 	struct pl_lk_log dram_curlog_header;    // 32 bytes
-	u32 reserve[43];                        // reserve 43 * 4 char size
+	u32 gz_log_addr;
+	u32 gz_log_len;
+	u32 lk_save_cmd;
+	u32 reserve[40];                        // reserve 34 * 4 char size
+};
+
+enum EMMC_STORE_TYPE {
+	UART_LOG = 0,
+	LOG_LEVEL,
+	PRINTK_PATELIMIT,
+	KEDUMP_CTL,
+	EMMC_STORE_TYPE_NR
+};
+
+#define LAST_PLLK_REGIONS (5)
+/* emmc last block struct */
+struct log_emmc_header {
+	u32 sig;
+	u32 offset;
+	u32 uart_flag;
+	u32 reboot_normal_count;
+	u32 pllk_size[LAST_PLLK_REGIONS];
+	u32 reserve[4];
 };
 
 #ifdef CONFIG_MTK_DRAM_LOG_STORE
 void log_store_bootup(void);
 void store_log_to_emmc_enable(bool value);
 void disable_early_log(void);
+int set_emmc_config(int type, int value);
+int read_emmc_config(struct log_emmc_header *log_header);
 #else
 
 static inline void  log_store_bootup(void)
@@ -98,6 +127,16 @@ static inline void store_log_to_emmc_enable(bool value)
 
 static inline void disable_early_log(void)
 {
+}
+
+static inline int set_emmc_config(int type, int value)
+{
+	return 0;
+}
+
+static inline int read_emmc_config(struct log_emmc_header *log_header)
+{
+	return 0;
 }
 #endif
 #endif
