@@ -162,7 +162,7 @@ void hal_rtc_set_gpio_32k_status(u16 user, bool enable)
 		rtc_write_trigger();
 	}
 	hal_rtc_xinfo("RTC_GPIO user %d enable = %d 32k (0x%x), RTC_CON = %x\n",
-		      user, enable, pdn1, rtc_read(RTC_CON));
+		user, enable, pdn1, rtc_read(RTC_CON));
 }
 
 void rtc_spar_alarm_clear_wait(void)
@@ -173,8 +173,8 @@ void rtc_spar_alarm_clear_wait(void)
 		if ((rtc_read(RTC_BBPU) & RTC_BBPU_CLR) == 0)
 			break;
 		else if (sched_clock() > timeout) {
-			hal_rtc_xinfo("%s, spar/alarm clear time out, %x,\n",
-					__func__, rtc_read(RTC_BBPU));
+			pr_notice("%s, spar/alarm clear time out, %x,\n",
+				__func__, rtc_read(RTC_BBPU));
 			break;
 		}
 	} while (1);
@@ -182,96 +182,72 @@ void rtc_spar_alarm_clear_wait(void)
 
 void rtc_enable_k_eosc(void)
 {
-#if 0
 	u16 osc32;
-#endif
 	/* Truning on eosc cali mode clock */
-	pmic_config_interface_nolock(PMIC_SCK_TOP_CKPDN_CON0_CLR_ADDR, 1,
-					PMIC_RG_RTC_EOSC32_CK_PDN_MASK,
-					PMIC_RG_RTC_EOSC32_CK_PDN_SHIFT);
-#if 0
-	pmic_config_interface_nolock(PMIC_RG_SRCLKEN_IN0_HW_MODE_ADDR, 1,
-					PMIC_RG_SRCLKEN_IN0_HW_MODE_MASK,
-					PMIC_RG_SRCLKEN_IN0_HW_MODE_SHIFT);
-	pmic_config_interface_nolock(PMIC_RG_SRCLKEN_IN1_HW_MODE_ADDR, 1,
-					PMIC_RG_SRCLKEN_IN1_HW_MODE_MASK,
-					PMIC_RG_SRCLKEN_IN1_HW_MODE_SHIFT);
+	pmic_config_interface_nolock(PMIC_SCK_TOP_CKPDN_CON0_CLR_ADDR,
+		1, PMIC_RG_RTC_EOSC32_CK_PDN_MASK,
+		PMIC_RG_RTC_EOSC32_CK_PDN_SHIFT);
+	pmic_config_interface_nolock(PMIC_RG_SRCLKEN_IN0_HW_MODE_ADDR,
+		1, PMIC_RG_SRCLKEN_IN0_HW_MODE_MASK,
+		PMIC_RG_SRCLKEN_IN0_HW_MODE_SHIFT);
+	pmic_config_interface_nolock(PMIC_RG_SRCLKEN_IN1_HW_MODE_ADDR,
+		1, PMIC_RG_SRCLKEN_IN1_HW_MODE_MASK,
+		PMIC_RG_SRCLKEN_IN1_HW_MODE_SHIFT);
 	pmic_config_interface_nolock(PMIC_RG_RTC_EOSC32_CK_PDN_ADDR, 0,
-					PMIC_RG_RTC_EOSC32_CK_PDN_MASK,
-					PMIC_RG_RTC_EOSC32_CK_PDN_SHIFT);
-#endif
-	if (rtc_eosc_cali_td != 8) {
+		PMIC_RG_RTC_EOSC32_CK_PDN_MASK,
+		PMIC_RG_RTC_EOSC32_CK_PDN_SHIFT);
 
-		pr_notice("%s set eosc_cali_td = %d\n",
-						__func__, rtc_eosc_cali_td);
-
-		switch (rtc_eosc_cali_td) {
-		case 1:
-			pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR,
-					0x3,
-					PMIC_EOSC_CALI_TD_MASK,
-					PMIC_EOSC_CALI_TD_SHIFT);
-			break;
-		case 2:
-			pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR,
-					0x4,
-					PMIC_EOSC_CALI_TD_MASK,
-					PMIC_EOSC_CALI_TD_SHIFT);
-			break;
-		case 4:
-			pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR,
-					0x5,
-					PMIC_EOSC_CALI_TD_MASK,
-					PMIC_EOSC_CALI_TD_SHIFT);
-			break;
-		case 16:
-			pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR,
-					0x7,
-					PMIC_EOSC_CALI_TD_MASK,
-					PMIC_EOSC_CALI_TD_SHIFT);
-			break;
-		default:
-			pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR,
-					0x6,
-					PMIC_EOSC_CALI_TD_MASK,
-					PMIC_EOSC_CALI_TD_SHIFT);
-			break;
-		}
+	switch (rtc_eosc_cali_td) {
+	case 1:
+		pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR, 0x3,
+			PMIC_EOSC_CALI_TD_MASK, PMIC_EOSC_CALI_TD_SHIFT);
+		break;
+	case 2:
+		pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR, 0x4,
+			PMIC_EOSC_CALI_TD_MASK, PMIC_EOSC_CALI_TD_SHIFT);
+		break;
+	case 4:
+		pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR, 0x5,
+			PMIC_EOSC_CALI_TD_MASK, PMIC_EOSC_CALI_TD_SHIFT);
+		break;
+	case 16:
+		pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR, 0x7,
+			PMIC_EOSC_CALI_TD_MASK, PMIC_EOSC_CALI_TD_SHIFT);
+		break;
+	default:
+		pmic_config_interface_nolock(PMIC_EOSC_CALI_TD_ADDR, 0x6,
+			PMIC_EOSC_CALI_TD_MASK, PMIC_EOSC_CALI_TD_SHIFT);
+		break;
 	}
-	/*Switch the DCXO from 32k-less mode to RTC mode,
-	 *otherwise, EOSC cali will fail
-	 */
+/*Switch the DCXO from 32k-less mode to RTC mode, otherwise,
+ * EOSC cali will fail
+ */
 	/*RTC mode will have only OFF mode and FPM */
-	pmic_config_interface_nolock(PMIC_XO_EN32K_MAN_ADDR, 0,
-				     PMIC_XO_EN32K_MAN_MASK,
-					 PMIC_XO_EN32K_MAN_SHIFT);
-#if 0
+	pmic_config_interface_nolock(PMIC_XO_EN32K_MAN_ADDR,
+		0, PMIC_XO_EN32K_MAN_MASK,
+		PMIC_XO_EN32K_MAN_SHIFT);
 	rtc_write(RTC_BBPU,
-		  rtc_read(RTC_BBPU) | RTC_BBPU_KEY | RTC_BBPU_RELOAD);
+		rtc_read(RTC_BBPU) | RTC_BBPU_KEY | RTC_BBPU_RELOAD);
 	rtc_write_trigger();
 	/* Enable K EOSC mode for normal power off and then plug out battery */
-	rtc_write(RTC_AL_YEA,
-		  ((rtc_read(RTC_AL_YEA) | RTC_K_EOSC_RSV_0) &
-		   (~RTC_K_EOSC_RSV_1)) | RTC_K_EOSC_RSV_2);
+	rtc_write(RTC_AL_YEA, ((rtc_read(RTC_AL_YEA) | RTC_K_EOSC_RSV_0)
+		& (~RTC_K_EOSC_RSV_1)) | RTC_K_EOSC_RSV_2);
 	rtc_write_trigger();
 
 	osc32 = rtc_read(RTC_OSC32CON);
 	rtc_xosc_write(osc32 | RTC_EMBCK_SRC_SEL, true);
-#endif
 	hal_rtc_xinfo("RTC_enable_k_eosc\n");
 }
 
-#if 0
 void rtc_disable_2sec_reboot(void)
 {
 	u16 reboot;
 
-	reboot =
-	    (rtc_read(RTC_AL_SEC) & ~RTC_BBPU_2SEC_EN) & ~RTC_BBPU_AUTO_PDN_SEL;
+	reboot = (rtc_read(RTC_AL_SEC) & ~RTC_BBPU_2SEC_EN)
+			& ~RTC_BBPU_AUTO_PDN_SEL;
 	rtc_write(RTC_AL_SEC, reboot);
 	rtc_write_trigger();
 }
-#endif
 
 void rtc_bbpu_pwrdown(bool auto_boot)
 {
@@ -282,9 +258,7 @@ void hal_rtc_bbpu_pwdn(bool charger_status)
 {
 	u16 con, bbpu;
 
-#if 0
 	rtc_disable_2sec_reboot();
-#endif
 	rtc_enable_k_eosc();
 
 	/* disable 32K export if there are no RTC_GPIO users */
@@ -294,7 +268,7 @@ void hal_rtc_bbpu_pwdn(bool charger_status)
 		rtc_write_trigger();
 	}
 	/* lpsd */
-	hal_rtc_xinfo("clear lpsd solution\n");
+	pr_notice("clear lpsd solution\n");
 	bbpu = RTC_BBPU_KEY | RTC_BBPU_CLR | RTC_BBPU_PWREN;
 	rtc_write(RTC_BBPU, bbpu);
 
@@ -306,9 +280,9 @@ void hal_rtc_bbpu_pwdn(bool charger_status)
 	wk_pmic_enable_sdn_delay();
 
 	rtc_write(RTC_BBPU,
-		rtc_read(RTC_BBPU) | RTC_BBPU_KEY | RTC_BBPU_RELOAD);
+			rtc_read(RTC_BBPU) | RTC_BBPU_KEY | RTC_BBPU_RELOAD);
 	rtc_write_trigger();
-	hal_rtc_xinfo("RTC_AL_MASK= 0x%x RTC_IRQ_EN= 0x%x\n",
+	pr_notice("RTC_AL_MASK= 0x%x RTC_IRQ_EN= 0x%x\n",
 			rtc_read(RTC_AL_MASK), rtc_read(RTC_IRQ_EN));
 	/* lpsd */
 	rtc_bbpu_pwrdown(true);
@@ -322,10 +296,9 @@ void hal_rtc_get_pwron_alarm(struct rtc_time *tm, struct rtc_wkalrm *alm)
 	pdn1 = rtc_read(RTC_PDN1);
 	pdn2 = rtc_read(RTC_PDN2);
 
-	alm->enabled =
-	    (pdn1 & RTC_PDN1_PWRON_TIME ? (pdn2 & RTC_PDN2_PWRON_LOGO ? 3 : 2) :
-	     0);
-	/* return Power-On Alarm bit */
+	alm->enabled = (pdn1 & RTC_PDN1_PWRON_TIME ?
+		(pdn2 & RTC_PDN2_PWRON_LOGO ? 3 : 2) : 0);
+		/* return Power-On Alarm bit */
 	alm->pending = !!(pdn2 & RTC_PDN2_PWRON_ALARM);
 
 	hal_rtc_get_alarm_time(tm);
@@ -359,7 +332,7 @@ bool hal_rtc_is_pwron_alarm(struct rtc_time *nowtm, struct rtc_time *tm)
 		hal_rtc_xinfo("pdn1 = 0x%4x\n", pdn1);
 		hal_rtc_get_tick_time(nowtm);
 		hal_rtc_xinfo("pdn1 = 0x%4x\n", pdn1);
-		/* SEC has carried */
+			/* SEC has carried */
 		if (rtc_read(RTC_TC_SEC) < nowtm->tm_sec)
 			hal_rtc_get_tick_time(nowtm);
 
@@ -379,7 +352,7 @@ void hal_rtc_get_alarm(struct rtc_time *tm, struct rtc_wkalrm *alm)
 	hal_rtc_get_alarm_time(tm);
 	pdn2 = rtc_read(RTC_PDN2);
 	alm->enabled = !!(irqen & RTC_IRQ_EN_AL);
-	/* return Power-On Alarm bit */
+		/* return Power-On Alarm bit */
 	alm->pending = !!(pdn2 & RTC_PDN2_PWRON_ALARM);
 }
 
@@ -446,31 +419,35 @@ void rtc_clock_enable(int enable)
 {
 	if (enable) {
 		pmic_config_interface_nolock(PMIC_SCK_TOP_CKPDN_CON0_CLR_ADDR,
-					     1, PMIC_RG_RTC_MCLK_PDN_MASK,
-					     PMIC_RG_RTC_MCLK_PDN_SHIFT);
+			1,
+			PMIC_RG_RTC_MCLK_PDN_MASK,
+			PMIC_RG_RTC_MCLK_PDN_SHIFT);
 		pmic_config_interface_nolock(PMIC_SCK_TOP_CKPDN_CON0_CLR_ADDR,
-					     1, PMIC_RG_RTC_32K_CK_PDN_MASK,
-					     PMIC_RG_RTC_32K_CK_PDN_SHIFT);
+			1,
+			PMIC_RG_RTC_32K_CK_PDN_MASK,
+			PMIC_RG_RTC_32K_CK_PDN_SHIFT);
 	} else {
 		pmic_config_interface_nolock(PMIC_SCK_TOP_CKPDN_CON0_SET_ADDR,
-					     1, PMIC_RG_RTC_MCLK_PDN_MASK,
-					     PMIC_RG_RTC_MCLK_PDN_SHIFT);
+			1,
+			PMIC_RG_RTC_MCLK_PDN_MASK,
+			PMIC_RG_RTC_MCLK_PDN_SHIFT);
 		pmic_config_interface_nolock(PMIC_SCK_TOP_CKPDN_CON0_SET_ADDR,
-					     1, PMIC_RG_RTC_32K_CK_PDN_MASK,
-					     PMIC_RG_RTC_32K_CK_PDN_SHIFT);
+			1,
+			PMIC_RG_RTC_32K_CK_PDN_MASK,
+			PMIC_RG_RTC_32K_CK_PDN_SHIFT);
 	}
 }
 
 void rtc_lpsd_restore_al_mask(void)
 {
-	hal_rtc_xinfo("%s\n", __func__);
+	pr_notice("%s\n", __func__);
 
 	rtc_write(RTC_BBPU,
-		rtc_read(RTC_BBPU) | RTC_BBPU_KEY | RTC_BBPU_RELOAD);
+			rtc_read(RTC_BBPU) | RTC_BBPU_KEY | RTC_BBPU_RELOAD);
 	rtc_write_trigger();
-	hal_rtc_xinfo("1st RTC_AL_MASK = 0x%x\n", rtc_read(RTC_AL_MASK));
+	pr_notice("1st RTC_AL_MASK = 0x%x\n", rtc_read(RTC_AL_MASK));
 	/* mask DOW */
 	rtc_write(RTC_AL_MASK, RTC_AL_MASK_DOW);
 	rtc_write_trigger();
-	hal_rtc_xinfo("2nd RTC_AL_MASK = 0x%x\n", rtc_read(RTC_AL_MASK));
+	pr_notice("2nd RTC_AL_MASK = 0x%x\n", rtc_read(RTC_AL_MASK));
 }
