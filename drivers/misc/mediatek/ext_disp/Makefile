@@ -20,8 +20,12 @@ endif
 
 ifeq ($(CONFIG_SINGLE_PANEL_OUTPUT),y)
 else ifneq ($(wildcard $(srctree)/drivers/misc/mediatek/ext_disp/$(PLATFORM)/),)
+ifeq (y, $(filter y, $(CONFIG_MACH_MT6765) $(CONFIG_MACH_MT6768) $(CONFIG_MACH_MT6771) $(CONFIG_MACH_MT6785) $(CONFIG_MACH_MT6885) $(CONFIG_MACH_MT8168) $(CONFIG_MACH_MT8167)))
 obj-y += $(PLATFORM)/
+endif
+ifeq (y, $(filter y, $(CONFIG_MACH_MT6739) $(CONFIG_MACH_MT6768) $(CONFIG_MACH_MT6785) $(CONFIG_MACH_MT6885) $(CONFIG_MACH_MT8168) $(CONFIG_MACH_MT8167)))
 obj-y += common/
+endif
 else
 obj-y += dummy/
 endif
