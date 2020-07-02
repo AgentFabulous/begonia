@@ -21,6 +21,7 @@
 #define MMSYS_CG_CON0		(0x100)
 #define MMSYS_CG_CON1		(0x110)
 #define MMSYS_HW_DCM_1ST_DIS0	(0x120)
+#define MMSYS_HW_DCM_1ST_DIS_SET0	(0x124)
 #define MMSYS_HW_DCM_2ND_DIS0	(0x130)
 #define MMSYS_SW0_RST_B		(0x140)
 #define MMSYS_GALS_DBG(x)	(0x914 + ((x) << 2))
@@ -38,6 +39,8 @@
 #define SMI_M4U_TH		(0x234)
 #define SMI_FIFO_TH1		(0x238)
 #define SMI_FIFO_TH2		(0x23c)
+#define SMI_PREULTRA_MASK0	(0x240)
+#define SMI_PREULTRA_MASK1	(0x244)
 
 #define SMI_DCM				(0x300)
 #define SMI_ELA				(0x304)
@@ -61,6 +64,7 @@
 #define SMI_LARB_CON			(0x10)
 #define SMI_LARB_CON_SET		(0x14)
 #define SMI_LARB_CON_CLR		(0x18)
+#define SMI_LARB_VC_PRI_MODE		(0x20)
 #define SMI_LARB_CMD_THRT_CON		(0x24)
 #define SMI_LARB_SW_FLAG		(0x40)
 #define SMI_LARB_BWL_EN			(0x50)
@@ -84,6 +88,7 @@
 #define SMI_LARB_REQ_DET		(0xc4)
 #define SMI_LARB_EXT_ONGOING		(0xc8)
 #define SMI_LARB_INT_ONGOING		(0xcc)
+#define SMI_LARB_DBG_CON		(0xf0)
 #define SMI_LARB_WRR_PORT(p)		(0x100 + ((p) << 2))
 #define SMI_LARB_OSTDL_PORT(p)		(0x200 + ((p) << 2))
 #define SMI_LARB_OSTD_MON_PORT(p)	(0x280 + ((p) << 2))
@@ -96,6 +101,9 @@
 #define SMI_LARB_MON_REQ_CNT		(0x414)
 #define SMI_LARB_MON_BEAT_CNT		(0x418)
 #define SMI_LARB_MON_BYTE_CNT		(0x41c)
-#define SMI_LARB_SEC_CON(p)		(0xf80 + ((p) << 2))
+
+#define INT_SMI_LARB_CMD_THRT_CON	(0x500 + (SMI_LARB_CMD_THRT_CON))
+#define INT_SMI_LARB_DBG_CON		(0x500 + (SMI_LARB_DBG_CON))
+#define INT_SMI_LARB_OSTD_MON_PORT(p)	(0x500 + SMI_LARB_OSTD_MON_PORT(p))
 
 #endif
