@@ -508,8 +508,6 @@ void __init change_floppy(char *fmt, ...)
 }
 #endif
 
-void __attribute__((weak)) mount_block_root_post(void) { }
-
 void __init mount_root(void)
 {
 #ifdef CONFIG_ROOT_NFS
@@ -540,8 +538,6 @@ void __init mount_root(void)
 		if (err < 0)
 			pr_emerg("Failed to create /dev/root: %d\n", err);
 		mount_block_root("/dev/root", root_mountflags);
-
-		mount_block_root_post();
 	}
 #endif
 }
