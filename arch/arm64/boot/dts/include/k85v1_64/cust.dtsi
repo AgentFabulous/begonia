@@ -558,15 +558,7 @@
 	status = "okay";
 };
 
-&md1_sim2_hot_plug_eint {
-	compatible = "mediatek,md1_sim2_hot_plug_eint-eint";
-	interrupts = <1 8>;
-	debounce = <1 100000>;
-	dedicated = <1 0>;
-	src_pin = <1 2>;
-	sockettype = <1 0>;
-	status = "okay";
-};
+
 
 /*************************
  * PMIC DTSI File
