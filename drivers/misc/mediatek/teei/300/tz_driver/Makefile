@@ -23,6 +23,5 @@ obj-$(CONFIG_MICROTRUST_TZ_DRIVER) += teei.o
 
 ccflags-$(CONFIG_MTK_ENG_BUILD) += -DENABLED_TEEI_BOOT_LOG
 
-ccflags-y += -D DEBUG_DO
 ccflags-y += -Wno-error
 ccflags-y += -D UT_DMA_ZONE
