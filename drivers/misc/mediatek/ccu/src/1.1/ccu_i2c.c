@@ -390,9 +390,9 @@ static void ccu_i2c_dump_info(struct mt_i2c *i2c)
 {
 	/* I2CFUC(); */
 	/* int val=0; */
-	pr_info("i2c_dump_info ++++++++++++++++++++++++++++++++++++++++++\n");
-	pr_info("base address 0x%p\n", i2c->base);
-	pr_info("I2C register:\n"
+	pr_debug("i2c_dump_info ++++++++++++++++++++++++++++++++++++++++++\n");
+	pr_debug("base address 0x%p\n", i2c->base);
+	pr_debug("I2C register:\n"
 	       I2CTAG "SLAVE_ADDR=%x,INTR_MASK=%x,INTR_STAT=%x,"
 	       I2CTAG "CONTROL=%x,TRANSFER_LEN=%x\n"
 	       I2CTAG "TRANSAC_LEN=%x,DELAY_LEN=%x,"
@@ -416,7 +416,7 @@ static void ccu_i2c_dump_info(struct mt_i2c *i2c)
 	       (i2c_readw(i2c, 0x200 + OFFSET_EXT_CONF)),
 		   (i2c_readw(i2c, 0x200 + OFFSET_TRANSFER_LEN_AUX)));
 
-	pr_info("DMA register(0x%p):\n"
+	pr_debug("DMA register(0x%p):\n"
 	       I2CTAG "INT_FLAG=%x,INT_EN=%x,EN=%x,RST=%x,\n"
 	       I2CTAG "STOP=%x,FLUSH=%x,CON=%x,TX_MEM_ADDR=%x, RX_MEM_ADDR=%x\n"
 	       I2CTAG "TX_LEN=%x,RX_LEN=%x,INT_BUF_SIZE=%x,DEBUG_STATUS=%x\n"
@@ -437,6 +437,6 @@ static void ccu_i2c_dump_info(struct mt_i2c *i2c)
 	       (i2c_readl_dma(i2c, 0x80 + OFFSET_DEBUG_STA)),
 	       (i2c_readl_dma(i2c, 0x80 + OFFSET_TX_MEM_ADDR2)),
 	       (i2c_readl_dma(i2c, 0x80 + OFFSET_RX_MEM_ADDR2)));
-	pr_info("i2c_dump_info ------------------------------------------\n");
+	pr_debug("i2c_dump_info ------------------------------------------\n");
 
 }
