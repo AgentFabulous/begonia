@@ -132,9 +132,6 @@ obj-y += $(subst ",,$(MTK_PLATFORM))/
 else
 obj-y += mmdvfs_plat_default.o
 endif
-ifeq (true, $(APPLY_CLK_LOG))
-ccflags-y += -DAPPLY_CLK_LOG
-endif
 
 ifeq ($(CONFIG_MTK_QOS_V2),y)
 ifeq (true, $(QOS_BOUND_DETECT))
