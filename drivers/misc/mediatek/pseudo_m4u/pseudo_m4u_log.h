@@ -25,7 +25,7 @@ extern int m4u_log_to_uart;
 do { \
 	if (level > m4u_log_level) { \
 		if (level > m4u_log_to_uart) \
-			pr_info("[PSEUDO][%s #%d]: "string,	 \
+			pr_debug("[PSEUDO][%s #%d]: "string,	 \
 				__func__, __LINE__, ##args); \
 		else\
 			pr_debug("[PSEUDO][%s #%d]: "string,		\
@@ -45,7 +45,7 @@ do { \
 #define M4UTRACE() \
 do { \
 	if (!m4u_log_to_uart) \
-		pr_info("[PSEUDO] %s, %d\n", __func__, __LINE__); \
+		pr_debug("[PSEUDO] %s, %d\n", __func__, __LINE__); \
 } while (0)
 
 #define M4U_PRINT_SEQ(seq_file, fmt, args...) \
