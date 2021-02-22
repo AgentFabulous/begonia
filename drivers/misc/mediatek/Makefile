@@ -32,7 +32,9 @@ obj-$(CONFIG_MTK_M4U)   += m4u/
 obj-$(CONFIG_MTK_PSEUDO_M4U)   += pseudo_m4u/
 obj-$(CONFIG_MTK_ICE_DEBUG) += ice_debug/
 obj-y += mmdvfs/
+ifneq ($(CONFIG_MTK_SYSTRACKER_DISABLE),y)
 obj-$(CONFIG_MTK_SYSTRACKER_V2)   += systracker/
+endif
 
 obj-$(CONFIG_MTK_IRRX) += irrx/
 
