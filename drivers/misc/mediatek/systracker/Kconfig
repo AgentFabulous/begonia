@@ -1,3 +1,9 @@
+config MTK_SYSTRACKER_DISABLE
+	bool "Disable all systracker services"
+	default y
+	help
+	  Disable the Mediatek systracker debugging feature
+
 config MTK_SYSTRACKER_V2
 	bool "Enable MTK System Tracker Debugger V2"
 	select MTK_SYSTRACKER

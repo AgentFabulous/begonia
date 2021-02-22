@@ -10,7 +10,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
-
+ifneq ($(CONFIG_MTK_SYSTRACKER_DISABLE),y)
 ifeq ($(CONFIG_MTK_SYSTRACKER_V2),y)
     obj-y += systracker_interface_v2.o
 endif
@@ -20,4 +20,5 @@ ifeq ($(CONFIG_ARM64), y)
 else
   obj-y += backtrace32.o
   obj-y += backtrace32_asm.o
+endif
 endif
