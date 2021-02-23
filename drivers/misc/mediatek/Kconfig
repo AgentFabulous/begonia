@@ -71,6 +71,7 @@ config MTK_BOUNCING_CHECK
 
 config MTK_ENG_BUILD
 	bool "flag for MTK eng/usr build verification"
+	default n
 	help
 	  Y means this kernel version is engineering mode and has more debugging
 	  features built-in. This option is supposed to specifiy engineering or
