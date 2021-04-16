@@ -56,8 +56,8 @@
 #define dbgmsg(...)
 #endif
 #define msg(msg...) pr_info(PFX msg)
-#define warnmsg(msg...) pr_info(PFX msg)
-#define errmsg(msg...) pr_notice(PFX msg)
+#define warnmsg(msg...) pr_warn(PFX msg)
+#define errmsg(msg...) pr_err(PFX msg)
 
 #define WK_MAX_MSG_SIZE (128)
 #define MIN_KICK_INTERVAL	 1
