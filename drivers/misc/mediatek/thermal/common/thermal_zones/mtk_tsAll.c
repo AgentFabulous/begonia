@@ -66,13 +66,13 @@ struct cooler_data {
 static struct cooler_data g_coolerData[RESERVED_TZS];
 #endif
 
-static int tsallts_debug_log;
+static int tsallts_debug_log = 0;
 
 #define TSALLTS_TEMP_CRIT 120000	/* 120.000 degree Celsius */
 
 #define tsallts_dprintk(fmt, args...)   \
 	do {                                    \
-		if (tsallts_debug_log) {                \
+		if (tsallts_debug_log != 0) {                \
 			pr_debug("[Thermal/TZ/CPUALL]" fmt, ##args);\
 		}                                   \
 	} while (0)
@@ -80,7 +80,7 @@ static int tsallts_debug_log;
 #if AUTO_GEN_COOLERS
 #define clnothings_dprintk(fmt, args...)   \
 	do {                                    \
-		if (tsallts_debug_log) {                \
+		if (tsallts_debug_log != 0) {                \
 			pr_debug("[Thermal/TZ/CLNOTHINGS]" fmt, ##args);\
 		}                                   \
 	} while (0)
