@@ -142,7 +142,7 @@ struct DPE_CLK_STRUCT dpe_clk;
 #define LOG_VRB(format,	args...)    pr_debug(MyTag format, ##args)
 
 #ifdef DPE_DEBUG_USE
-#define LOG_DBG(format, args...)    pr_info(MyTag format, ##args)
+#define LOG_DBG(format, args...)    pr_debug(MyTag format, ##args)
 #else
 #define LOG_DBG(format, args...)
 #endif

@@ -141,7 +141,7 @@ pr_debug(MyTag "[%s] " format, __func__, ##args)
 #define WPE_DEBUG
 #ifdef WPE_DEBUG
 #define LOG_DBG(format, args...) \
-pr_info(MyTag "[%s] " format, __func__, ##args)
+pr_debug(MyTag "[%s] " format, __func__, ##args)
 #else
 #define LOG_DBG(format, args...)
 #endif
@@ -151,9 +151,9 @@ pr_info(MyTag "[%s] " format, __func__, ##args)
 #define LOG_NOTICE(format, args...) \
 pr_notice(MyTag "[%s] " format, __func__, ##args)
 #define LOG_WRN(format, args...) \
-pr_info(MyTag "[%s] " format, __func__, ##args)
+pr_warn(MyTag "[%s] " format, __func__, ##args)
 #define LOG_ERR(format, args...) \
-pr_info(MyTag "[%s] " format, __func__, ##args)
+pr_err(MyTag "[%s] " format, __func__, ##args)
 #define LOG_AST(format, args...) \
 pr_debug(MyTag "[%s] " format, __func__, ##args)
 

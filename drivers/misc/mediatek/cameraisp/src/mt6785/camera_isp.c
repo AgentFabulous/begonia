@@ -122,7 +122,7 @@
 	 __func__, ##args)
 #define ISP_DEBUG
 #ifdef ISP_DEBUG
-#define LOG_DBG(format, args...)    pr_info(MyTag "[%s] " format, \
+#define LOG_DBG(format, args...)    pr_debug(MyTag "[%s] " format, \
 	 __func__, ##args)
 #else
 #define LOG_DBG(format, args...)
@@ -1100,7 +1100,7 @@ static int32_t ISP_GetWaitQCamIndex(enum ISP_IRQ_TYPE_ENUM type)
 	int32_t index = type - ISP_IRQ_TYPE_INT_CAM_A_ST;
 
 	if (index >= CAM_AMOUNT)
-		pr_info("waitq cam index out of range:%d", index);
+		pr_debug("waitq cam index out of range:%d", index);
 
 	return index;
 }
@@ -1113,7 +1113,7 @@ static int32_t ISP_GetWaitQCamsvIndex(enum ISP_IRQ_TYPE_ENUM type)
 	int32_t index = type - ISP_IRQ_TYPE_INT_CAMSV_0_ST;
 
 	if (index >= CAMSV_AMOUNT)
-		pr_info("waitq camsv index out of range:%d", index);
+		pr_debug("waitq camsv index out of range:%d", index);
 
 	return index;
 }
@@ -1143,7 +1143,7 @@ static int32_t ISP_GetWaitQCamIrqIndex(
 	}
 
 	if (index == ISP_WAITQ_HEAD_IRQ_AMOUNT)
-		pr_info("waitq cam irq index out of range:%d_%d",
+		pr_debug("waitq cam irq index out of range:%d_%d",
 				st_type, status);
 
 	return index;
@@ -1165,7 +1165,7 @@ static int32_t ISP_GetWaitQCamsvIrqIndex(
 	}
 
 	if (index == ISP_WAITQ_HEAD_IRQ_SV_AMOUNT)
-		pr_info("waitq camsv irq index out of range:%d_%d",
+		pr_debug("waitq camsv irq index out of range:%d_%d",
 				st_type, status);
 
 	return index;
@@ -2273,7 +2273,7 @@ static int ISP_REGISTER_IRQ_USERKEY(char *userName)
 		}
 
 		if (IspInfo.DebugMask & ISP_DBG_INT)
-			pr_info(" [regUser] UserName (%s)\n", userName);
+			pr_debug(" [regUser] UserName (%s)\n", userName);
 
 		/* 1. check the current users is full or not */
 		if (FirstUnusedIrqUserKey >= IRQ_USER_NUM_MAX ||

@@ -146,7 +146,7 @@ static u32 target_clk;
 #define ISP_DEBUG
 #ifdef ISP_DEBUG
 #define LOG_DBG(format, args...) \
-		pr_info(MyTag "[%s] " format, __func__, ##args)
+		pr_debug(MyTag "[%s] " format, __func__, ##args)
 #else
 #define LOG_DBG(format, args...)
 #endif
