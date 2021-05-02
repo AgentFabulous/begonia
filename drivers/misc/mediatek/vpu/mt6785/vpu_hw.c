@@ -350,7 +350,7 @@ static void vpu_err_msg(int core, const char *msg)
 
 #define vpu_err_hnd(hw_fail, core, req, key, fmt, args...) \
 	do { \
-		pr_info(fmt, ##args); \
+		pr_debug(fmt, ##args); \
 		vpu_err_msg(core, __func__); \
 		if (hw_fail) { \
 			vpu_dmp_create_locked(core, req, fmt, ##args); \
@@ -377,7 +377,7 @@ static int wait_idle(int core, uint32_t latency, uint32_t retry)
 		udelay(latency);
 	} while (count < retry);
 
-	pr_info("%s: vpu%d: %d us: pwaitmode: %d, info00: 0x%x, info25: 0x%x\n",
+	pr_debug("%s: vpu%d: %d us: pwaitmode: %d, info00: 0x%x, info25: 0x%x\n",
 		__func__, core, (latency * retry), pwait,
 		vpu_read_field(core, FLD_XTENSA_INFO00),
 		vpu_read_field(core, FLD_XTENSA_INFO25));
@@ -402,11 +402,11 @@ start:
 
 	/* ret == -ERESTARTSYS, if signal interrupt */
 	if (ret == -ERESTARTSYS) {
-		pr_info("%s: vpu%d: interrupt by signal: ret=%d\n",
+		pr_debug("%s: vpu%d: interrupt by signal: ret=%d\n",
 			__func__, core, ret);
 
 		if (retry) {
-			pr_info("%s: vpu%d: try wait again\n",
+			pr_debug("%s: vpu%d: try wait again\n",
 				__func__, core);
 			retry = false;
 			goto start;
@@ -419,7 +419,7 @@ start:
 		ret = 0;
 	} else {    /* condition false: timeout or retry*/
 		if (count >= CMD_WAIT_COUNT) {
-			pr_info("%s: vpu%d: timeout: %d ms\n",
+			pr_debug("%s: vpu%d: timeout: %d ms\n",
 				__func__, core, CMD_WAIT_TIME_MS);
 			ret = -ETIMEDOUT;
 		} else {
@@ -5621,7 +5621,7 @@ int vpu_dump_mesg_seq(struct seq_file *s, int core_s)
 		(void *)(vpu_service_cores[core].work_buf->va + VPU_OFFSET_LOG),
 		VPU_SIZE_LOG_BUF, true);
 	} else
-		pr_info("%s: NULL handle for dump!\n", __func__);
+		pr_debug("%s: NULL handle for dump!\n", __func__);
 	return 0;
 }
 
