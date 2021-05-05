@@ -66,7 +66,7 @@
 			ptr = &_gSVBW_LIST[module - \
 				ISP_IRQ_TYPE_INT_CAMSV_0_ST]; \
 		} else { \
-			LOG_NOTICE("sv idx violation , force to ke\n"); \
+			LOG_DBG("sv idx violation , force to ke\n"); \
 		} \
 		ptr; \
 	})
@@ -84,7 +84,7 @@
 			ptr = &_gSV_BW_REQ \
 				[module - ISP_IRQ_TYPE_INT_CAMSV_0_ST][port]; \
 		} else { \
-			LOG_NOTICE("sv idx violation , force to ke\n"); \
+			LOG_DBG("sv idx violation , force to ke\n"); \
 		} \
 		ptr; \
 	})
@@ -117,7 +117,7 @@ static u32 target_clk;
 			mm_qos_remove_all_request(gSVBW_LIST(module));
 			break;
 		default:
-			LOG_NOTICE("unsupported module:%d\n", module);
+			LOG_DBG("unsupported module:%d\n", module);
 			break;
 		}
 	}
@@ -137,7 +137,7 @@ static u32 target_clk;
 					SMI_SOC0);
 				break;
 			default:
-				LOG_NOTICE("unsupported port:%d\n", portID);
+				LOG_DBG("unsupported port:%d\n", portID);
 				break;
 			}
 			break;
@@ -151,14 +151,14 @@ static u32 target_clk;
 						SMI_SOC1);
 					break;
 				default:
-					LOG_NOTICE("unsupported port:%d\n",
+					LOG_DBG("unsupported port:%d\n",
 						portID);
 					break;
 				}
 				break;
 		case ISP_IRQ_TYPE_INT_CAMSV_4_ST: /* FALLTHROUGH */
 		case ISP_IRQ_TYPE_INT_CAMSV_5_ST:
-				LOG_NOTICE("unsupported module:%d\n", module);
+				LOG_DBG("unsupported module:%d\n", module);
 				break;
 		default:
 				switch (portID) {
@@ -267,7 +267,7 @@ static u32 target_clk;
 						SMI_LSCI_2);
 						break;
 					default:
-						LOG_NOTICE(
+						LOG_DBG(
 							"unsupported module:%d\n",
 							module);
 						break;
@@ -284,7 +284,7 @@ static u32 target_clk;
 						SMI_PDI);
 					break;
 				default:
-					LOG_NOTICE("unsupported port:%d\n",
+					LOG_DBG("unsupported port:%d\n",
 						portID);
 					break;
 				}
@@ -327,7 +327,7 @@ static u32 target_clk;
 					bw.avg, bw.peak, BW_COMP_NONE);
 				break;
 			default:
-				LOG_NOTICE("unsupported port:%d\n", portID);
+				LOG_DBG("unsupported port:%d\n", portID);
 				break;
 			}
 			break;
@@ -344,12 +344,12 @@ static u32 target_clk;
 					bw.avg, bw.peak, BW_COMP_DEFAULT);
 				break;
 			default:
-				LOG_NOTICE("unsupported port:%d\n", portID);
+				LOG_DBG("unsupported port:%d\n", portID);
 				break;
 			}
 			break;
 		default:
-			LOG_NOTICE("unsupported module:%d\n", module);
+			LOG_DBG("unsupported module:%d\n", module);
 			break;
 		}
 	}
@@ -372,7 +372,7 @@ static u32 target_clk;
 			mm_qos_update_all_request(gSVBW_LIST(module));
 			break;
 		default:
-			LOG_NOTICE("unsupported module:%d\n", module);
+			LOG_DBG("unsupported module:%d\n", module);
 			break;
 		}
 	}
@@ -402,7 +402,7 @@ static u32 target_clk;
 			mm_qos_update_all_request_zero(gSVBW_LIST(module));
 			break;
 		default:
-			LOG_NOTICE("unsupported module:%d\n", module);
+			LOG_DBG("unsupported module:%d\n", module);
 			break;
 		}
 	}
@@ -438,55 +438,55 @@ static u32 target_clk;
 	inline void mtk_pmqos_remove(
 			enum ISP_IRQ_TYPE_ENUM module)
 	{
-		LOG_NOTICE("MTK_SET_PM_QOS is not supported\n");
+		LOG_DBG("MTK_SET_PM_QOS is not supported\n");
 	}
 	inline void mtk_pmqos_add(
 		enum ISP_IRQ_TYPE_ENUM module,
 		u32 portID)
 	{
-		LOG_NOTICE("MTK_SET_PM_QOS is not supported\n");
+		LOG_DBG("MTK_SET_PM_QOS is not supported\n");
 	}
 	inline void mtk_pmqos_set(
 		enum ISP_IRQ_TYPE_ENUM module,
 		u32 portID,
 		struct ISP_BW bw)
 	{
-		LOG_NOTICE("MTK_SET_PM_QOS is not supported\n");
+		LOG_DBG("MTK_SET_PM_QOS is not supported\n");
 	}
 	inline void mtk_pmqos_update(
 		enum ISP_IRQ_TYPE_ENUM module)
 	{
-		LOG_NOTICE("MTK_SET_PM_QOS is not supported\n");
+		LOG_DBG("MTK_SET_PM_QOS is not supported\n");
 	}
 	inline void mtk_pmqos_clr(
 		enum ISP_IRQ_TYPE_ENUM module)
 	{
-		LOG_NOTICE("MTK_SET_PM_QOS is not supported\n");
+		LOG_DBG("MTK_SET_PM_QOS is not supported\n");
 	}
 
 	inline void mtk_dfs_add(void)
 	{
 		//mmdvfs_pm_qos_add_request(&isp_qos,
 		//	MMDVFS_PM_QOS_SUB_SYS_CAMERA, 0);
-		LOG_NOTICE("mmdvfs_pm_qos_add_request is not supported\n");
+		LOG_DBG("mmdvfs_pm_qos_add_request is not supported\n");
 	}
 	inline void mtk_dfs_remove(void)
 	{
 		//mmdvfs_pm_qos_remove_request(&isp_qos);
-		LOG_NOTICE("mtk_dfs_remove is not supported\n");
+		LOG_DBG("mtk_dfs_remove is not supported\n");
 	}
 	inline void mtk_dfs_clr(void)
 	{
 		//mmdvfs_pm_qos_update_request(&isp_qos,
 		//	MMDVFS_PM_QOS_SUB_SYS_CAMERA, 0);
-		LOG_NOTICE("mtk_dfs_clr is not supported\n");
+		LOG_DBG("mtk_dfs_clr is not supported\n");
 	}
 	inline void mtk_dfs_set(void) {}
 	inline void mtk_dfs_update(u32 clk)
 	{
 		//mmdvfs_pm_qos_update_request(&isp_qos,
 		//	MMDVFS_PM_QOS_SUB_SYS_CAMERA, clk);
-		LOG_NOTICE("mtk_dfs_update is not supported\n");
+		LOG_DBG("mtk_dfs_update is not supported\n");
 	}
 	inline void mtk_dfs_supported(u64 *frq, u32 *step)
 	{
@@ -496,13 +496,13 @@ static u32 target_clk;
 		//	frq[lv] = mmdvfs_qos_get_thres_value(&isp_qos,
 		//		MMDVFS_PM_QOS_SUB_SYS_CAMERA, lv);
 		//}
-		LOG_NOTICE("mtk_dfs_supported is not supported\n");
+		LOG_DBG("mtk_dfs_supported is not supported\n");
 	}
 	inline unsigned int mtk_dfs_cur(void)
 	{
 		//return mmdvfs_qos_get_cur_thres(&isp_qos,
 		//	MMDVFS_PM_QOS_SUB_SYS_CAMERA);
-		LOG_NOTICE("mtk_dfs_cur is not supported\n");
+		LOG_DBG("mtk_dfs_cur is not supported\n");
 	}
 #endif
 
@@ -515,14 +515,14 @@ int ISP_SetPMQOS(
 	int Ret = 0;
 
 	if (module > ISP_IRQ_TYPE_INT_CAM_C_ST) {
-		LOG_NOTICE("supported only to CAM_C\n");
+		LOG_DBG("supported only to CAM_C\n");
 		return 1;
 	}
 
 	switch (cmd) {
 	case E_BW_REMOVE:
 		mtk_pmqos_remove(module);
-		LOG_INF("PM_QOS:module:%d,OFF\n", module);
+		LOG_DBG("PM_QOS:module:%d,OFF\n", module);
 		break;
 	case E_BW_ADD:
 		{
@@ -533,7 +533,7 @@ int ISP_SetPMQOS(
 			for (; i < _cam_max_; i++)
 				mtk_pmqos_add(module, i);
 
-			LOG_INF("PM_QOS:module:%d,ON\n", module);
+			LOG_DBG("PM_QOS:module:%d,ON\n", module);
 		}
 		break;
 	case E_BW_UPDATE:
@@ -554,20 +554,20 @@ int ISP_SetPMQOS(
 	case E_BW_CLR:
 		if (pvalue[0] == MFALSE) {
 			mtk_pmqos_clr(module);
-			LOG_INF("module:%d bw_clr\n", module);
+			LOG_DBG("module:%d bw_clr\n", module);
 		}
 		break;
 	case E_CLK_ADD:
 		mtk_dfs_add();
-		LOG_INF("DFS_add\n");
+		LOG_DBG("DFS_add\n");
 		break;
 	case E_CLK_REMOVE:
 		mtk_dfs_remove();
-		LOG_INF("DFS_remove\n");
+		LOG_DBG("DFS_remove\n");
 		break;
 	case E_CLK_CLR:
 		mtk_dfs_clr();
-		LOG_INF("DFS_clr\n");
+		LOG_DBG("DFS_clr\n");
 		break;
 	case E_CLK_UPDATE:
 		mtk_dfs_set();
@@ -609,7 +609,7 @@ int ISP_SetPMQOS(
 		break;
 	case E_QOS_UNKNOWN:
 	default:
-		LOG_NOTICE("unsupport cmd:%d", cmd);
+		LOG_DBG("unsupport cmd:%d", cmd);
 		Ret = -1;
 		break;
 	}
@@ -627,14 +627,14 @@ int SV_SetPMQOS(
 
 	if ((module < ISP_IRQ_TYPE_INT_CAMSV_0_ST) &&
 		(module > ISP_IRQ_TYPE_INT_CAMSV_5_ST)) {
-		LOG_NOTICE("supported only to SV0 to SV5\n");
+		LOG_DBG("supported only to SV0 to SV5\n");
 		return 1;
 	}
 
 	switch (cmd) {
 	case E_BW_REMOVE:
 		mtk_pmqos_remove(module);
-		LOG_INF("PM_QOS:module:%d,OFF\n", module);
+		LOG_DBG("PM_QOS:module:%d,OFF\n", module);
 		break;
 	case E_BW_ADD:
 		{
@@ -665,7 +665,7 @@ int SV_SetPMQOS(
 	case E_BW_CLR:
 		if (pvalue[0] == MFALSE) {
 			mtk_pmqos_clr(module);
-		    LOG_INF("module:%d BW_clr\n", module);
+		    LOG_DBG("module:%d BW_clr\n", module);
 		}
 		break;
 	case E_QOS_UNKNOWN:
@@ -676,7 +676,7 @@ int SV_SetPMQOS(
 	case E_CLK_SUPPORTED:
 	case E_CLK_CUR:
 	default:
-		LOG_NOTICE("unsupport cmd:%d", cmd);
+		LOG_DBG("unsupport cmd:%d", cmd);
 		Ret = -1;
 		break;
 	}
