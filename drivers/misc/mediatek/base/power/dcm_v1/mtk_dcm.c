@@ -436,7 +436,7 @@ static ssize_t dcm_state_store(struct kobject *kobj,
 				 */
 				if (mask & STALL_DCM_TYPE) {
 					if (mode)
-						dcm_pr_info("stall dcm is enabled for Default(Normal) mode started\n");
+						dcm_pr_info("stall dcm is enabled for Default(Normal) mode started\n");
 					else
 						dcm_pr_info("stall dcm is disabled for Performance(Sports) mode started\n");
 				}

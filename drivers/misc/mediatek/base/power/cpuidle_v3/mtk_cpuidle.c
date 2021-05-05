@@ -286,7 +286,7 @@ static int wakeup_source_lookup(void)
 
 		irq_nr = of_irq_get(of_args.np, of_args.args[0]);
 		if (irq_nr <= 0) {
-			pr_notice("cpuidle: wake up IRQ not found: %d\n",
+			pr_debug("cpuidle: wake up IRQ not found: %d\n",
 				irq_nr);
 			goto fail;
 		}

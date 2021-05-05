@@ -114,7 +114,7 @@ static ssize_t idle_state_write(char *FromUserBuf, size_t sz, void *priv)
 		} else if (!strcmp(cmd, "spmtwam_sel")) {
 			mtk_idle_get_twam()->sel = parm;
 		} else if (!strcmp(cmd, "spmtwam")) {
-			pr_info("Power/swap spmtwam_event = %d\n", parm);
+			pr_debug("Power/swap spmtwam_event = %d\n", parm);
 			if (parm >= 0)
 				mtk_idle_twam_enable(parm);
 			else

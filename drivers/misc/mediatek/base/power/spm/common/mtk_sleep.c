@@ -132,7 +132,7 @@ spm_set_sleep_wakesrc(u32 wakesrc, bool enable, bool replace)
 
 bool __attribute__((weak)) spm_is_enable_sleep(void)
 {
-	pr_info("NO %s !!!\n", __func__);
+	pr_debug("NO %s !!!\n", __func__);
 	return false;
 }
 
@@ -431,9 +431,9 @@ void slp_module_init(void)
 	}
 
 	spm_output_sleep_option();
-	pr_info("[SLP] SLEEP_DPIDLE_EN:%d, REPLACE_DEF_WAKESRC:%d",
+	pr_debug("[SLP] SLEEP_DPIDLE_EN:%d, REPLACE_DEF_WAKESRC:%d",
 		SLP_SLEEP_DPIDLE_EN, SLP_REPLACE_DEF_WAKESRC);
-	pr_info(", SUSPEND_LOG_EN:%d\n", SLP_SUSPEND_LOG_EN);
+	pr_debug(", SUSPEND_LOG_EN:%d\n", SLP_SUSPEND_LOG_EN);
 	suspend_set_ops(&slp_suspend_ops);
 #if SLP_SUSPEND_LOG_EN
 	console_suspend_enabled = 0;

@@ -836,7 +836,7 @@ void set_mcdi_s_state(int state)
 		return;
 	}
 
-	pr_info("%s:  %d\n", __func__, state);
+	pr_debug("%s:  %d\n", __func__, state);
 
 	spin_lock_irqsave(&mcdi_feature_stat_spin_lock, flags);
 

@@ -54,7 +54,7 @@ void __attribute__((weak)) clk_buf_dump_clkbuf_log(void)
 
 int __attribute__((weak)) clk_buf_fs_init(void)
 {
-	pr_info("%s: dummy func\n", __func__);
+	pr_debug("%s: dummy func\n", __func__);
 	return 0;
 }
 

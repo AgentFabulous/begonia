@@ -35,6 +35,6 @@ EXPORT_SYMBOL(dpidle_enter);
 /* for display use, abandoned 'spm_enable_sodi' */
 void mtk_idle_disp_is_ready(bool enable)
 {
-	pr_notice("Power/swap - %s not support anymore!\n", __func__);
+	pr_debug("Power/swap - %s not support anymore!\n", __func__);
 }
 

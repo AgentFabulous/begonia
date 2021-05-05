@@ -106,14 +106,14 @@ int mtk_idle_notifier_register(struct notifier_block *n)
 	symname = kallsyms_lookup((unsigned long)n->notifier_call,
 			NULL, NULL, NULL, namebuf);
 	if (symname) {
-		pr_info("Power/swap [mt_idle_ntf] <%02d>%08lx (%s)\n",
+		pr_debug("Power/swap [mt_idle_ntf] <%02d>%08lx (%s)\n",
 			index++, (unsigned long)n->notifier_call, symname);
 	} else {
-		pr_info("Power/swap [mt_idle_ntf] <%02d>%08lx\n",
+		pr_debug("Power/swap [mt_idle_ntf] <%02d>%08lx\n",
 			index++, (unsigned long)n->notifier_call);
 	}
 	#else
-	pr_info("Power/swap [mt_idle_ntf] <%02d>%08lx\n",
+	pr_debug("Power/swap [mt_idle_ntf] <%02d>%08lx\n",
 			index++, (unsigned long)n->notifier_call);
 	#endif
 

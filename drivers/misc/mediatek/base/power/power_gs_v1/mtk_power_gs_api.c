@@ -359,13 +359,13 @@ void mt_power_gs_pmic_manual_dump(void)
 				_golden_read_reg(pmd.addr_array[i]));
 
 			if (dump_cnt && ((dump_cnt % PER_LINE_TO_PRINT) == 0)) {
-				pr_notice("%s", buf);
+				pr_debug("%s", buf);
 				p = buf;
 				p += snprintf(p, sizeof(buf), "\n");
 			}
 		}
 		if (dump_cnt % PER_LINE_TO_PRINT)
-			pr_notice("%s", buf);
+			pr_debug("%s", buf);
 	}
 }
 
@@ -407,7 +407,7 @@ void mt_power_gs_compare(char *scenario, char *pmic_name,
 
 				if (dump_cnt &&
 					((dump_cnt % PER_LINE_TO_PRINT) == 0)) {
-					pr_notice("%s", buf);
+					pr_debug("%s", buf);
 					p = buf;
 					p += snprintf(p, sizeof(buf), "\n");
 				}
@@ -415,7 +415,7 @@ void mt_power_gs_compare(char *scenario, char *pmic_name,
 
 		}
 		if (dump_cnt % PER_LINE_TO_PRINT)
-			pr_notice("%s", buf);
+			pr_debug("%s", buf);
 
 	/* dump raw data mode */
 	} else {
@@ -433,12 +433,12 @@ void mt_power_gs_compare(char *scenario, char *pmic_name,
 				scenario, pmic_name, pmic_gs[i], val0);
 
 			if (dump_cnt && ((dump_cnt % PER_LINE_TO_PRINT) == 0)) {
-				pr_notice("%s", buf);
+				pr_debug("%s", buf);
 				p = buf;
 				p += snprintf(p, sizeof(buf), "\n");
 			}
 		}
 		if (dump_cnt % PER_LINE_TO_PRINT)
-			pr_notice("%s", buf);
+			pr_debug("%s", buf);
 	}
 }

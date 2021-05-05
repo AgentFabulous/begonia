@@ -576,7 +576,7 @@ void mt_gpufreq_power_control_disable(bool cg, bool mtcmos, bool buck)
 
 	/* Be powering off MTCMOS and BUCK when PTPOD is initializing */
 	if (g_DVFS_is_paused_by_ptpod) {
-		gpufreq_pr_info(
+		gpufreq_pr_debug(
 				"@%s: DVFS is paused by PTPOD\n",
 				__func__);
 	}
@@ -679,12 +679,12 @@ void mt_gpufreq_enable_by_ptpod(void)
 
 #if defined(CONFIG_ARM64) && \
 	defined(CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES)
-	gpufreq_pr_info("@%s: flavor name: %s\n",
+	gpufreq_pr_debug("@%s: flavor name: %s\n",
 			__func__,
 			CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES);
 	if ((strstr(CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES,
 		"k85v1_64_aging") != NULL)) {
-		gpufreq_pr_info(
+		gpufreq_pr_debug(
 				"@%s: AGING flavor !!!\n",
 				__func__);
 		g_enable_aging_test = 1;
@@ -3149,7 +3149,7 @@ static void __mt_gpufreq_set_initial(void)
 			(DRV_Reg32(MFGPLL_CON1) & (0x7 << POSDIV_SHIFT))
 			>> POSDIV_SHIFT;
 
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: preloader opp index = %d(%d), initial opp index = %d, g_posdiv_power = %d\n",
 			__func__,
 			cur_preloader_idx,
@@ -3232,7 +3232,7 @@ static int __mt_gpufreq_init_pmic(struct platform_device *pdev)
 
 	g_buck_on = true;
 
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: VGPU sfchg raising rate: %d (us/step),\t"
 			" VGPU sfchg falling rate: %d (us/step),\t"
 			" VSRAM_GPU sfchg raising rate: %d (us/step),\t"
@@ -3243,7 +3243,7 @@ static int __mt_gpufreq_init_pmic(struct platform_device *pdev)
 			g_vsram_sfchg_rrate,
 			g_vsram_sfchg_frate);
 
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: VGPU is enabled = %d (%d mV), VSRAM_GPU is enabled = %d (%d mV)\n",
 			__func__,
 			regulator_is_enabled(g_pmic->reg_vgpu),
@@ -3349,7 +3349,7 @@ static int __mt_gpufreq_init_clk(struct platform_device *pdev)
 		return PTR_ERR(g_clk->mtcmos_mfg_core3);
 	}
 
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: clk_mux is at 0x%p, clk_main_parent is at 0x%p,\t"
 			" clk_sub_parent is at 0x%p, subsys_mfg_cg is at 0x%p,\t"
 			" mtcmos_mfg_async is at 0x%p, mtcmos_mfg is at 0x%p,\t"
@@ -3386,7 +3386,7 @@ static void __mt_gpufreq_init_efuse(void)
 		g_segment_id = MT6785T_SEGMENT;
 	}
 
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: g_efuse_id = 0x%08X, g_segment_id = %d\n",
 			__func__,
 			g_efuse_id,
@@ -3487,21 +3487,21 @@ static int __mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	/* setup initial frequency */
 	__mt_gpufreq_set_initial();
 
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: freq = %d (KHz), vgpu = %d (uV), vsram_gpu = %d (uV)\n",
 			__func__,
 			mt_get_ckgen_freq(15),
 			__mt_gpufreq_get_cur_vgpu() * 10,
 			__mt_gpufreq_get_cur_vsram_gpu() * 10);
 
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: g_cur_opp_freq = %d, g_cur_opp_vgpu = %d, g_cur_opp_vsram_gpu = %d\n",
 			__func__,
 			g_cur_opp_freq,
 			g_cur_opp_vgpu,
 			g_cur_opp_vsram_gpu);
 
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: g_cur_opp_idx = %d\n",
 			__func__,
 			g_cur_opp_idx);
@@ -3520,7 +3520,7 @@ static int __init __mt_gpufreq_init(void)
 
 #if MT_GPUFREQ_BRINGUP == 1
 	/* skip driver init in bring up stage */
-	gpufreq_pr_info(
+	gpufreq_pr_debug(
 			"@%s: init freq = %d (KHz)\n",
 			__func__,
 			mt_get_ckgen_freq(15));

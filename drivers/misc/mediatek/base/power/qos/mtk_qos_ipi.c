@@ -73,7 +73,7 @@ int qos_ipi_to_sspm_command(void *buffer, int slot)
 	int ret = sspm_ipi_send_sync(IPI_ID_QOS, IPI_OPT_POLLING,
 			buffer, slot, &ack_data, 1);
 	if (ret != 0)
-		pr_notice("qos_ipi_to_sspm error(%d)\n", ret);
+		pr_err("qos_ipi_to_sspm error(%d)\n", ret);
 #endif
 	return ack_data;
 }

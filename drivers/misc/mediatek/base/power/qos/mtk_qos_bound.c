@@ -170,19 +170,19 @@ int qos_notifier_call_chain(unsigned long val, void *v)
 	if (is_qos_bound_log_enabled()) {
 		idx = bound->idx;
 		stat = &bound->stats[bound->idx];
-		pr_info("idx: %hu, state: %hu, num: %hu, event: %hu\n",
+		pr_debug("idx: %hu, state: %hu, num: %hu, event: %hu\n",
 				idx, state,
 				stat->num, stat->event);
 		for (i = 0; i < NR_QOS_EMIBM_TYPE; i++)
-			pr_info("emibw [%d]: mon: %hu, req: %hu\n", i,
+			pr_debug("emibw [%d]: mon: %hu, req: %hu\n", i,
 					stat->emibw_mon[i],
 					stat->emibw_req[i]);
 		for (i = 0; i < NR_QOS_SMIBM_TYPE; i++)
-			pr_info("smibw [%d]: mon: %hu, req: %hu\n", i,
+			pr_debug("smibw [%d]: mon: %hu, req: %hu\n", i,
 					stat->smibw_mon[i],
 					stat->smibw_req[i]);
 		for (i = 0; i < NR_QOS_LAT_TYPE; i++)
-			pr_info("lat [%d]: mon: %hu\n", i, stat->lat_mon[i]);
+			pr_debug("lat [%d]: mon: %hu\n", i, stat->lat_mon[i]);
 	}
 
 	ret = blocking_notifier_call_chain(&qos_bound_chain_head, val, v);

@@ -87,7 +87,7 @@ static void mcdi_enable_mcupm_cluster_counter(void)
 		thre = s->target_residency;
 		mcdi_write((mcdi_mcupm_base + MCUPM_CFGREG_MP_SLEEP_TH[idx]),
 			(thre | (CLUSTER_COUNTER_ENABLE << 31)));
-		pr_info("[mcdi] [%s] cls_thre(%d)=0x%08x\n", __func__, idx,
+		pr_debug("[mcdi] [%s] cls_thre(%d)=0x%08x\n", __func__, idx,
 			mcdi_read(mcdi_mcupm_base +
 				  MCUPM_CFGREG_MP_SLEEP_TH[idx]));
 	}
