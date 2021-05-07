@@ -45,14 +45,14 @@ endif
 endef
 $(foreach drv,$(subst $\",,$(CONFIG_CUSTOM_KERNEL_IMGSENSOR)),$(eval $(call FILTER_DRV,$(drv))))
 ifneq ($(common_drv),)
-$(info imgsensor drv by common $(common_drv))
+#$(info imgsensor drv by common $(common_drv))
 endif
 obj-y				+= $(common_drv)
 ifneq ($(platform_drv),)
-$(info imgsensor drv by platform $(platform_drv))
+#$(info imgsensor drv by platform $(platform_drv))
 endif
 
-$(info imgsensor drv by platform $(project_drv))
+#$(info imgsensor drv by platform $(project_drv))
 
 obj-y				+= $(platform_drv)
 ifeq (,$(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_project/$(ARCH_MTK_PROJECT)/camera_hw))

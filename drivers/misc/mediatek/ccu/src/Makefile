@@ -22,7 +22,7 @@ endif
 
 obj-y += $(subst ",,$(platform))/
 
-$(warning CCU_MAKE_FILE_CALLED)
+#$(warning CCU_MAKE_FILE_CALLED)
 ifneq (,$(filter $(platform),mt6757 mt6799))
     obj-y += 1.0/
 else ifneq (,$(filter $(platform),mt6758 mt6763))
