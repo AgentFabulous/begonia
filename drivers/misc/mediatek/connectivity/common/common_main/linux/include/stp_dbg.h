@@ -58,12 +58,12 @@ extern INT32 gStpDbgDbgLevel;
 #define STP_DBG_PR_LOUD(fmt, arg...) \
 do { \
 	if (gStpDbgDbgLevel >= STP_DBG_LOG_LOUD) \
-		pr_info(PFX_STP_DBG "%s: "  fmt, __func__, ##arg); \
+		pr_debug(PFX_STP_DBG "%s: "  fmt, __func__, ##arg); \
 } while (0)
 #define STP_DBG_PR_DBG(fmt, arg...) \
 do { \
 	if (gStpDbgDbgLevel >= STP_DBG_LOG_DBG) \
-		pr_info(PFX_STP_DBG "%s: "  fmt, __func__, ##arg); \
+		pr_debug(PFX_STP_DBG "%s: "  fmt, __func__, ##arg); \
 } while (0)
 #define STP_DBG_PR_INFO(fmt, arg...) \
 do { \

@@ -61,7 +61,7 @@ static INT32 gDbgLevel = UART_LOG_INFO;
 
 #define UART_PR_DBG(fmt, arg...)	\
 do { if (gDbgLevel >= UART_LOG_DBG)	\
-		pr_info(PFX "%s: "  fmt, __func__, ##arg);	\
+		pr_debug(PFX "%s: "  fmt, __func__, ##arg);	\
 } while (0)
 #define UART_PR_INFO(fmt, arg...)	\
 do { if (gDbgLevel >= UART_LOG_INFO)	\
@@ -133,11 +133,11 @@ static _osal_inline_ INT32 stp_uart_tx_wakeup(struct tty_struct *tty)
 
 #if 0
 	if ((i > 1000) && (i % 5) == 0) {
-		UART_PR_INFO("i=(%d), ****** drop data from uart******\n", i);
+		UART_PR_DBG("i=(%d), ****** drop data from uart******\n", i);
 		i++;
 		return 0;
 	}
-	UART_PR_INFO("i=(%d)at stp uart **\n", i);
+	UART_PR_DBG("i=(%d)at stp uart **\n", i);
 #endif
 
 	len = (wr_idx >= rd_idx) ? (wr_idx - rd_idx) : (MTKSTP_BUFFER_SIZE - rd_idx);
@@ -324,19 +324,19 @@ static VOID stp_uart_rx_handling(ULONG func_data)
 
 	if (how_much_to_get >= RX_BUFFER_LEN) {
 		flag = 1;
-		UART_PR_INFO("fifolen(%d)\n", how_much_to_get);
+		UART_PR_DBG("fifolen(%d)\n", how_much_to_get);
 	}
 
 	do {
 		how_much_get = kfifo_out(g_stp_uart_rx_fifo, g_rx_data, RX_BUFFER_LEN);
-		/* UART_PR_INFO ("fifoget(%d)\n", how_much_get); */
+		/* UART_PR_DBG ("fifoget(%d)\n", how_much_get); */
 		mtk_wcn_stp_parser_data((UINT8 *) g_rx_data, how_much_get);
 		how_much_to_get = kfifo_len(g_stp_uart_rx_fifo);
 	} while (how_much_to_get > 0);
 
 /* read_unlock(&g_stp_uart_rx_handling_lock); */
 	if (flag == 1)
-		UART_PR_INFO("finish, fifolen(%d)\n", kfifo_len(g_stp_uart_rx_fifo));
+		UART_PR_DBG("finish, fifolen(%d)\n", kfifo_len(g_stp_uart_rx_fifo));
 }
 
 static VOID stp_uart_tty_receive(struct tty_struct *tty, const unsigned char *data, PINT8 flags, INT32 count)
@@ -359,7 +359,7 @@ static VOID stp_uart_tty_receive(struct tty_struct *tty, const unsigned char *da
 	}
 	/*How much empty seat? */
 	if (fifo_avail_len > 0) {
-		/* UART_PR_INFO ("fifo left(%d), count(%d)\n", fifo_avail_len, count); */
+		/* UART_PR_DBG ("fifo left(%d), count(%d)\n", fifo_avail_len, count); */
 		how_much_put = kfifo_in(g_stp_uart_rx_fifo, (PUINT8) data, count);
 
 		/*schedule it! */
@@ -393,7 +393,7 @@ static INT32 stp_uart_fifo_init(VOID)
 		goto fifo_init_end;
 	}
 
-	UART_PR_INFO("g_stp_uart_rx_buf alloc ok(0x%p, %d)\n",
+	UART_PR_DBG("g_stp_uart_rx_buf alloc ok(0x%p, %d)\n",
 		       g_stp_uart_rx_buf, LDISC_RX_BUF_SIZE);
 
 	/*add rx fifo */
@@ -414,7 +414,7 @@ static INT32 stp_uart_fifo_init(VOID)
 		err = -3;
 		goto fifo_init_end;
 	}
-	UART_PR_INFO("g_stp_uart_rx_fifo alloc ok\n");
+	UART_PR_DBG("g_stp_uart_rx_fifo alloc ok\n");
 
 fifo_init_end:
 

@@ -33,19 +33,19 @@ void ring_emi_init(void *base, unsigned int max_size, void *read, void *write, s
 	if (ring_emi->read)
 		EMI_WRITE32(ring_emi->read, 0);
 	ring_emi->max_size = max_size;
-	pr_info("base: %p, read: %p, write: %p, max_size: %d\n", base, read, write, max_size);
+	pr_debug("base: %p, read: %p, write: %p, max_size: %d\n", base, read, write, max_size);
 }
 
 void ring_emi_dump(const char *title, struct ring_emi *ring_emi)
 {
-	pr_info("[%s] ring_emi:{base=0x%p, write=%d, read=%d, max_size=%d}\n",
+	pr_debug("[%s] ring_emi:{base=0x%p, write=%d, read=%d, max_size=%d}\n",
 			title, ring_emi->base, EMI_READ32(ring_emi->write),
 			EMI_READ32(ring_emi->read), ring_emi->max_size);
 }
 
 void ring_emi_dump_segment(const char *title, struct ring_emi_segment *seg)
 {
-	pr_info("[%s] seg:{ring_emi_pt=0x%p, data_pos=%d, sz=%d, remain=%d}\n",
+	pr_debug("[%s] seg:{ring_emi_pt=0x%p, data_pos=%d, sz=%d, remain=%d}\n",
 			title, seg->ring_emi_pt, seg->data_pos, seg->sz, seg->remain);
 }
 

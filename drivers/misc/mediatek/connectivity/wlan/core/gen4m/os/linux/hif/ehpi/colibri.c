@@ -155,8 +155,8 @@ uint32_t glRegisterBus(probe_card pfProbe, remove_card pfRemove)
 	ASSERT(pfProbe);
 	ASSERT(pfRemove);
 
-	pr_info("mtk_sdio: MediaTek eHPI WLAN driver\n");
-	pr_info("mtk_sdio: Copyright MediaTek Inc.\n");
+	pr_debug("mtk_sdio: MediaTek eHPI WLAN driver\n");
+	pr_debug("mtk_sdio: Copyright MediaTek Inc.\n");
 
 	if (pfProbe(NULL) != WLAN_STATUS_SUCCESS) {
 		pfRemove();
@@ -306,7 +306,7 @@ int32_t glBusSetIrq(void *pvData, void *pfnIsr, void *pvCookie)
 	if (i4Status < 0)
 		pr_debug("request_irq(%d) failed\n", pDev->irq);
 	else
-		pr_info("request_irq(%d) success with dev_id(%x)\n", pDev->irq, (unsigned int)pvCookie);
+		pr_debug("request_irq(%d) success with dev_id(%x)\n", pDev->irq, (unsigned int)pvCookie);
 
 	return i4Status;
 }
@@ -326,7 +326,7 @@ void glBusFreeIrq(void *pvData, void *pvCookie)
 	struct net_device *prDev = (struct net_device *)pvData;
 
 	if (!prDev) {
-		pr_info("Invalid net_device context.\n");
+		pr_debug("Invalid net_device context.\n");
 		return;
 	}
 
@@ -441,7 +441,7 @@ static void collibri_ehpi_reg_init(void)
 	u4RegValue |= EHPI_CONFIG;
 	MSC2 = u4RegValue;
 
-	pr_info("EHPI new MSC2:0x%08x\n", MSC2);
+	pr_debug("EHPI new MSC2:0x%08x\n", MSC2);
 }
 
 /*----------------------------------------------------------------------------*/

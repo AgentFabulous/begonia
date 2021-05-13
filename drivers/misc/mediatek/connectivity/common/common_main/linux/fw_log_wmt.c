@@ -32,13 +32,13 @@ static wait_queue_head_t wq;
 
 static int fw_log_wmt_open(struct inode *inode, struct file *file)
 {
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 
 static int fw_log_wmt_close(struct inode *inode, struct file *file)
 {
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 

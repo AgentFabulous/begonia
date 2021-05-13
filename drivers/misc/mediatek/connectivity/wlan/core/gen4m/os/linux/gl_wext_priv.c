@@ -11188,7 +11188,7 @@ int priv_driver_set_dbdc(IN struct net_device *prNetDev, IN char *pcCommand,
 	for (ucBssIndex = 0; ucBssIndex < (prAdapter->ucHwBssIdNum + 1);
 	     ucBssIndex++) {
 		prBssInfo = prGlueInfo->prAdapter->aprBssInfo[ucBssIndex];
-		pr_info("****BSS %u inUse %u active %u Mode %u priCh %u state %u rfBand %u\n",
+		pr_debug("****BSS %u inUse %u active %u Mode %u priCh %u state %u rfBand %u\n",
 			ucBssIndex,
 			prBssInfo->fgIsInUse,
 			prBssInfo->fgIsNetActive,

@@ -116,7 +116,7 @@ int hif_sdio_is_chipid_valid(int chipId)
 	if (index < 0)
 		WMT_DETECT_PR_ERR("no supported chipid found\n");
 	else
-		WMT_DETECT_PR_INFO("index:%d, chipId:0x%x\n", index, gChipInfoArray[index].chipId);
+		WMT_DETECT_PR_DBG("index:%d, chipId:0x%x\n", index, gChipInfoArray[index].chipId);
 
 	return index;
 }
@@ -132,7 +132,7 @@ int hif_sdio_match_chipid_by_dev_id(const struct sdio_device_id *id)
 		localId = &(gChipInfoArray[index].deviceId);
 		if ((localId->vendor == id->vendor) && (localId->device == id->device)) {
 			chipId = gChipInfoArray[index].chipId;
-			WMT_DETECT_PR_INFO
+			WMT_DETECT_PR_DBG
 			    ("valid chipId found, index(%d), vendor id(0x%x), device id(0x%x), chip id(0x%x)\n", index,
 			     localId->vendor, localId->device, chipId);
 			mtk_wcn_wmt_set_chipid(chipId);
@@ -173,7 +173,7 @@ int sdio_detect_do_autok(int chipId)
 {
 	int i_ret = 0;
 
-	WMT_DETECT_PR_INFO("autok was move to sdio driver\n");
+	WMT_DETECT_PR_DBG("autok was move to sdio driver\n");
 	return i_ret;
 }
 
@@ -193,14 +193,14 @@ static int sdio_detect_probe(struct sdio_func *func, const struct sdio_device_id
 {
 	int chipId = 0;
 
-	WMT_DETECT_PR_INFO("vendor(0x%x) device(0x%x) num(0x%x)\n", func->vendor, func->device, func->num);
+	WMT_DETECT_PR_DBG("vendor(0x%x) device(0x%x) num(0x%x)\n", func->vendor, func->device, func->num);
 	chipId = hif_sdio_match_chipid_by_dev_id(id);
 
 	if ((chipId == 0x6630 || chipId == 0x6632) && (func->num == 1)) {
 		int ret = 0;
 
 		g_func = func;
-		WMT_DETECT_PR_INFO("autok function detected, func:0x%p\n", g_func);
+		WMT_DETECT_PR_DBG("autok function detected, func:0x%p\n", g_func);
 
 		sdio_claim_host(func);
 		ret = sdio_enable_func(func);
@@ -220,7 +220,7 @@ static void sdio_detect_remove(struct sdio_func *func)
 		sdio_release_host(func);
 		g_func = NULL;
 	}
-	WMT_DETECT_PR_INFO("do sdio remove\n");
+	WMT_DETECT_PR_DBG("do sdio remove\n");
 }
 
 int sdio_detect_init(void)
@@ -232,7 +232,7 @@ int sdio_detect_init(void)
 		if (ret == 0)
 			gDrvRegistered = 1;
 	}
-	WMT_DETECT_PR_INFO("sdio_register_driver() ret=%d\n", ret);
+	WMT_DETECT_PR_DBG("sdio_register_driver() ret=%d\n", ret);
 	return ret;
 }
 
@@ -244,6 +244,6 @@ int sdio_detect_exit(void)
 		sdio_unregister_driver(&mtk_sdio_client_drv);
 		gDrvRegistered = 0;
 	}
-	WMT_DETECT_PR_INFO("sdio_unregister_driver\n");
+	WMT_DETECT_PR_DBG("sdio_unregister_driver\n");
 	return 0;
 }

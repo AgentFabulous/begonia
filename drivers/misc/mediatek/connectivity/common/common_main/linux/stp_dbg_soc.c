@@ -107,7 +107,7 @@ static VOID stp_dbg_dump_log(PUINT8 buf, INT32 size)
 
 		if (i >= DUMP_LOG_BYTES_PER_LINE || !size) {
 			line[i] = 0;
-			pr_info("page_trace: %s\n", line);
+			pr_debug("page_trace: %s\n", line);
 			i = 0;
 		}
 	}
@@ -165,7 +165,7 @@ static _osal_inline_ INT32 stp_dbg_soc_put_emi_dump_to_nl(PUINT8 data_buf, INT32
 			/* schedule(); */
 		} while (remain > 0);
 	} else
-		STP_DBG_PR_INFO("dump entry length is 0\n");
+		STP_DBG_PR_DBG("dump entry length is 0\n");
 
 	return ret;
 }
@@ -225,7 +225,7 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_dump(INT32 dump_sink)
 	dump_num = wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_chip_page_dump_num);
 	if (dump_num != 0) {
 		packet_num = dump_num;
-		STP_DBG_PR_INFO("get consys dump num packet_num(%d)\n", packet_num);
+		STP_DBG_PR_DBG("get consys dump num packet_num(%d)\n", packet_num);
 	} else {
 		dump_num = CORE_DUMP_NUM;
 		STP_DBG_PR_ERR("can not get consys dump num and default num is %d\n", CORE_DUMP_NUM);
@@ -241,7 +241,7 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_dump(INT32 dump_sink)
 	while (1) {
 		/* assert flag 2 means mcu is ready to start coredump */
 		if (wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_assert_flag) == 2) {
-			STP_DBG_PR_INFO("coredump handshake start\n");
+			STP_DBG_PR_DBG("coredump handshake start\n");
 			break;
 		} else if (stp_dbg_get_coredump_timer_state() == CORE_DUMP_TIMEOUT)
 			goto paged_dump_end;
@@ -380,19 +380,19 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_dump(INT32 dump_sink)
 
 paged_dump_end:
 		wmt_plat_set_host_dump_state(STP_HOST_DUMP_NOT_START);
-		STP_DBG_PR_INFO("++ counter(%d) packet_num(%d) page_counter(%d) g_paged_dump_len(%d) fw_state(%d)++\n",
+		STP_DBG_PR_DBG("++ counter(%d) packet_num(%d) page_counter(%d) g_paged_dump_len(%d) fw_state(%d)++\n",
 				counter, packet_num, page_counter, g_paged_dump_len,
 				wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_state));
 		if (wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_chip_paded_dump_end) ||
 				(wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_state) == 0x8)) {
 			if (stp_dbg_get_coredump_timer_state() == CORE_DUMP_DOING) {
-				STP_DBG_PR_INFO("paged dump end by emi flag\n");
+				STP_DBG_PR_DBG("paged dump end by emi flag\n");
 				if (dump_sink == 1)
 					stp_dbg_aee_send(FAKECOREDUMPEND, osal_sizeof(FAKECOREDUMPEND), 0);
 				else if (dump_sink == 2)
 					stp_dbg_nl_send_data(FAKECOREDUMPEND, osal_sizeof(FAKECOREDUMPEND));
 			} else
-				STP_DBG_PR_INFO("paged dump end\n");
+				STP_DBG_PR_DBG("paged dump end\n");
 			ret = 0;
 			break;
 		} else if (abort || stp_dbg_get_coredump_timer_state() == CORE_DUMP_TIMEOUT) {
@@ -453,7 +453,7 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_trace(VOID)
 		buffer_start = wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_chip_print_buff_start);
 		buffer_idx = wmt_plat_get_dump_info(p_ecsi->p_ecso->emi_apmem_ctrl_chip_print_buff_idx);
 		g_paged_trace_len = buffer_idx;
-		STP_DBG_PR_INFO("paged trace buffer addr(%08x),buffer_len(%d)\n", buffer_start,
+		STP_DBG_PR_DBG("paged trace buffer addr(%08x),buffer_len(%d)\n", buffer_start,
 				buffer_idx);
 		dump_vir_addr = wmt_plat_get_emi_virt_add(buffer_start - p_ecsi->emi_phy_addr);
 		if (!dump_vir_addr) {
@@ -467,7 +467,7 @@ static _osal_inline_ INT32 stp_dbg_soc_paged_trace(VOID)
 
 		dump_len =
 			buffer_idx < STP_DBG_PAGED_TRACE_SIZE ? buffer_idx : STP_DBG_PAGED_TRACE_SIZE;
-		pr_info("-- paged trace ascii output --");
+		pr_debug("-- paged trace ascii output --");
 		stp_dbg_dump_log(&g_paged_trace_buffer[0], dump_len);
 		ret = 0;
 	} while (0);
@@ -481,7 +481,7 @@ INT32 stp_dbg_soc_core_dump(INT32 dump_sink)
 
 	if (dump_sink == 0 || chip_reset_only == 1) {
 		if (chip_reset_only) {
-			STP_DBG_PR_INFO("Chip reset only\n");
+			STP_DBG_PR_DBG("Chip reset only\n");
 			chip_reset_only = 0;
 		}
 		mtk_wcn_stp_ctx_restore();
@@ -519,16 +519,16 @@ PUINT8 stp_dbg_soc_id_to_task(UINT32 id)
 
 	if (osal_strncmp(patch_name, ROM_V2_PATCH, strlen(ROM_V2_PATCH)) == 0) {
 		temp_id = soc_gen_two_task_id_adapter[id];
-		STP_DBG_PR_INFO("id = %d, gen two task_id = %d\n", id, temp_id);
+		STP_DBG_PR_DBG("id = %d, gen two task_id = %d\n", id, temp_id);
 	} else if (osal_strncmp(patch_name, ROM_V3_PATCH, strlen(ROM_V3_PATCH)) == 0) {
 		temp_id = soc_gen_three_task_id_adapter[id];
-		STP_DBG_PR_INFO("id = %d, gen three task_id = %d\n", id, temp_id);
+		STP_DBG_PR_DBG("id = %d, gen three task_id = %d\n", id, temp_id);
 	} else if (osal_strncmp(patch_name, ROM_V4_PATCH, strlen(ROM_V4_PATCH)) == 0) {
 		temp_id = soc_gen_three_task_id_adapter[id];
-		STP_DBG_PR_INFO("id = %d, gen three (ROMv4) task_id = %d\n", id, temp_id);
+		STP_DBG_PR_DBG("id = %d, gen three (ROMv4) task_id = %d\n", id, temp_id);
 	} else {
 		temp_id = id;
-		STP_DBG_PR_INFO("id = %d, CONNAC project task_id = %d\n", id, temp_id);
+		STP_DBG_PR_DBG("id = %d, CONNAC project task_id = %d\n", id, temp_id);
 	}
 
 	return soc_task_str[temp_id];
@@ -549,7 +549,7 @@ UINT32 stp_dbg_soc_read_debug_crs(ENUM_CONNSYS_DEBUG_CR cr)
 			return CONSYS_REG_READ(conn_reg.topckgen_base +
 					emi_phy_addr->emi_remap_offset);
 		else
-			STP_DBG_PR_INFO("EMI remap has no value\n");
+			STP_DBG_PR_DBG("EMI remap has no value\n");
 	}
 
 	if (chip_id == 0x6765 || chip_id == 0x3967 || chip_id == 0x6761

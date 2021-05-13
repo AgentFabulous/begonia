@@ -304,7 +304,7 @@ static void connlog_ring_emi_to_cache(int conn_type)
 			ring_dump_segment(__func__, &ring_cache_seg);
 #endif
 			if (__ratelimit(&_rs2))
-				pr_info("%s: ring_emi_seg.sz=%d, ring_cache_pt=%p, ring_cache_seg.sz=%d\n",
+				pr_debug("%s: ring_emi_seg.sz=%d, ring_cache_pt=%p, ring_cache_seg.sz=%d\n",
 					type_to_title[conn_type], ring_emi_seg.sz, ring_cache_seg.ring_pt,
 					ring_cache_seg.sz);
 			memcpy_fromio(ring_cache_seg.ring_pt, ring_emi_seg.ring_emi_pt + ring_cache_seg.data_pos,
@@ -350,7 +350,7 @@ static void connlog_dump_buf(const char *title, const char *buf, ssize_t sz)
 				memset(line+i*3, ' ', (BYETES_PER_LINE-i)*3);
 				memset(line+3*BYETES_PER_LINE+i, '.', BYETES_PER_LINE-i);
 			}
-			pr_info("%s: %s\n", title, line);
+			pr_debug("%s: %s\n", title, line);
 			i = 0;
 		}
 	}
@@ -380,7 +380,7 @@ static void connlog_fw_log_parser(int conn_type, const char *buf, ssize_t sz)
 				print_len = buf_len >= LOG_MAX_LEN ? LOG_MAX_LEN - 1 : buf_len;
 				memcpy(log_line, buf + LOG_HEAD_LENG, print_len);
 				log_line[print_len] = 0;
-				pr_info("%s: %s\n", type_to_title[conn_type], log_line);
+				pr_debug("%s: %s\n", type_to_title[conn_type], log_line);
 				sz -= (LOG_HEAD_LENG + buf_len);
 				buf += (LOG_HEAD_LENG + buf_len);
 				continue;
@@ -389,7 +389,7 @@ static void connlog_fw_log_parser(int conn_type, const char *buf, ssize_t sz)
 				memcpy(&systime, buf + 28, sizeof(systime));
 				memcpy(&utc_s, buf + 32, sizeof(utc_s));
 				memcpy(&utc_us, buf + 36, sizeof(utc_us));
-				pr_info("%s: timesync :  (%u) %u.%06u\n",
+				pr_debug("%s: timesync :  (%u) %u.%06u\n",
 					type_to_title[conn_type], systime, utc_s, utc_us);
 				sz -= TIMESYNC_LENG;
 				buf += TIMESYNC_LENG;
@@ -557,7 +557,7 @@ static int connlog_set_alarm_timer(void)
 	kt = ktime_set(gDev.log_alarm.alarm_sec, 0);
 	alarm_start_relative(&gDev.log_alarm.alarm_timer, kt);
 
-	pr_info("[connsys_log_alarm] alarm timer enabled timeout=[%d]", gDev.log_alarm.alarm_sec);
+	pr_debug("[connsys_log_alarm] alarm timer enabled timeout=[%d]", gDev.log_alarm.alarm_sec);
 	return 0;
 }
 
@@ -573,7 +573,7 @@ static int connlog_set_alarm_timer(void)
 *****************************************************************************/
 static int connlog_cancel_alarm_timer(void)
 {
-	pr_info("[connsys_log_alarm] alarm timer cancel");
+	pr_debug("[connsys_log_alarm] alarm timer cancel");
 	return alarm_cancel(&gDev.log_alarm.alarm_timer);
 }
 
@@ -597,7 +597,7 @@ int connsys_log_alarm_enable(unsigned int sec)
 	gDev.log_alarm.alarm_sec = sec;
 	if (!connlog_is_alarm_enable()) {
 		gDev.log_alarm.alarm_state = CONNLOG_ALARM_STATE_ENABLE;
-		pr_info("[connsys_log_alarm] alarm timer enabled timeout=[%d]", sec);
+		pr_debug("[connsys_log_alarm] alarm timer enabled timeout=[%d]", sec);
 	}
 	if (gDev.log_alarm.blank_state == 0)
 		connlog_set_alarm_timer();
@@ -628,7 +628,7 @@ int connsys_log_alarm_disable(void)
 	if (connlog_is_alarm_enable()) {
 		ret = connlog_cancel_alarm_timer();
 		gDev.log_alarm.alarm_state = CONNLOG_ALARM_STATE_DISABLE;
-		pr_info("[connsys_log_alarm] alarm timer disable");
+		pr_debug("[connsys_log_alarm] alarm timer disable");
 	}
 
 	spin_unlock_irqrestore(&gDev.log_alarm.alarm_lock, gDev.log_alarm.flags);
@@ -686,7 +686,7 @@ static enum alarmtimer_restart alarm_timer_handler(struct alarm *alarm,
 
 	connsys_dedicated_log_get_utc_time(&tsec, &tusec);
 	rtc_time_to_tm(tsec, &tm);
-	pr_info("[connsys_log_alarm] alarm_timer triggered [%d-%02d-%02d %02d:%02d:%02d.%09u]"
+	pr_debug("[connsys_log_alarm] alarm_timer triggered [%d-%02d-%02d %02d:%02d:%02d.%09u]"
 			, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday
 			, tm.tm_hour, tm.tm_min, tm.tm_sec, tusec);
 
@@ -733,13 +733,13 @@ static void connlog_log_data_handler(struct work_struct *work)
 				/* ret++; */
 			} else {
 				if (__ratelimit(&_rs))
-					pr_info("[connlog] %s emi ring is empty!!\n", type_to_title[i]);
+					pr_debug("[connlog] %s emi ring is empty!!\n", type_to_title[i]);
 			}
 		}
 	} while (ret);
 
 	if (__ratelimit(&_rs2))
-		pr_info("[connlog] irq counter=%d module=0x%04x\n",
+		pr_debug("[connlog] irq counter=%d module=0x%04x\n",
 			EMI_READ32(gDev.virAddrEmiLogBase + CONNLOG_IRQ_COUNTER_BASE), module);
 	spin_lock_irqsave(&gDev.irq_lock, gDev.flags);
 	if (gDev.eirqOn)
@@ -785,7 +785,7 @@ static int connlog_eirq_init(const struct connlog_irq_config *irq_config)
 	int iret = 0;
 
 	if (irq_config == NULL) {
-		pr_info("irq_config is NULL\n");
+		pr_debug("irq_config is NULL\n");
 		return -1;
 	}
 
@@ -798,7 +798,7 @@ static int connlog_eirq_init(const struct connlog_irq_config *irq_config)
 
 	gDev.irq_callback = irq_config->irq_callback;
 
-	pr_info("EINT CONN_LOG_IRQ(%d, %d)\n", irq_config->irq_num, irq_config->irq_flag);
+	pr_debug("EINT CONN_LOG_IRQ(%d, %d)\n", irq_config->irq_num, irq_config->irq_flag);
 
 	iret = request_irq(gDev.conn2ApIrqId, connlog_eirq_isr, irq_config->irq_flag, "CONN_LOG_IRQ", NULL);
 	if (iret) {
@@ -883,7 +883,7 @@ static int connlog_emi_init(phys_addr_t emi_base, const struct connlog_emi_confi
 	gDev.virAddrEmiLogBase = ioremap_nocache(gDev.phyAddrEmiBase +
 		emi_config->emi_offset, emi_config->emi_size_total);
 	if (gDev.virAddrEmiLogBase) {
-		pr_info("EMI mapping OK virtual(0x%p) physical(0x%x)\n",
+		pr_debug("EMI mapping OK virtual(0x%p) physical(0x%x)\n",
 				gDev.virAddrEmiLogBase,
 				(unsigned int)(gDev.phyAddrEmiBase + emi_config->emi_offset));
 		memset_io(gDev.virAddrEmiLogBase, 0, emi_config->emi_size_total);

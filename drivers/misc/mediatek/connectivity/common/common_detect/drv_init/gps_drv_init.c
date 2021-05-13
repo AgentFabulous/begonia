@@ -23,7 +23,7 @@
 #ifdef CONFIG_MTK_COMBO_GPS
 int __attribute__((weak)) mtk_wcn_stpgps_drv_init()
 {
-	WMT_DETECT_PR_INFO("no impl. mtk_wcn_stpgps_drv_init\n");
+	WMT_DETECT_PR_DBG("no impl. mtk_wcn_stpgps_drv_init\n");
 	return 0;
 }
 #endif
@@ -32,11 +32,11 @@ int do_gps_drv_init(int chip_id)
 {
 	int i_ret = -1;
 #ifdef CONFIG_MTK_COMBO_GPS
-	WMT_DETECT_PR_INFO("start to do gps driver init\n");
+	WMT_DETECT_PR_DBG("start to do gps driver init\n");
 	i_ret = mtk_wcn_stpgps_drv_init();
-	WMT_DETECT_PR_INFO("finish gps driver init, i_ret:%d\n", i_ret);
+	WMT_DETECT_PR_DBG("finish gps driver init, i_ret:%d\n", i_ret);
 #else
-	WMT_DETECT_PR_INFO("CONFIG_MTK_COMBO_GPS is not defined\n");
+	WMT_DETECT_PR_DBG("CONFIG_MTK_COMBO_GPS is not defined\n");
 #endif
 	return i_ret;
 

@@ -27,7 +27,7 @@ int do_common_drv_init(int chip_id)
 	int i_ret = 0;
 	int i_ret_tmp = 0;
 
-	WMT_DETECT_PR_INFO("start to do common driver init, chipid:0x%08x\n", chip_id);
+	WMT_DETECT_PR_DBG("start to do common driver init, chipid:0x%08x\n", chip_id);
 
 	wmt_detect_set_chip_type(chip_id);
 
@@ -51,7 +51,7 @@ int do_common_drv_init(int chip_id)
 	i_ret += i_ret_tmp;
 	WMT_DETECT_PR_DBG("STP-SDIO driver init, i_ret:%d\n", i_ret);
 
-	WMT_DETECT_PR_INFO("common driver init finish:%d\n", i_ret);
+	WMT_DETECT_PR_DBG("common driver init finish:%d\n", i_ret);
 	return i_ret;
 
 }

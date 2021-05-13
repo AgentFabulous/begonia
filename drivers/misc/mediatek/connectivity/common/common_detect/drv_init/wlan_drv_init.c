@@ -22,25 +22,25 @@
 
 int __attribute__((weak)) mtk_wcn_wlan_gen4_init()
 {
-	WMT_DETECT_PR_INFO("no impl. mtk_wcn_wlan_gen4_init\n");
+	WMT_DETECT_PR_DBG("no impl. mtk_wcn_wlan_gen4_init\n");
 	return 0;
 }
 
 int __attribute__((weak)) mtk_wcn_wlan_gen3_init()
 {
-	WMT_DETECT_PR_INFO("no impl. mtk_wcn_wlan_gen3_init\n");
+	WMT_DETECT_PR_DBG("no impl. mtk_wcn_wlan_gen3_init\n");
 	return 0;
 }
 
 int __attribute__((weak)) mtk_wcn_wlan_gen2_init()
 {
-	WMT_DETECT_PR_INFO("no impl. mtk_wcn_wlan_gen2_init\n");
+	WMT_DETECT_PR_DBG("no impl. mtk_wcn_wlan_gen2_init\n");
 	return 0;
 }
 
 int __attribute__((weak)) mtk_wcn_wmt_wifi_init()
 {
-	WMT_DETECT_PR_INFO("no impl. mtk_wcn_wmt_wifi_init\n");
+	WMT_DETECT_PR_DBG("no impl. mtk_wcn_wmt_wifi_init\n");
 	return 0;
 }
 
@@ -49,18 +49,18 @@ int do_wlan_drv_init(int chip_id)
 	int i_ret = 0;
 	int ret = 0;
 
-	WMT_DETECT_PR_INFO("start to do wlan module init 0x%x\n", chip_id);
+	WMT_DETECT_PR_DBG("start to do wlan module init 0x%x\n", chip_id);
 
 	/* WMT-WIFI char dev init */
 	ret = mtk_wcn_wmt_wifi_init();
-	WMT_DETECT_PR_INFO("WMT-WIFI char dev init, ret:%d\n", ret);
+	WMT_DETECT_PR_DBG("WMT-WIFI char dev init, ret:%d\n", ret);
 	i_ret += ret;
 
 	switch (chip_id) {
 	case 0x6580:
 	case 0x6739:
 		ret = mtk_wcn_wlan_gen2_init();
-		WMT_DETECT_PR_INFO("WLAN-GEN2 driver init, ret:%d\n", ret);
+		WMT_DETECT_PR_DBG("WLAN-GEN2 driver init, ret:%d\n", ret);
 		break;
 
 	case 0x6630:
@@ -71,19 +71,19 @@ int do_wlan_drv_init(int chip_id)
 	case 0x6771:
 		/* WLAN driver init */
 		ret = mtk_wcn_wlan_gen3_init();
-		WMT_DETECT_PR_INFO("WLAN-GEN3 driver init, ret:%d\n", ret);
+		WMT_DETECT_PR_DBG("WLAN-GEN3 driver init, ret:%d\n", ret);
 		break;
 
 	default:
 		/* WLAN driver init */
 		ret = mtk_wcn_wlan_gen4_init();
-		WMT_DETECT_PR_INFO("WLAN-GEN4 driver init, ret:%d\n", ret);
+		WMT_DETECT_PR_DBG("WLAN-GEN4 driver init, ret:%d\n", ret);
 		break;
 	}
 
 	i_ret += ret;
 
-	WMT_DETECT_PR_INFO("finish wlan module init\n");
+	WMT_DETECT_PR_DBG("finish wlan module init\n");
 
 	return i_ret;
 }

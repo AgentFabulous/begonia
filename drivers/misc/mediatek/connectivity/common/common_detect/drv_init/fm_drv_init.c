@@ -23,19 +23,19 @@
 #ifdef CONFIG_MTK_FMRADIO
 int __attribute__((weak)) mtk_wcn_fm_init()
 {
-	WMT_DETECT_PR_INFO("no impl. mtk_wcn_fm_init\n");
+	WMT_DETECT_PR_DBG("no impl. mtk_wcn_fm_init\n");
 	return 0;
 }
 #endif
 
 int do_fm_drv_init(int chip_id)
 {
-	WMT_DETECT_PR_INFO("start to do fm module init\n");
+	WMT_DETECT_PR_DBG("start to do fm module init\n");
 
 #ifdef CONFIG_MTK_FMRADIO
 	mtk_wcn_fm_init();
 #endif
 
-	WMT_DETECT_PR_INFO("finish fm module init\n");
+	WMT_DETECT_PR_DBG("finish fm module init\n");
 	return 0;
 }

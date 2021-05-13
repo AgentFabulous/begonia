@@ -36,13 +36,13 @@ void ring_init(void *base, unsigned int max_size, unsigned int read,
 
 void ring_dump(const char *title, struct ring *ring)
 {
-	pr_info("[%s] ring:{write=%d, read=%d, max_size=%d}\n",
+	pr_debug("[%s] ring:{write=%d, read=%d, max_size=%d}\n",
 			title, ring->write, ring->read, ring->max_size);
 }
 
 void ring_dump_segment(const char *title, struct ring_segment *seg)
 {
-	pr_info("[%s] seg:{ring_pt=0x%p, data_pos=%d, sz=%d, remain=%d}\n",
+	pr_debug("[%s] seg:{ring_pt=0x%p, data_pos=%d, sz=%d, remain=%d}\n",
 			title, seg->ring_pt, seg->data_pos, seg->sz, seg->remain);
 }
 

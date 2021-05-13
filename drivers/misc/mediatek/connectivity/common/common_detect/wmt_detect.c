@@ -45,30 +45,30 @@ static ENUM_WMT_CHIP_TYPE g_chip_type = WMT_CHIP_TYPE_INVALID;
 
 static int wmt_detect_open(struct inode *inode, struct file *file)
 {
-	WMT_DETECT_PR_INFO("open major %d minor %d (pid %d)\n", imajor(inode), iminor(inode), current->pid);
+	WMT_DETECT_PR_DBG("open major %d minor %d (pid %d)\n", imajor(inode), iminor(inode), current->pid);
 
 	return 0;
 }
 
 static int wmt_detect_close(struct inode *inode, struct file *file)
 {
-	WMT_DETECT_PR_INFO("close major %d minor %d (pid %d)\n", imajor(inode), iminor(inode), current->pid);
+	WMT_DETECT_PR_DBG("close major %d minor %d (pid %d)\n", imajor(inode), iminor(inode), current->pid);
 
 	return 0;
 }
 
 static ssize_t wmt_detect_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
-	WMT_DETECT_PR_INFO(" ++\n");
-	WMT_DETECT_PR_INFO(" --\n");
+	WMT_DETECT_PR_DBG(" ++\n");
+	WMT_DETECT_PR_DBG(" --\n");
 
 	return 0;
 }
 
 ssize_t wmt_detect_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos)
 {
-	WMT_DETECT_PR_INFO(" ++\n");
-	WMT_DETECT_PR_INFO(" --\n");
+	WMT_DETECT_PR_DBG(" ++\n");
+	WMT_DETECT_PR_DBG(" --\n");
 
 	return 0;
 }
@@ -77,7 +77,7 @@ static long wmt_detect_unlocked_ioctl(struct file *filp, unsigned int cmd, unsig
 {
 	int retval = 0;
 
-	WMT_DETECT_PR_INFO("cmd (%d),arg(%ld)\n", cmd, arg);
+	WMT_DETECT_PR_DBG("cmd (%d),arg(%ld)\n", cmd, arg);
 
 	switch (cmd) {
 	case COMBO_IOCTL_GET_CHIP_ID:
@@ -89,7 +89,7 @@ static long wmt_detect_unlocked_ioctl(struct file *filp, unsigned int cmd, unsig
 		break;
 
 	case COMBO_IOCTL_SET_CHIP_ID:
-		WMT_DETECT_PR_INFO("chipid(%ld)\n", arg);
+		WMT_DETECT_PR_DBG("chipid(%ld)\n", arg);
 		mtk_wcn_wmt_set_chipid(arg);
 		wmt_detect_set_chip_type(arg);
 		break;
@@ -126,10 +126,10 @@ static long wmt_detect_unlocked_ioctl(struct file *filp, unsigned int cmd, unsig
 	case COMBO_IOCTL_DO_MODULE_INIT:
 #if (MTK_WCN_REMOVE_KO)
 		/*deinit SDIO-DETECT module */
-		WMT_DETECT_PR_INFO("built-in mode\n");
+		WMT_DETECT_PR_DBG("built-in mode\n");
 		retval = do_connectivity_driver_init(arg);
 #else
-		WMT_DETECT_PR_INFO("kernel object mode\n");
+		WMT_DETECT_PR_DBG("kernel object mode\n");
 		retval = mtk_wcn_common_drv_init();
 #endif
 		break;
@@ -146,7 +146,7 @@ static long WMT_compat_detect_ioctl(struct file *filp, unsigned int cmd, unsigne
 {
 	long ret;
 
-	WMT_DETECT_PR_INFO("cmd (%d)\n", cmd);
+	WMT_DETECT_PR_DBG("cmd (%d)\n", cmd);
 	ret = wmt_detect_unlocked_ioctl(filp, cmd, arg);
 	return ret;
 }
@@ -167,14 +167,14 @@ int wmt_detect_ext_chip_pwr_on(void)
 	/*pre power on external chip */
 	/* wmt_plat_pwr_ctrl(FUNC_ON); */
 #ifdef MTK_WCN_COMBO_CHIP_SUPPORT
-	WMT_DETECT_PR_INFO("++\n");
+	WMT_DETECT_PR_DBG("++\n");
 	if (wmt_detect_chip_pwr_ctrl(1) != 0)
 		return -2;
 	if (wmt_detect_sdio_pwr_ctrl(1) != 0)
 		return -3;
 	return 0;
 #else
-	WMT_DETECT_PR_INFO("combo chip is not supported\n");
+	WMT_DETECT_PR_DBG("combo chip is not supported\n");
 	return -1;
 #endif
 }
@@ -184,11 +184,11 @@ int wmt_detect_ext_chip_pwr_off(void)
 	/*pre power off external chip */
 	/* wmt_plat_pwr_ctrl(FUNC_OFF); */
 #ifdef MTK_WCN_COMBO_CHIP_SUPPORT
-	WMT_DETECT_PR_INFO("--\n");
+	WMT_DETECT_PR_DBG("--\n");
 	wmt_detect_sdio_pwr_ctrl(0);
 	return wmt_detect_chip_pwr_ctrl(0);
 #else
-	WMT_DETECT_PR_INFO("combo chip is not supported\n");
+	WMT_DETECT_PR_DBG("combo chip is not supported\n");
 	return 0;
 #endif
 }
@@ -201,7 +201,7 @@ int wmt_detect_ext_chip_detect(void)
 	/*if there is no external combo chip, return -1 */
 	int bgfEintStatus = -1;
 
-	WMT_DETECT_PR_INFO("++\n");
+	WMT_DETECT_PR_DBG("++\n");
 	/*wait for a stable time */
 	msleep(20);
 
@@ -210,25 +210,25 @@ int wmt_detect_ext_chip_detect(void)
 
 	if (bgfEintStatus == 0) {
 		/*external chip does not exist */
-		WMT_DETECT_PR_INFO("external combo chip not detected\n");
+		WMT_DETECT_PR_DBG("external combo chip not detected\n");
 		iRet = -2;
 	} else if (bgfEintStatus == 1) {
 		/*combo chip exists */
-		WMT_DETECT_PR_INFO("external combo chip detected\n");
+		WMT_DETECT_PR_DBG("external combo chip detected\n");
 
 		/*detect chipid by sdio_detect module */
 		chipId = sdio_detect_query_chipid(1);
 		if (hif_sdio_is_chipid_valid(chipId) >= 0)
-			WMT_DETECT_PR_INFO("valid external combo chip id (0x%x)\n", chipId);
+			WMT_DETECT_PR_DBG("valid external combo chip id (0x%x)\n", chipId);
 		else
-			WMT_DETECT_PR_INFO("invalid external combo chip id (0x%x)\n", chipId);
+			WMT_DETECT_PR_DBG("invalid external combo chip id (0x%x)\n", chipId);
 		iRet = 0;
 	} else {
 		/*Error exists */
 		WMT_DETECT_PR_ERR("error happens when detecting combo chip\n");
 		iRet = -3;
 	}
-	WMT_DETECT_PR_INFO("--\n");
+	WMT_DETECT_PR_DBG("--\n");
 	/*return 0 */
 #endif
 	return iRet;
@@ -240,7 +240,7 @@ static int wmt_detect_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 
-	WMT_DETECT_PR_INFO("platform name: %s\n", pdev->name);
+	WMT_DETECT_PR_DBG("platform name: %s\n", pdev->name);
 	ret = wmt_gpio_init(pdev);
 	if (-1 == ret)
 		WMT_DETECT_PR_ERR("gpio init fail ret:%d\n", ret);
@@ -338,7 +338,7 @@ static int wmt_detect_driver_init(void)
 		goto err2;
 	}
 
-	WMT_DETECT_PR_INFO("driver(major %d) installed success\n", gWmtDetectMajor);
+	WMT_DETECT_PR_DBG("driver(major %d) installed success\n", gWmtDetectMajor);
 
 	return 0;
 
@@ -395,7 +395,7 @@ static void wmt_detect_driver_exit(void)
 		platform_driver_unregister(&wmt_detect_driver);
 #endif
 
-	WMT_DETECT_PR_INFO("done\n");
+	WMT_DETECT_PR_DBG("done\n");
 }
 
 module_init(wmt_detect_driver_init);

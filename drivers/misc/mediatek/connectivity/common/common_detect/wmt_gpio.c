@@ -333,7 +333,7 @@ INT32 wmt_gpio_init(struct platform_device *pdev)
 			}
 		}
 
-		pr_info("wmt_gpio: gpio init start!\n");
+		pr_debug("wmt_gpio: gpio init start!\n");
 		if (gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_URXD_PIN].gpio_state[GPIO_PULL_DIS]) {
 			pinctrl_select_state(gpio_ctrl_info.pinctrl_info,
 								 gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_URXD_PIN].
@@ -421,7 +421,7 @@ INT32 wmt_gpio_init(struct platform_device *pdev)
 		} else
 			pr_warn("wmt_gpio:it may not be 6632 project, GPIO_CHIP_WAKE_UP_PIN no need config!\n");
 
-		pr_info("wmt_gpio: gpio init done!\n");
+		pr_debug("wmt_gpio: gpio init done!\n");
 	} else {
 		pr_err("wmt_gpio:can't find pinctrl dev!\n");
 		iret = -1;
@@ -461,8 +461,8 @@ VOID _wmt_dump_gpio_regs(INT32 idx)
 {
 	ULONG idxl = (ULONG)idx;
 
-	pr_info("PIN: [MODE] [PULL_SEL] [DIN] [DOUT] [PULL EN] [DIR] [IES]\n");
-	pr_info("idx = %3d: %d %d %d %d %d %d %d\n",
+	pr_debug("PIN: [MODE] [PULL_SEL] [DIN] [DOUT] [PULL EN] [DIR] [IES]\n");
+	pr_debug("idx = %3d: %d %d %d %d %d %d %d\n",
 	       idx, mt_get_gpio_mode_base(idxl),
 	       mt_get_gpio_pull_select_base(idxl),
 	       mt_get_gpio_in_base(idxl),
@@ -487,8 +487,8 @@ VOID _wmt_gpio_pre_regs(INT32 num, WMT_GPIO_STATE_INFO *gpio_state)
 
 VOID _wmt_dump_gpio_pre_regs(WMT_GPIO_STATE_INFO gpio_state)
 {
-	pr_info("PIN: [MODE] [PULL_SEL] [DIN] [DOUT] [PULL EN] [DIR] [IES]\n");
-	pr_info("idx = %3d: %d %d %d %d %d %d %d\n",
+	pr_debug("PIN: [MODE] [PULL_SEL] [DIN] [DOUT] [PULL EN] [DIR] [IES]\n");
+	pr_debug("idx = %3d: %d %d %d %d %d %d %d\n",
 		gpio_state.gpio_num, gpio_state.mode,
 		gpio_state.pull_sel, gpio_state.in,
 		gpio_state.out, gpio_state.pull_en,

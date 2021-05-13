@@ -52,7 +52,7 @@ extern INT32 wmtPlatLogLvl;
 #define WMT_PLAT_PR_LOUD(fmt, arg...) \
 do { \
 	if (wmtPlatLogLvl >= WMT_PLAT_LOG_LOUD) \
-		pr_info(DFT_TAG "[L]%s:"  fmt, __func__, ##arg); \
+		pr_debug(DFT_TAG "[L]%s:"  fmt, __func__, ##arg); \
 } while (0)
 #define WMT_PLAT_PR_INFO(fmt, arg...) \
 do { \
@@ -72,7 +72,7 @@ do { \
 #define WMT_PLAT_PR_DBG(fmt, arg...) \
 do { \
 	if (wmtPlatLogLvl >= WMT_PLAT_LOG_DBG) \
-		pr_info(DFT_TAG "[D]%s:"  fmt, __func__, ##arg); \
+		pr_debug(DFT_TAG "[D]%s:"  fmt, __func__, ##arg); \
 } while (0)
 
 #endif

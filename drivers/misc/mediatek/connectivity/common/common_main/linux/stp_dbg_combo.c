@@ -78,7 +78,7 @@ static _osal_inline_ INT32 stp_dbg_combo_put_dump_to_aee(VOID)
 						osal_memcpy(&tmp[0], pkt->raw, STP_DMP_SZ);
 					ret = stp_dbg_aee_send(tmp, pkt->hdr.len, 0);
 				} else {
-					STP_DBG_PR_INFO("dump entry length is over long\n");
+					STP_DBG_PR_DBG("dump entry length is over long\n");
 					osal_bug_on(0);
 				}
 				retry = 0;
@@ -137,7 +137,7 @@ static _osal_inline_ INT32 stp_dbg_combo_put_dump_to_nl(VOID)
 
 					/* schedule(); */
 				} else {
-					STP_DBG_PR_INFO("dump entry length is over long\n");
+					STP_DBG_PR_DBG("dump entry length is over long\n");
 					osal_bug_on(0);
 				}
 				retry = 0;
@@ -157,7 +157,7 @@ INT32 stp_dbg_combo_core_dump(INT32 dump_sink)
 
 	switch (dump_sink) {
 	case 0:
-		STP_DBG_PR_INFO("coredump is disabled!\n");
+		STP_DBG_PR_DBG("coredump is disabled!\n");
 		break;
 	case 1:
 		ret = stp_dbg_combo_put_dump_to_aee();

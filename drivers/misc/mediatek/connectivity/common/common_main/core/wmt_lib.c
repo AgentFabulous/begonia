@@ -1039,7 +1039,7 @@ static INT32 wmt_lib_ps_handler(MTKSTP_PSM_ACTION_T action)
 
 		if (!mtk_wcn_stp_is_sdio_mode()) {
 			if (__ratelimit(&_rs))
-				pr_info("conn2ap_btif0_wakeup_out_b EIRQ handler\n");
+				pr_debug("conn2ap_btif0_wakeup_out_b EIRQ handler\n");
 			WMT_DBG_FUNC("disable host eirq\n");
 			/* Disable interrupt */
 			/*wmt_plat_eirq_ctrl(PIN_BGF_EINT, PIN_STA_EINT_DIS);*/

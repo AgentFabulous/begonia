@@ -973,8 +973,8 @@ int8_t atoi(uint8_t ch);
 #define kalGetTimeTick()                jiffies_to_msecs(jiffies)
 
 #define WLAN_TAG                        "[wlan]"
-#define kalPrint(_Fmt...)               pr_info(WLAN_TAG _Fmt)
-#define kalPrintLimited(_Fmt...)        pr_info_ratelimited(WLAN_TAG _Fmt)
+#define kalPrint(_Fmt...)               pr_debug(WLAN_TAG _Fmt)
+#define kalPrintLimited(_Fmt...)        pr_debug_ratelimited(WLAN_TAG _Fmt)
 
 #define kalBreakPoint() \
 do { \

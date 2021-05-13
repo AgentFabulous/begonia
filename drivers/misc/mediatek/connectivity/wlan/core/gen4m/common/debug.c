@@ -787,14 +787,14 @@ firmwareHexDump(const uint8_t *pucPreFix,
 
 		switch (i4PreFixType) {
 		case DUMP_PREFIX_ADDRESS:
-			pr_info("%s%p: %s\n",
+			pr_debug("%s%p: %s\n",
 				pucPreFix, pucPtr + i, ucLineBuf);
 			break;
 		case DUMP_PREFIX_OFFSET:
-			pr_info("%s%.8x: %s\n", pucPreFix, i, ucLineBuf);
+			pr_debug("%s%.8x: %s\n", pucPreFix, i, ucLineBuf);
 			break;
 		default:
-			pr_info("%s%s\n", pucPreFix, ucLineBuf);
+			pr_debug("%s%s\n", pucPreFix, ucLineBuf);
 			break;
 		}
 	}
@@ -811,7 +811,7 @@ void wlanPrintFwLog(uint8_t *pucLogContent,
 #undef KBUILD_MODNAME
 #undef LOG_FUNC
 #define KBUILD_MODNAME "wlan_mt6632_fw"
-#define LOG_FUNC pr_info
+#define LOG_FUNC pr_debug
 #define DBG_LOG_BUF_SIZE 128
 
 	int8_t aucLogBuffer[DBG_LOG_BUF_SIZE];

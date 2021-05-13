@@ -38,12 +38,12 @@ INT32 gBtmDbgLevel = STP_BTM_LOG_INFO;
 #define STP_BTM_PR_LOUD(fmt, arg...) \
 do { \
 	if (gBtmDbgLevel >= STP_BTM_LOG_LOUD) \
-		pr_info(PFX_BTM "%s: "  fmt, __func__, ##arg); \
+		pr_debug(PFX_BTM "%s: "  fmt, __func__, ##arg); \
 } while (0)
 #define STP_BTM_PR_DBG(fmt, arg...) \
 do { \
 	if (gBtmDbgLevel >= STP_BTM_LOG_DBG) \
-		pr_info(PFX_BTM "%s: "  fmt, __func__, ##arg); \
+		pr_debug(PFX_BTM "%s: "  fmt, __func__, ##arg); \
 } while (0)
 #define STP_BTM_PR_INFO(fmt, arg...) \
 do { \
@@ -117,7 +117,7 @@ static INT32 _stp_btm_handler(MTKSTP_BTM_T *stp_btm, P_STP_BTM_OP pStpOp)
 
 		/*whole chip reset */
 	case STP_OPID_BTM_RST:
-		STP_BTM_PR_INFO("whole chip reset start!\n");
+		STP_BTM_PR_DBG("whole chip reset start!\n");
 		if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_SOC &&
 		    mtk_wcn_stp_coredump_flag_get() != 0 && chip_reset_only == 0) {
 #ifdef CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH
@@ -125,7 +125,7 @@ static INT32 _stp_btm_handler(MTKSTP_BTM_T *stp_btm, P_STP_BTM_OP pStpOp)
 #endif
 			stp_dbg_core_dump_flush(0, MTK_WCN_BOOL_FALSE);
 		}
-		STP_BTM_PR_INFO("....+\n");
+		STP_BTM_PR_DBG("....+\n");
 		WMT_STEP_DO_ACTIONS_FUNC(STEP_TRIGGER_POINT_BEFORE_CHIP_RESET);
 		if (stp_btm->wmt_notify) {
 			stp_btm->wmt_notify(BTM_RST_OP);
@@ -135,7 +135,7 @@ static INT32 _stp_btm_handler(MTKSTP_BTM_T *stp_btm, P_STP_BTM_OP pStpOp)
 			ret = -1;
 		}
 
-		STP_BTM_PR_INFO("whole chip reset end!\n");
+		STP_BTM_PR_DBG("whole chip reset end!\n");
 		WMT_STEP_DO_ACTIONS_FUNC(STEP_TRIGGER_POINT_AFTER_CHIP_RESET);
 		break;
 
@@ -157,7 +157,7 @@ static INT32 _stp_btm_handler(MTKSTP_BTM_T *stp_btm, P_STP_BTM_OP pStpOp)
 		stp_dbg_poll_cpupcr(5, 1, 1);
 		if (wmt_detect_get_chip_type() == WMT_CHIP_TYPE_COMBO) {
 			/* Flush dump data, and reset compressor */
-			STP_BTM_PR_INFO("Flush dump data\n");
+			STP_BTM_PR_DBG("Flush dump data\n");
 			stp_dbg_core_dump_flush(0, MTK_WCN_BOOL_TRUE);
 		}
 		ret = mtk_wcn_stp_coredump_timeout_handle();
@@ -172,7 +172,7 @@ static INT32 _stp_btm_handler(MTKSTP_BTM_T *stp_btm, P_STP_BTM_OP pStpOp)
 		ret = 0;
 		break;
 	case STP_OPID_BTM_EMI_DUMP_END:
-		STP_BTM_PR_INFO("emi dump end notification.\n");
+		STP_BTM_PR_DBG("emi dump end notification.\n");
 		stp_dbg_stop_emi_dump();
 		mtk_wcn_stp_ctx_restore();
 		ret = 0;
@@ -386,7 +386,7 @@ static INT32 _stp_btm_proc(PVOID pvData)
 		osal_wait_for_event(&stp_btm->STPd_event, _stp_btm_wait_for_msg, (PVOID) stp_btm);
 
 		if (osal_thread_should_stop(&stp_btm->BTMd)) {
-			STP_BTM_PR_INFO("should stop now...\n");
+			STP_BTM_PR_DBG("should stop now...\n");
 			/* TODO: clean up active opQ */
 			break;
 		}
@@ -446,7 +446,7 @@ handler_done:
 		}
 	}
 
-	STP_BTM_PR_INFO("exits\n");
+	STP_BTM_PR_DBG("exits\n");
 
 	return 0;
 }
@@ -650,7 +650,7 @@ INT32 stp_btm_deinit(MTKSTP_BTM_T *stp_btm)
 
 	INT32 ret = -1;
 
-	STP_BTM_PR_INFO("btm deinit\n");
+	STP_BTM_PR_DBG("btm deinit\n");
 
 	if (!stp_btm)
 		return STP_BTM_OPERATION_FAIL;
@@ -701,11 +701,11 @@ static inline INT32 _stp_btm_do_fw_assert(MTKSTP_BTM_T *stp_btm)
 	MTK_WCN_BOOL bRet = MTK_WCN_BOOL_FALSE;
 
 	/* send assert command */
-	STP_BTM_PR_INFO("trigger stp assert process\n");
+	STP_BTM_PR_DBG("trigger stp assert process\n");
 	if (mtk_wcn_stp_is_sdio_mode()) {
 		bRet = stp_btm->wmt_notify(BTM_TRIGGER_STP_ASSERT_OP);
 		if (bRet == MTK_WCN_BOOL_FALSE) {
-			STP_BTM_PR_INFO("trigger stp assert failed\n");
+			STP_BTM_PR_DBG("trigger stp assert failed\n");
 			return status;
 		}
 		status = 0;
@@ -719,7 +719,7 @@ static inline INT32 _stp_btm_do_fw_assert(MTKSTP_BTM_T *stp_btm)
 	stp_btm_start_trigger_assert_timer(stp_btm);
 
 	if (status == 0)
-		STP_BTM_PR_INFO("trigger stp assert succeed\n");
+		STP_BTM_PR_DBG("trigger stp assert succeed\n");
 
 	return status;
 }
