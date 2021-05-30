@@ -278,7 +278,7 @@ void dump_opp_table(void)
 
 	LOG_DBG("%s start\n", __func__);
 	for (i = 0; i < VPU_DVFS_OPP_MAX; i++) {
-		LOG_INF("vpu opp:%d, vol:%d, freq:%d\n", i
+		LOG_DBG("vpu opp:%d, vol:%d, freq:%d\n", i
 			, vpu_opp_table[i].vpufreq_volt
 		, vpu_opp_table[i].vpufreq_khz);
 	}
@@ -290,7 +290,7 @@ void dump_ptp_count(void)
 
 	LOG_DBG("%s start\n", __func__);
 	for (i = 0; i < 4; i++) {
-		LOG_INF("vvpu id:%d, ptp cnt:%d\n", i
+		LOG_DBG("vvpu id:%d, ptp cnt:%d\n", i
 			, vpu_ptp_count_table[i].vpu_ptp_count);
 	}
 	LOG_DBG("%s end\n", __func__);
@@ -331,12 +331,12 @@ void apu_get_power_info(void)
 	LOG_DVFS("vvpu=%d, vcore=%d\n", vvpu, vcore);
 	if (vvpu < 700000) {
 		if	((dsp_freq >= 364000) || (ipuif_freq >= 364000)) {
-			LOG_INF("freq check fail\n");
-			LOG_INF("dsp_freq = %d\n", dsp_freq);
-			LOG_INF("dsp1_freq = %d\n", dsp1_freq);
-			LOG_INF("dsp2_freq = %d\n", dsp2_freq);
-			LOG_INF("ipuif_freq = %d\n", ipuif_freq);
-	LOG_INF("vvpu=%d, vcore=%d\n", vvpu, vcore);
+			LOG_DBG("freq check fail\n");
+			LOG_DBG("dsp_freq = %d\n", dsp_freq);
+			LOG_DBG("dsp1_freq = %d\n", dsp1_freq);
+			LOG_DBG("dsp2_freq = %d\n", dsp2_freq);
+			LOG_DBG("ipuif_freq = %d\n", ipuif_freq);
+	LOG_DBG("vvpu=%d, vcore=%d\n", vvpu, vcore);
 	aee_kernel_warning("freq check", "%s: failed.", __func__);
 			}
 	}
@@ -383,10 +383,10 @@ unsigned int vvpu_update_ptp_count(unsigned int ptp_count[],
 
 	for (i = 0; i < array_size; i++) {
 		vpu_ptp_count_table[i].vpu_ptp_count = ptp_count[i];
-		LOG_INF("%s id:%d, ptp cnt:0x%x\n", __func__, i, ptp_count[i]);
+		LOG_DBG("%s id:%d, ptp cnt:0x%x\n", __func__, i, ptp_count[i]);
 		}
 //
-LOG_INF("[CPE]:VPU Det_Count: %d, %d, %d, %d\n",
+LOG_DBG("[CPE]:VPU Det_Count: %d, %d, %d, %d\n",
 vpu_ptp_count_table[0].vpu_ptp_count,
 	vpu_ptp_count_table[1].vpu_ptp_count,
 	vpu_ptp_count_table[2].vpu_ptp_count,
@@ -488,11 +488,11 @@ int vvpu_regulator_set_mode(bool enable)
 	int ret = 0;
 
 	if (!vvpu_reg_id) {
-		LOG_INF("vvpu_reg_id not ready\n");
+		LOG_DBG("vvpu_reg_id not ready\n");
 		return ret;
 	}
 	if (vvpu_DVFS_is_paused_by_ptpod) {
-		LOG_INF("vvpu dvfs lock\n");
+		LOG_DBG("vvpu dvfs lock\n");
 		return ret;
 	}
 	mutex_lock(&vpu_opp_lock);
@@ -722,7 +722,7 @@ static int vvpu_vbin(int opp)
 
 	for (i = 0; i < 4; i++) {
 		if (vpu_ptp_count_table[i].vpu_ptp_count == 0) {
-			LOG_INF("vpu ptp count 0\n");
+			LOG_DBG("vpu ptp count 0\n");
 			result = 0;
 			return result;
 		}
@@ -768,7 +768,7 @@ static int vvpu_vbin(int opp)
 		else
 			result = 1;
 	}
-LOG_INF("[CPE]:VPU_OPP=%d,VPU_BIN=%d,CPE_VBIN=%d,Criteria=%d,Result=%d\n",
+LOG_DBG("[CPE]:VPU_OPP=%d,VPU_BIN=%d,CPE_VBIN=%d,Criteria=%d,Result=%d\n",
 	opp, vvpu_opp, vbin, pass_crit, result);
 	return result;
 }
@@ -780,19 +780,19 @@ int apu_dvfs_dump_info(void)
 
 	mode = regulator_get_mode(vvpu_reg_id);
 		if (mode == REGULATOR_MODE_FAST)
-			LOG_INF("++vvpu_reg_id pwm mode\n");
+			LOG_DBG("++vvpu_reg_id pwm mode\n");
 		else
-			LOG_INF("++vvpu_reg_id auto mode\n");
+			LOG_DBG("++vvpu_reg_id auto mode\n");
 
 	for (i = 0; i < 4; i++) {
-		LOG_INF("id:%d, vpu ptp cnt:0x%x\n",
+		LOG_DBG("id:%d, vpu ptp cnt:0x%x\n",
 			i, vpu_ptp_count_table[i].vpu_ptp_count);
 	}
 
 
-	LOG_INF("vpu dvfs lock:%d\n",
+	LOG_DBG("vpu dvfs lock:%d\n",
 		vvpu_DVFS_is_paused_by_ptpod);
-	LOG_INF("vpu cpe0:%d, cpe1:%d, cpe2:%d\n",
+	LOG_DBG("vpu cpe0:%d, cpe1:%d, cpe2:%d\n",
 		vvpu0_cpe_result, vvpu1_cpe_result, vvpu2_cpe_result);
 	vvpu_vbin(0);
 	vvpu_vbin(1);
@@ -886,7 +886,7 @@ static int commit_data(int type, int data)
 	case PM_QOS_VVPU_OPP:
 		mutex_lock(&vpu_opp_lock);
 		if (get_vvpu_DVFS_is_paused_by_ptpod()) {
-			LOG_INF("PM_QOS_VVPU_OPP paused by ptpod %d\n", data);
+			LOG_DBG("PM_QOS_VVPU_OPP paused by ptpod %d\n", data);
 		} else {
 			LOG_DVFS("%s PM_QOS_VVPU_OPP %d\n", __func__, data);
 			/*settle time*/

@@ -323,7 +323,7 @@ static inline void lock_command(int core_s, int cmd)
 	mutex_lock(&(vpu_service_cores[core].cmd_mutex));
 	vpu_service_cores[core].is_cmd_done = false;
 	vpu_write_field(core, FLD_XTENSA_INFO17, 0);
-	LOG_INF("%s: vpu%d: cmd: %02xh, info00:%xh, info17:%xh\n",
+	LOG_DBG("%s: vpu%d: cmd: %02xh, info00:%xh, info17:%xh\n",
 		__func__, core, cmd,
 		vpu_read_field(core, FLD_XTENSA_INFO00),
 		vpu_read_field(core, FLD_XTENSA_INFO17));
@@ -585,7 +585,7 @@ static inline int wait_to_do_change_vcore_opp(int core)
 	/* now this function just return directly. NO WAIT */
 	if (g_func_mask & VFM_NEED_WAIT_VCORE) {
 		if (g_vpu_log_level > Log_STATE_MACHINE) {
-			LOG_INF("[vpu_%d_0x%x] wait for vcore change now\n",
+			LOG_DBG("[vpu_%d_0x%x] wait for vcore change now\n",
 					core, g_func_mask);
 		}
 	} else {
@@ -665,7 +665,7 @@ static inline int wait_to_do_vpu_running(int core)
 	/* now this function just return directly. NO WAIT */
 	if (g_func_mask & VFM_NEED_WAIT_VCORE) {
 		if (g_vpu_log_level > Log_STATE_MACHINE) {
-			LOG_INF("[vpu_%d_0x%x] wait for vpu running now\n",
+			LOG_DBG("[vpu_%d_0x%x] wait for vpu running now\n",
 					core, g_func_mask);
 		}
 	} else {
@@ -944,7 +944,7 @@ EXPORT_SYMBOL(get_vpu_init_done);
 static void get_segment_from_efuse(void)
 {
 	segment_max_opp = 0;
-	LOG_INF("vpu segment_max_opp: %d\n", segment_max_opp);
+	LOG_DBG("vpu segment_max_opp: %d\n", segment_max_opp);
 }
 
 /* expected range, vvpu_index: 0~15 */
@@ -1007,7 +1007,7 @@ static void vpu_opp_check(int core_s, uint8_t vvpu_index, uint8_t freq_index)
 			change_freq_first[core] = true;
 
 		if (vcore_index < max_vcore_opp) {
-			LOG_INF("vpu bound vcore opp(%d) to %d",
+			LOG_DBG("vpu bound vcore opp(%d) to %d",
 					vcore_index, max_vcore_opp);
 
 			vcore_index = max_vcore_opp;
@@ -1040,7 +1040,7 @@ if (vvpu_index == 0xFF) {
 		change_freq_first[core] = true;
 
 	if (vvpu_index < max_vvpu_opp) {
-		LOG_INF("vpu bound vvpu opp(%d) to %d",
+		LOG_DBG("vpu bound vvpu opp(%d) to %d",
 				vvpu_index, max_vvpu_opp);
 
 		vvpu_index = max_vvpu_opp;
@@ -1073,7 +1073,7 @@ if (vvpu_index == 0xFF) {
 		force_change_dsp_freq[core] = false;
 	} else {
 		if (freq_index < max_dsp_freq) {
-			LOG_INF("vpu bound dsp freq(%dMHz) to %dMHz",
+			LOG_DBG("vpu bound dsp freq(%dMHz) to %dMHz",
 					log_freq, log_max_freq);
 			freq_index = max_dsp_freq;
 		}
@@ -1089,7 +1089,7 @@ if (vvpu_index == 0xFF) {
 				(freq_index > opps.dspcore[core].index) &&
 				(opp_keep_flag)) {
 				if (g_vpu_log_level > Log_ALGO_OPP_INFO) {
-					LOG_INF("%s(%d) %s (%d/%d_%d/%d)\n",
+					LOG_DBG("%s(%d) %s (%d/%d_%d/%d)\n",
 						__func__,
 						core,
 						"dsp keep high",
@@ -1166,7 +1166,7 @@ if (vvpu_index == 0xFF) {
 		} else {
 			/* vcore not change & dsp not change */
 			if (g_vpu_log_level > Log_ALGO_OPP_INFO)
-				LOG_INF("opp_check(%d) vcore/dsp no change\n",
+				LOG_DBG("opp_check(%d) vcore/dsp no change\n",
 						core);
 
 			opp_keep_flag = true;
@@ -1177,7 +1177,7 @@ if (vvpu_index == 0xFF) {
 	}
 	mutex_unlock(&opp_mutex);
 out:
-	LOG_INF("%s(%d)(%d/%d_%d)(%d/%d)(%d.%d.%d.%d)(%d/%d)(%d/%d/%d/%d)%d\n",
+	LOG_DBG("%s(%d)(%d/%d_%d)(%d/%d)(%d.%d.%d.%d)(%d/%d)(%d/%d/%d/%d)%d\n",
 		"opp_check",
 		core,
 		is_power_debug_lock,
@@ -1201,7 +1201,7 @@ out:
 static bool vpu_change_opp(int core_s, int type)
 {
 #ifdef MTK_VPU_FPGA_PORTING
-	LOG_INF("[vpu_%d] %d Skip at FPGA", core, type);
+	LOG_DBG("[vpu_%d] %d Skip at FPGA", core, type);
 
 	return true;
 #else
@@ -1209,7 +1209,7 @@ static bool vpu_change_opp(int core_s, int type)
 	unsigned int core = (unsigned int)core_s;
 #if 0
 	if (get_vvpu_DVFS_is_paused_by_ptpod()) {
-		LOG_INF("[vpu_%d] dvfs skip by ptpod", core);
+		LOG_DBG("[vpu_%d] dvfs skip by ptpod", core);
 		return true;
 	}
 #endif
@@ -1221,7 +1221,7 @@ static bool vpu_change_opp(int core_s, int type)
 	/* dsp freq opp */
 	case OPPTYPE_DSPFREQ:
 		mutex_lock(&opp_mutex);
-		LOG_INF("[vpu_%d] %s setclksrc(%d/%d/%d/%d)\n",
+		LOG_DBG("[vpu_%d] %s setclksrc(%d/%d/%d/%d)\n",
 				core,
 				__func__,
 				opps.dsp.index,
@@ -1384,7 +1384,7 @@ int32_t vpu_thermal_en_throttle_cb(uint8_t vcore_opp, uint8_t vpu_opp)
 		mutex_unlock(&power_counter_mutex[i]);
 	}
 	if (vpu_down) {
-		LOG_INF("[vpu] all vpu are off currently, do nothing\n");
+		LOG_DBG("[vpu] all vpu are off currently, do nothing\n");
 		return ret;
 	}
 	#endif
@@ -1406,7 +1406,7 @@ int32_t vpu_thermal_en_throttle_cb(uint8_t vcore_opp, uint8_t vpu_opp)
 		return -1;
 	}
 	#endif
-	LOG_INF("%s, opp(%d)->(%d/%d)\n", __func__,
+	LOG_DBG("%s, opp(%d)->(%d/%d)\n", __func__,
 		vpu_opp, vvpu_opp_index, vpu_freq_index);
 
 	mutex_lock(&opp_mutex);
@@ -1429,59 +1429,59 @@ int32_t vpu_thermal_en_throttle_cb(uint8_t vcore_opp, uint8_t vpu_opp)
 			switch (vpu_freq_index) {
 			case 0:
 			default:
-				LOG_INF("thermal force bound freq @750MHz\n");
+				LOG_DBG("thermal force bound freq @750MHz\n");
 				break;
 			case 1:
-				LOG_INF("thermal force bound freq @ 700MHz\n");
+				LOG_DBG("thermal force bound freq @ 700MHz\n");
 				break;
 			case 2:
-				LOG_INF("thermal force bound freq @624MHz\n");
+				LOG_DBG("thermal force bound freq @624MHz\n");
 				break;
 			case 3:
-				LOG_INF("thermal force bound freq @594MHz\n");
+				LOG_DBG("thermal force bound freq @594MHz\n");
 				break;
 			case 4:
-				LOG_INF("thermal force bound freq @560MHz\n");
+				LOG_DBG("thermal force bound freq @560MHz\n");
 				break;
 			case 5:
-				LOG_INF("thermal force bound freq @525MHz\n");
+				LOG_DBG("thermal force bound freq @525MHz\n");
 				break;
 			case 6:
-				LOG_INF("thermal force bound freq @450MHz\n");
+				LOG_DBG("thermal force bound freq @450MHz\n");
 				break;
 			case 7:
-				LOG_INF("thermal force bound freq @416MHz\n");
+				LOG_DBG("thermal force bound freq @416MHz\n");
 				break;
 			case 8:
-				LOG_INF("thermal force bound freq @364MHz\n");
+				LOG_DBG("thermal force bound freq @364MHz\n");
 				break;
 			case 9:
-				LOG_INF("thermal force bound freq @312MHz\n");
+				LOG_DBG("thermal force bound freq @312MHz\n");
 				break;
 			case 10:
-				LOG_INF("thermal force bound freq @273MHz\n");
+				LOG_DBG("thermal force bound freq @273MHz\n");
 				break;
 			case 11:
-				LOG_INF("thermal force bound freq @208MHz\n");
+				LOG_DBG("thermal force bound freq @208MHz\n");
 				break;
 			case 12:
-				LOG_INF("thermal force bound freq @137MHz\n");
+				LOG_DBG("thermal force bound freq @137MHz\n");
 				break;
 			case 13:
-				LOG_INF("thermal force bound freq @104MHz\n");
+				LOG_DBG("thermal force bound freq @104MHz\n");
 				break;
 			case 14:
-				LOG_INF("thermal force bound freq @52MHz\n");
+				LOG_DBG("thermal force bound freq @52MHz\n");
 				break;
 			case 15:
-				LOG_INF("thermal force bound freq @26MHz\n");
+				LOG_DBG("thermal force bound freq @26MHz\n");
 				break;
 			}
 			/*vpu_change_opp(i, OPPTYPE_DSPFREQ);*/
 		}
 		if (force_change_vvpu_opp[i]) {
 			/* vcore change should wait */
-			LOG_INF("thermal force bound vcore opp to %d\n",
+			LOG_DBG("thermal force bound vcore opp to %d\n",
 					vvpu_opp_index);
 			/* vcore only need to change one time from
 			 * thermal request
@@ -1500,13 +1500,13 @@ int32_t vpu_thermal_dis_throttle_cb(void)
 
 	if (vpu_init_done != 1)
 		return ret;
-	LOG_INF("%s +\n", __func__);
+	LOG_DBG("%s +\n", __func__);
 	mutex_lock(&opp_mutex);
 	max_vcore_opp = 0;
 	max_dsp_freq = 0;
 	max_vvpu_opp = 0;
 	mutex_unlock(&opp_mutex);
-	LOG_INF("%s -\n", __func__);
+	LOG_DBG("%s -\n", __func__);
 
 	return ret;
 }
@@ -1524,7 +1524,7 @@ static int vpu_prepare_regulator_and_clock(struct device *pdev)
 
 
 #ifdef MTK_VPU_FPGA_PORTING
-	LOG_INF("%s skip at FPGA\n", __func__);
+	LOG_DBG("%s skip at FPGA\n", __func__);
 #else
 #define PREPARE_VPU_MTCMOS(clk) \
 	{ \
@@ -1608,7 +1608,7 @@ static int vpu_prepare_regulator_and_clock(struct device *pdev)
 static int vpu_enable_regulator_and_clock(int core)
 {
 #ifdef MTK_VPU_FPGA_PORTING
-	LOG_INF("%s skip at FPGA\n", __func__);
+	LOG_DBG("%s skip at FPGA\n", __func__);
 
 	is_power_on[core] = true;
 	force_change_vcore_opp[core] = false;
@@ -1637,7 +1637,7 @@ static int vpu_enable_regulator_and_clock(int core)
 	ret1 = vvpu_regulator_set_mode(true);
 	udelay(100);//slew rate:rising10mV/us
 if (g_vpu_log_level > Log_STATE_MACHINE)
-	LOG_INF("enable vvpu ret:%d\n", ret1);
+	LOG_DBG("enable vvpu ret:%d\n", ret1);
 
 
 
@@ -1796,7 +1796,7 @@ clk_on:
 #undef ENABLE_VPU_MTCMOS
 #undef ENABLE_VPU_CLK
 
-	LOG_INF("[vpu_%d] en_rc setclksrc(%d/%d/%d/%d)\n",
+	LOG_DBG("[vpu_%d] en_rc setclksrc(%d/%d/%d/%d)\n",
 			core,
 			opps.dsp.index,
 			opps.dspcore[0].index,
@@ -1911,9 +1911,9 @@ static unsigned int vpu_read_smi_bus_debug(int core)
 		}
 		smi_bus_vpu_value = (smi_bus_value & 0x007FE000) >> 13;
 	} else {
-		LOG_INF("[vpu_%d] null smi_cmn_base\n", core);
+		LOG_DBG("[vpu_%d] null smi_cmn_base\n", core);
 	}
-	LOG_INF("[vpu_%d] read_smi_bus (0x%x/0x%x)\n", core,
+	LOG_DBG("[vpu_%d] read_smi_bus (0x%x/0x%x)\n", core,
 			smi_bus_value, smi_bus_vpu_value);
 
 	return smi_bus_vpu_value;
@@ -1926,7 +1926,7 @@ static int vpu_disable_regulator_and_clock(int core)
 	int ret1 = 0;
 
 #ifdef MTK_VPU_FPGA_PORTING
-	LOG_INF("%s skip at FPGA\n", __func__);
+	LOG_DBG("%s skip at FPGA\n", __func__);
 
 	is_power_on[core] = false;
 	if (!is_power_debug_lock)
@@ -1942,13 +1942,13 @@ static int vpu_disable_regulator_and_clock(int core)
 #ifdef MTK_VPU_SMI_DEBUG_ON
 	smi_bus_vpu_value = vpu_read_smi_bus_debug(core);
 
-	LOG_INF("[vpu_%d] dis_rc 1 (0x%x)\n", core, smi_bus_vpu_value);
+	LOG_DBG("[vpu_%d] dis_rc 1 (0x%x)\n", core, smi_bus_vpu_value);
 
 	if ((int)smi_bus_vpu_value != 0) {
 		mdelay(1);
 		smi_bus_vpu_value = vpu_read_smi_bus_debug(core);
 
-		LOG_INF("[vpu_%d] dis_rc again (0x%x)\n", core,
+		LOG_DBG("[vpu_%d] dis_rc again (0x%x)\n", core,
 				smi_bus_vpu_value);
 
 		if ((int)smi_bus_vpu_value != 0) {
@@ -2063,7 +2063,7 @@ out:
 	opps.dsp.index = 9;
 	opps.ipu_if.index = 9;
 if (g_vpu_log_level > Log_STATE_MACHINE)
-	LOG_INF("[vpu_%d] dis_rc -\n", core);
+	LOG_DBG("[vpu_%d] dis_rc -\n", core);
 	return ret;
 #endif
 }
@@ -2072,7 +2072,7 @@ static void vpu_unprepare_regulator_and_clock(void)
 {
 
 #ifdef MTK_VPU_FPGA_PORTING
-	LOG_INF("%s skip at FPGA\n", __func__);
+	LOG_DBG("%s skip at FPGA\n", __func__);
 #else
 #define UNPREPARE_VPU_CLK(clk) \
 	{ \
@@ -2576,7 +2576,7 @@ info18_out:
 #ifdef VPU_MOVE_WAKE_TO_BACK
 	if (normal_check_done == 1) {
 		vpu_trace_dump("VPU%d VPU_REQ_DO_CHECK_STATE OK", core);
-		LOG_INF("normal_check_done UNLOCK\n");
+		LOG_DBG("normal_check_done UNLOCK\n");
 		vpu_service_cores[core].is_cmd_done = true;
 		wake_up_interruptible(&cmd_wait);
 	}
@@ -2635,7 +2635,7 @@ static void vpu_hw_ion_free_handle(struct ion_client *client,
 		return;
 	}
 	if (g_vpu_log_level > Log_STATE_MACHINE)
-		LOG_INF("[vpu] ion_free_handle(0x%p)\n", handle);
+		LOG_DBG("[vpu] ion_free_handle(0x%p)\n", handle);
 
 	ion_free(client, handle);
 }
@@ -2793,7 +2793,7 @@ for (j = 0 ; j < req->buffers[i].plane_count ; j++) { \
 			service_core, i,
 				vpu_dev->priority_list[service_core][i]);
 		if (vpu_dev->priority_list[service_core][i] > 0) {
-			LOG_INF("+ opp due to priority %d\n", req->priority);
+			LOG_DBG("+ opp due to priority %d\n", req->priority);
 			vcore_opp_index = 0;
 			dsp_freq_index = 0;
 			break;
@@ -2817,7 +2817,7 @@ for (j = 0 ; j < req->buffers[i].plane_count ; j++) { \
 #define LOG_STRING \
 "[v%d<-0x%x]0x%lx,ID=0x%lx_%d,%d->%d,%d,%d/%d-%d,%d-%d,0x%x,%d/%d/%d/0x%x\n"
 
-			LOG_INF(LOG_STRING,
+			LOG_DBG(LOG_STRING,
 				service_core,
 				req->requested_core,
 				(unsigned long)req->user_id,
@@ -2916,7 +2916,7 @@ out:
 			list_add_tail(vlist_link(req, struct vpu_request),
 						&user->deque_list);
 
-			LOG_INF("[vpu_%d, 0x%x->0x%x] %s(%d_%d), st(%d) %s\n",
+			LOG_DBG("[vpu_%d, 0x%x->0x%x] %s(%d_%d), st(%d) %s\n",
 				service_core,
 				req->requested_core, req->occupied_core,
 				"algo_id", (int)(req->algo_id[service_core]),
@@ -3372,14 +3372,14 @@ void vpu_put_power(int core_s, enum VpuPowerOnType type)
 				msecs_to_jiffies(10 * PWR_KEEP_TIME_MS));
 			break;
 		case VPT_IMT_OFF:
-			LOG_INF("[vpu_%d] VPT_IMT_OFF\n", core);
+			LOG_DBG("[vpu_%d] VPT_IMT_OFF\n", core);
 			mod_delayed_work(wq,
 				&(power_counter_work[core].my_work),
 				msecs_to_jiffies(0));
 			break;
 		case VPT_SDSP_OFF:
 			power_counter_work[core].logbackup = 0;
-			LOG_INF("[vpu_%d] VPT_IMT_OFF (SDSP)\n", core);
+			LOG_DBG("[vpu_%d] VPT_IMT_OFF (SDSP)\n", core);
 			mod_delayed_work(wq,
 				&(power_counter_work[core].my_work),
 				msecs_to_jiffies(0));
@@ -3424,7 +3424,7 @@ int vpu_set_power(struct vpu_user *user, struct vpu_power *power)
 		return ret;
 	}
 
-	LOG_INF("[vpu_%d] set power opp:%d, pid=%d, tid=%d\n",
+	LOG_DBG("[vpu_%d] set power opp:%d, pid=%d, tid=%d\n",
 			core, power->opp_step,
 			user->open_pid, user->open_tgid);
 
@@ -3457,7 +3457,7 @@ int vpu_set_power(struct vpu_user *user, struct vpu_power *power)
 
 	/* to avoid power leakage, power on/off need be paired */
 	vpu_put_power(core, VPT_PRE_ON);
-	LOG_INF("[vpu_%d] %s -\n", core, __func__);
+	LOG_DBG("[vpu_%d] %s -\n", core, __func__);
 	return ret;
 }
 
@@ -3485,7 +3485,7 @@ int vpu_sdsp_get_power(struct vpu_user *user)
 	mod_delayed_work(wq, &sdsp_work,
 		msecs_to_jiffies(SDSP_KEEP_TIME_MS));
 
-	LOG_INF("[vpu] %s -\n", __func__);
+	LOG_DBG("[vpu] %s -\n", __func__);
 	return ret;
 }
 
@@ -3506,7 +3506,7 @@ int vpu_sdsp_put_power(struct vpu_user *user)
 			while (is_power_on[core] == true)
 				usleep_range(100, 500);
 
-			LOG_INF("[vpu] power_counter[%d] = %d/%d -\n",
+			LOG_DBG("[vpu] power_counter[%d] = %d/%d -\n",
 				core, power_counter[core], is_power_on[core]);
 
 		}
@@ -3515,7 +3515,7 @@ int vpu_sdsp_put_power(struct vpu_user *user)
 		&sdsp_work,
 		msecs_to_jiffies(0));
 
-	LOG_INF("[vpu] %s, sdsp_power_counter = %d -\n",
+	LOG_DBG("[vpu] %s, sdsp_power_counter = %d -\n",
 		__func__, sdsp_power_counter);
 	return ret;
 }
@@ -3558,7 +3558,7 @@ bool vpu_is_idle(int core_s)
 
 	mutex_unlock(&(vpu_service_cores[core].state_mutex));
 
-	LOG_INF("%s vpu_%d, idle = %d, state = %d  !!\r\n", __func__,
+	LOG_DBG("%s vpu_%d, idle = %d, state = %d  !!\r\n", __func__,
 		core, idle, vpu_service_cores[core].state);
 
 	return idle;
@@ -3571,7 +3571,7 @@ int vpu_quick_suspend(int core_s)
 
 	LOG_DBG("[vpu_%d] q_suspend +\n", core);
 	mutex_lock(&power_counter_mutex[core]);
-	LOG_INF("[vpu_%d] q_suspend (%d/%d)\n", core,
+	LOG_DBG("[vpu_%d] q_suspend (%d/%d)\n", core,
 		power_counter[core], vpu_service_cores[core].state);
 
 	if (power_counter[core] == 0) {
@@ -3617,10 +3617,10 @@ static void vpu_sdsp_routine(struct work_struct *work)
 {
 
 	if (sdsp_power_counter != 0) {
-		LOG_INF("%s long time not unlock!!! -\n", __func__);
+		LOG_DBG("%s long time not unlock!!! -\n", __func__);
 		LOG_ERR("%s long time not unlock error!!! -\n", __func__);
 	} else {
-		LOG_INF("%s sdsp_power_counter is correct!!! -\n", __func__);
+		LOG_DBG("%s sdsp_power_counter is correct!!! -\n", __func__);
 	}
 }
 
@@ -3692,7 +3692,7 @@ int vpu_init_hw(int core_s, struct vpu_device *device)
 		vpu_dev->vpu_hw_support[1] = true;
 #else
 		efuse_data = (get_devinfo_with_index(3) & 0xC00) >> 10;
-		LOG_INF("efuse_data: efuse_data(0x%x)\n", efuse_data);
+		LOG_DBG("efuse_data: efuse_data(0x%x)\n", efuse_data);
 		switch (efuse_data) {
 		case 0x3: /*b11*/
 			vpu_dev->vpu_hw_support[0] = false;
@@ -3788,7 +3788,7 @@ int vpu_init_hw(int core_s, struct vpu_device *device)
 
 			vpu_service_cores[i].work_buf_logsize = 0;
 
-			LOG_INF("core(%d):work_buf va (0x%lx),pa(0x%x)\n",
+			LOG_DBG("core(%d):work_buf va (0x%lx),pa(0x%x)\n",
 				i,
 				(unsigned long)
 				    (vpu_service_cores[i].work_buf->va),
@@ -3821,7 +3821,7 @@ int vpu_init_hw(int core_s, struct vpu_device *device)
 					&(vpu_service_cores[i].exec_kernel_lib),
 					&mem_param);
 
-			LOG_INF("core(%d):kernel_lib va (0x%lx),pa(0x%x)\n",
+			LOG_DBG("core(%d):kernel_lib va (0x%lx),pa(0x%x)\n",
 				i,
 				(unsigned long)
 				    (vpu_service_cores[i].exec_kernel_lib->va),
@@ -4203,7 +4203,7 @@ int vpu_hw_boot_sequence(int core_s)
 	}
 
 	vpu_trace_begin("%s", __func__);
-	LOG_INF("[vpu_%d] boot-seq core(%d)\n", core, core);
+	LOG_DBG("[vpu_%d] boot-seq core(%d)\n", core, core);
 
 	LOG_DBG("CTRL(0x%x)\n",
 			vpu_read_reg32(vpu_service_cores[core].vpu_base,
@@ -4292,7 +4292,7 @@ int vpu_hw_boot_sequence(int core_s)
 	VPU_SET_BIT(ptr_axi_0, 28);
 
 	if (g_vpu_log_level > VpuLogThre_PERFORMANCE) {
-		LOG_INF("[vpu_%d] REG_AXI_DEFAULT0(0x%x)\n", core,
+		LOG_DBG("[vpu_%d] REG_AXI_DEFAULT0(0x%x)\n", core,
 			vpu_read_reg32(vpu_service_cores[core].vpu_base,
 						CTRL_BASE_OFFSET + 0x13C));
 	}
@@ -4338,7 +4338,7 @@ out:
 	vpu_trace_end();
 	vpu_write_field(core, FLD_APMCU_INT, 1);
 
-	LOG_INF("[vpu_%d] hw_boot_sequence with clr INT-\n", core);
+	LOG_DBG("[vpu_%d] hw_boot_sequence with clr INT-\n", core);
 	return ret;
 }
 
@@ -4410,7 +4410,7 @@ int vpu_hw_set_debug(int core_s)
 	vpu_write_field(core, FLD_XTENSA_INFO30,
 		vpu_service_cores[core].work_buf_logsize);
 
-	LOG_INF("[vpu_%d] %s=(0x%lx), INFO01(0x%x), 23(%d)\n",
+	LOG_DBG("[vpu_%d] %s=(0x%lx), INFO01(0x%x), 23(%d)\n",
 		core,
 		"work_buf->pa + VPU_OFFSET_LOG",
 		(unsigned long)(vpu_service_cores[core].work_buf->pa +
@@ -4474,7 +4474,7 @@ out:
 	ret = vpu_hw_set_log_option(core);
 #endif
 	vpu_trace_end();
-	LOG_INF("[vpu_%d] hw_set_debug - version check(0x%x/0x%x)\n",
+	LOG_DBG("[vpu_%d] hw_set_debug - version check(0x%x/0x%x)\n",
 			core,
 			vpu_read_field(core, FLD_XTENSA_INFO20),
 			vpu_read_field(core, FLD_XTENSA_INFO29));
@@ -4548,7 +4548,7 @@ int vpu_get_entry_of_algo(int core_s, char *name, int *id,
 	for (i = 0; i < VPU_NUMS_IMAGE_HEADER; i++) {
 		for (j = 0; j < header[i].algo_info_count; j++) {
 			algo_info = &header[i].algo_infos[j];
-			LOG_INF("%s: %s/%s, %s:0x%x, %s:%d, %s:0x%x, 0x%x\n",
+			LOG_DBG("%s: %s/%s, %s:0x%x, %s:%d, %s:0x%x, 0x%x\n",
 					"algo name", name, algo_info->name,
 					"core info", (algo_info->vpu_core),
 					"input core", core,
@@ -4557,7 +4557,7 @@ int vpu_get_entry_of_algo(int core_s, char *name, int *id,
 			/* CHRISTODO */
 			if ((strcmp(name, algo_info->name) == 0) &&
 				(algo_info->vpu_core & coreMagicNum)) {
-				LOG_INF("[%d] algo_info->offset(0x%x)/0x%x",
+				LOG_DBG("[%d] algo_info->offset(0x%x)/0x%x",
 					core,
 					algo_info->offset,
 				    (unsigned int)
@@ -4567,7 +4567,7 @@ int vpu_get_entry_of_algo(int core_s, char *name, int *id,
 					 VPU_OFFSET_ALGO_AREA +
 					 vpu_service_cores[core].algo_data_mva;
 
-				LOG_INF("[%d] *mva(0x%x/0x%lx), s(%d)",
+				LOG_DBG("[%d] *mva(0x%x/0x%lx), s(%d)",
 						core, *mva,
 						(unsigned long)(*mva), s);
 
@@ -4960,7 +4960,7 @@ int vpu_hw_processing_request(int core_s, struct vpu_request *request)
 		}
 	}
 
-	LOG_INF("%s: vpu%d: algo: %s(%d)\n", __func__,
+	LOG_DBG("%s: vpu%d: algo: %s(%d)\n", __func__,
 		core, algo ? algo->name : "", request->algo_id[core]);
 
 	/* step3. do processing, algo loader and d2d*/
@@ -4992,7 +4992,7 @@ int vpu_hw_processing_request(int core_s, struct vpu_request *request)
 		LOG_DBG("[vpu_%d] vpu_check_precond done\n", core);
 
 		if (g_vpu_log_level > Log_ALGO_OPP_INFO)
-			LOG_INF("[vpu_%d] algo_%d ptr/length (0x%lx/0x%x), bf(%d)\n",
+			LOG_DBG("[vpu_%d] algo_%d ptr/length (0x%lx/0x%x), bf(%d)\n",
 				core, algo->id[core],
 				(unsigned long)algo->bin_ptr,
 				algo->bin_length,
@@ -5021,7 +5021,7 @@ int vpu_hw_processing_request(int core_s, struct vpu_request *request)
 		vpu_write_field(core, FLD_CTL_INT, 1);
 
 	if (g_vpu_log_level > Log_STATE_MACHINE) {
-		LOG_INF("[0x%lx]:load algo start ",
+		LOG_DBG("[0x%lx]:load algo start ",
 			(unsigned long)request->request_id);
 	}
 		/* 3. wait until done */
@@ -5034,7 +5034,7 @@ int vpu_hw_processing_request(int core_s, struct vpu_request *request)
 			ret |= vpu_check_postcond(core);
 
 		if (g_vpu_log_level > Log_ALGO_OPP_INFO)
-			LOG_INF("[vpu_%d] algo_%d %s=0x%lx, %s=%d, %s=%d, %s=%d, %d\n",
+			LOG_DBG("[vpu_%d] algo_%d %s=0x%lx, %s=%d, %s=%d, %s=%d, %d\n",
 			core, algo->id[core],
 			"bin_ptr", (unsigned long)algo->bin_ptr,
 			"done", vpu_service_cores[core].is_cmd_done,
@@ -5128,7 +5128,7 @@ int vpu_hw_processing_request(int core_s, struct vpu_request *request)
 	vpu_write_field(core, FLD_CTL_INT, 1);
 	ktime_get_ts(&start);
 	if (g_vpu_log_level > Log_ALGO_OPP_INFO)
-		LOG_INF("[0x%lx]:d2d start ",
+		LOG_DBG("[0x%lx]:d2d start ",
 		(unsigned long)request->request_id);
 	/* 3. wait until done */
 	ret = wait_command(core);
@@ -5140,7 +5140,7 @@ int vpu_hw_processing_request(int core_s, struct vpu_request *request)
 		ret |= vpu_check_postcond(core);
 
 	if (g_vpu_log_level > VpuLogThre_PERFORMANCE) {
-		LOG_INF("[vpu_%d] end d2d, done(%d), ret(%d), info00(%d), %d\n",
+		LOG_DBG("[vpu_%d] end d2d, done(%d), ret(%d), info00(%d), %d\n",
 			core,
 			vpu_service_cores[core].is_cmd_done, ret,
 			vpu_read_field(core, FLD_XTENSA_INFO00),
@@ -5164,7 +5164,7 @@ int vpu_hw_processing_request(int core_s, struct vpu_request *request)
 	latency += (uint64_t)(timespec_to_ns(&end) -
 		timespec_to_ns(&start));
 if (g_vpu_log_level > Log_STATE_MACHINE) {
-	LOG_INF("[0x%lx]:load algo + d2d latency[%lld] ",
+	LOG_DBG("[0x%lx]:load algo + d2d latency[%lld] ",
 		(unsigned long)request->request_id, latency);
 }
 	#ifdef ENABLE_PMQOS
@@ -5222,7 +5222,7 @@ out2:
 	request->bandwidth = vpu_cmd_qos_end(core);
 #endif
 if (g_vpu_log_level > Log_STATE_MACHINE) {
-	LOG_INF("[0x%lx]:vpu busy_time[%lld],bw[%d] ",
+	LOG_DBG("[0x%lx]:vpu busy_time[%lld],bw[%d] ",
 		(unsigned long)request->request_id,
 		request->busy_time, request->bandwidth);
 }
@@ -5266,7 +5266,7 @@ int vpu_hw_get_algo_info(int core_s, struct vpu_algo *algo)
 	ofs_sett_descs = ofs_info_descs +
 			sizeof(((struct vpu_algo *)0)->info_descs);
 
-	LOG_INF("[vpu_%d] %s check precond done\n", core, __func__);
+	LOG_DBG("[vpu_%d] %s check precond done\n", core, __func__);
 
 	/* 1. write register */
 	vpu_write_field(core, FLD_XTENSA_INFO01, VPU_CMD_GET_ALGO);
@@ -5293,7 +5293,7 @@ int vpu_hw_get_algo_info(int core_s, struct vpu_algo *algo)
 	if (ret == -ERESTARTSYS)
 		is_hw_fail = false;
 
-	LOG_INF("[vpu_%d] VPU_CMD_GET_ALGO done\n", core);
+	LOG_DBG("[vpu_%d] VPU_CMD_GET_ALGO done\n", core);
 	vpu_trace_end();
 	if (ret) {
 		vpu_err_hnd(is_hw_fail, core,
@@ -5826,7 +5826,7 @@ int vpu_set_power_parameter(uint8_t param, int argc, int *args)
 		vpu_lock_power.priority = POWER_HAL;
 		vpu_lock_power.max_boost_value = args[2];
 		vpu_lock_power.min_boost_value = args[1];
-		LOG_INF("[vpu]POWER_HAL_LOCK+core:%d, maxb:%d, minb:%d\n",
+		LOG_DBG("[vpu]POWER_HAL_LOCK+core:%d, maxb:%d, minb:%d\n",
 			vpu_lock_power.core, vpu_lock_power.max_boost_value,
 				vpu_lock_power.min_boost_value);
 		ret = vpu_lock_set_power(&vpu_lock_power);
@@ -5867,7 +5867,7 @@ int vpu_set_power_parameter(uint8_t param, int argc, int *args)
 		vpu_lock_power.priority = EARA_QOS;
 		vpu_lock_power.max_boost_value = args[2];
 		vpu_lock_power.min_boost_value = args[1];
-		LOG_INF("[vpu]EARA_LOCK+core:%d, maxb:%d, minb:%d\n",
+		LOG_DBG("[vpu]EARA_LOCK+core:%d, maxb:%d, minb:%d\n",
 			vpu_lock_power.core, vpu_lock_power.max_boost_value,
 				vpu_lock_power.min_boost_value);
 		ret = vpu_lock_set_power(&vpu_lock_power);
@@ -6001,7 +6001,7 @@ bool vpu_update_lock_power_parameter(struct vpu_lock_power *vpu_lock_power)
 	lock_power[priority][core].lock = true;
 	lock_power[priority][core].priority =
 		vpu_lock_power->priority;
-LOG_INF("power_parameter core %d, maxb:%d, minb:%d priority %d\n",
+LOG_DBG("power_parameter core %d, maxb:%d, minb:%d priority %d\n",
 		lock_power[priority][core].core,
 		lock_power[priority][core].max_boost_value,
 		lock_power[priority][core].min_boost_value,
@@ -6036,7 +6036,7 @@ bool vpu_update_unlock_power_parameter(struct vpu_lock_power *vpu_lock_power)
 	lock_power[priority][core].lock = false;
 	lock_power[priority][core].priority =
 		vpu_lock_power->priority;
-	LOG_INF("%s\n", __func__);
+	LOG_DBG("%s\n", __func__);
 	return ret;
 }
 uint8_t min_of(uint8_t value1, uint8_t value2)

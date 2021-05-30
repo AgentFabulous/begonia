@@ -100,7 +100,7 @@ static int add_qos_request(struct pm_qos_request *req)
 static void update_qos_request(struct pm_qos_request *req, int32_t val)
 {
 	if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-		LOG_INF("[vpu][qos] %s, peakBw=%d -\n", __func__, val);
+		LOG_DBG("[vpu][qos] %s, peakBw=%d -\n", __func__, val);
 
 	pm_qos_update_request(req, val);
 }
@@ -262,7 +262,7 @@ static int deque_cmd_qos(struct qos_counter *counter)
 	};
 
 	if (g_vpu_log_level > VpuLogThre_PERFORMANCE) {
-		LOG_INF("[vpu][qos] cmd:bw(%d/%d)\n",
+		LOG_DBG("[vpu][qos] cmd:bw(%d/%d)\n",
 			avg_bw, cmd_qos->total_bw);
 	}
 

@@ -258,7 +258,7 @@ struct ion_handle *vpu_hw_ion_import_handle(struct ion_client *client, int fd)
 	}
 
 	if (g_vpu_log_level > Log_STATE_MACHINE)
-		LOG_INF("[vpu] ion_import_handle(0x%p)\n", handle);
+		LOG_DBG("[vpu] ion_import_handle(0x%p)\n", handle);
 
 	return handle;
 }
@@ -324,7 +324,7 @@ int vpu_put_request_to_pool(struct vpu_user *user, struct vpu_request *req)
 				return -EINVAL;
 			} else {
 				if (g_vpu_log_level > Log_STATE_MACHINE)
-					LOG_INF("[vpu_drv]cnt_%d,%s=0x%p\n",
+					LOG_DBG("[vpu_drv]cnt_%d,%s=0x%p\n",
 						cnt,
 						"ion_import_dma_buf handle",
 						handle);
@@ -346,7 +346,7 @@ int vpu_put_request_to_pool(struct vpu_user *user, struct vpu_request *req)
 
 			} else {
 				/* import fd to handle for buffer ref count+1*/
-				LOG_INF("imprt sett ion fd to 0x%p", handle);
+				LOG_DBG("imprt sett ion fd to 0x%p", handle);
 				req->sett.sett_ion_fd =
 						(uint64_t)(uintptr_t)handle;
 			}
@@ -563,7 +563,7 @@ int vpu_get_request_from_queue(struct vpu_user *user,
 		}
 
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] %s (%d)\n", __func__, get);
+			LOG_DBG("[vpu] %s (%d)\n", __func__, get);
 		if (get)
 			list_del_init(vlist_link(req, struct vpu_request));
 
@@ -613,7 +613,7 @@ bool vpu_is_available(void)
 	pool_wait_size = vpu_pool_size(&vpu_device->pool_common);
 
 	if (pool_wait_size != 0) {
-		LOG_INF("common pool size = %d, no empty vpu \r\n",
+		LOG_DBG("common pool size = %d, no empty vpu \r\n",
 			pool_wait_size);
 
 		return false;
@@ -621,13 +621,13 @@ bool vpu_is_available(void)
 
 	for (i = 0; i < MTK_VPU_CORE; i++) {
 		pool_wait_size = vpu_pool_size(&vpu_device->pool[i]);
-		LOG_INF("vpu_%d, pool size = %d\r\n", i, pool_wait_size);
+		LOG_DBG("vpu_%d, pool size = %d\r\n", i, pool_wait_size);
 		if ((pool_wait_size == 0) && vpu_is_idle(i)) {
-			LOG_INF("vpu_%d, is available !!\r\n", i);
+			LOG_DBG("vpu_%d, is available !!\r\n", i);
 			return true;
 		}
 	}
-	LOG_INF("GG, no vpu available !!\r\n");
+	LOG_DBG("GG, no vpu available !!\r\n");
 
 	return false;
 
@@ -693,7 +693,7 @@ int vpu_delete_user(struct vpu_user *user)
 		vpu_hw_unlock(user);
 
 	mutex_lock(&vpu_device->user_mutex);
-	LOG_INF("deleted user[0x%lx]\n", (unsigned long)(user->id));
+	LOG_DBG("deleted user[0x%lx]\n", (unsigned long)(user->id));
 	list_del(vlist_link(user, struct vpu_user));
 	mutex_unlock(&vpu_device->user_mutex);
 
@@ -860,7 +860,7 @@ static int vpu_open(struct inode *inode, struct file *flip)
 		return -ENODEV;
 	}
 
-	LOG_INF("vpu_support core : 0x%x\n", efuse_data);
+	LOG_DBG("vpu_support core : 0x%x\n", efuse_data);
 
 	vpu_create_user(&user);
 	if (IS_ERR_OR_NULL(user)) {
@@ -869,7 +869,7 @@ static int vpu_open(struct inode *inode, struct file *flip)
 	}
 
 	user->id = (unsigned long *)user;
-	LOG_INF("%s cnt(%d) user->id : 0x%lx, tids(%d/%d)\n", __func__,
+	LOG_DBG("%s cnt(%d) user->id : 0x%lx, tids(%d/%d)\n", __func__,
 		vpu_num_users,
 		(unsigned long)(user->id),
 		user->open_pid, user->open_tgid);
@@ -957,7 +957,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			LOG_ERR("[EARA_LOCK] get arg fail\n");
 			goto out;
 			}
-		LOG_INF("[vpu] EARA_LOCK + core:%d, maxb:%d, minb:%d\n",
+		LOG_DBG("[vpu] EARA_LOCK + core:%d, maxb:%d, minb:%d\n",
 			vpu_lock_power.core, vpu_lock_power.max_boost_value,
 				vpu_lock_power.min_boost_value);
 		ret = vpu_lock_set_power(&vpu_lock_power);
@@ -983,7 +983,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			LOG_ERR("[EARA_UNLOCK] get arg fail\n");
 			goto out;
 			}
-		LOG_INF("[vpu] EARA_UNLOCK + core:%d\n",
+		LOG_DBG("[vpu] EARA_UNLOCK + core:%d\n",
 			vpu_lock_power.core);
 		vpu_unlock_set_power(&vpu_lock_power);
 		if (ret) {
@@ -1009,7 +1009,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			LOG_ERR("[POWER_HAL] get arg fail\n");
 			goto out;
 			}
-		LOG_INF("[vpu]POWER_HAL_LOCK+core:%d, maxb:%d, minb:%d\n",
+		LOG_DBG("[vpu]POWER_HAL_LOCK+core:%d, maxb:%d, minb:%d\n",
 			vpu_lock_power.core, vpu_lock_power.max_boost_value,
 				vpu_lock_power.min_boost_value);
 		ret = vpu_lock_set_power(&vpu_lock_power);
@@ -1037,7 +1037,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			LOG_ERR("[POWER_HAL_UNLOCK] get arg fail\n");
 			goto out;
 			}
-		LOG_INF("[vpu]POWER_HAL_UNLOCK+ core:%d\n",
+		LOG_DBG("[vpu]POWER_HAL_UNLOCK+ core:%d\n",
 			vpu_lock_power.core);
 		ret = vpu_unlock_set_power(&vpu_lock_power);
 		if (ret) {
@@ -1055,7 +1055,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		u_req = (struct vpu_request *) arg;
 
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] VPU_IOCTL_ENQUE_REQUEST +\n");
+			LOG_DBG("[vpu] VPU_IOCTL_ENQUE_REQUEST +\n");
 
 		ret = vpu_alloc_request(&req);
 		if (ret) {
@@ -1077,12 +1077,12 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		if (req_core == VPU_TRYLOCK_CORENUM &&
 			(ret == 0)) {
 			if (false == vpu_is_available()) {
-				LOG_INF("[vpu] vpu try lock fail!!\n");
+				LOG_DBG("[vpu] vpu try lock fail!!\n");
 				vpu_free_request(req);
 				ret = -EFAULT;
 				goto out;
 			}
-			LOG_INF("[vpu] ret = %d req->requested_core = 0x%x +\n",
+			LOG_DBG("[vpu] ret = %d req->requested_core = 0x%x +\n",
 			ret, req_core);
 		}  else if (req_core != VPU_CORE_COMMON &&
 			req_core > VPU_MAX_NUM_CORES) {
@@ -1173,7 +1173,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		/* free the request, error happened here*/
 		vpu_free_request(req);
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] .VPU_IOCTL_ENQUE_REQUEST - ");
+			LOG_DBG("[vpu] .VPU_IOCTL_ENQUE_REQUEST - ");
 		ret = -EFAULT;
 		break;
 	}
@@ -1184,7 +1184,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		struct vpu_request *u_req;
 
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] VPU_IOCTL_DEQUE_REQUEST + ");
+			LOG_DBG("[vpu] VPU_IOCTL_DEQUE_REQUEST + ");
 
 		u_req = (struct vpu_request *) arg;
 		#if 1
@@ -1225,7 +1225,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			goto out;
 		}
 		if (g_vpu_log_level > VpuLogThre_PERFORMANCE)
-			LOG_INF("[vpu] VPU_IOCTL_DEQUE_REQUEST - ");
+			LOG_DBG("[vpu] VPU_IOCTL_DEQUE_REQUEST - ");
 		break;
 	}
 	case VPU_IOCTL_FLUSH_REQUEST:
@@ -1459,7 +1459,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		dev_debug_info->open_tgid = user->open_tgid;
 
 		if (g_vpu_log_level > Log_ALGO_OPP_INFO) {
-			LOG_INF("[%s] user:%s/%d. pid(%d/%d)\n",
+			LOG_DBG("[%s] user:%s/%d. pid(%d/%d)\n",
 				"VPU_IOCTL_OPEN_DEV_NOTICE",
 				dev_debug_info->callername,
 				dev_debug_info->dev_fd,
@@ -1500,7 +1500,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			dbg_info = vlist_node_of(head,
 						struct vpu_dev_debug_info);
 			if (g_vpu_log_level > Log_ALGO_OPP_INFO) {
-				LOG_INF("[%s] req_user-> = %s/%d, %d/%d\n",
+				LOG_DBG("[%s] req_user-> = %s/%d, %d/%d\n",
 					"VPU_IOCTL_CLOSE_DEV_NOTICE",
 					dbg_info->callername,
 					dbg_info->dev_fd, dbg_info->open_pid,
@@ -1516,7 +1516,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		}
 
 		if (g_vpu_log_level > Log_ALGO_OPP_INFO) {
-			LOG_INF("[%s] user:%d. pid(%d/%d), get(%d)\n",
+			LOG_DBG("[%s] user:%d. pid(%d/%d), get(%d)\n",
 					"VPU_IOCTL_CLOSE_DEV_NOTICE",
 					dev_fd, user->open_pid,
 					user->open_tgid, get);
@@ -1625,7 +1625,7 @@ static int vpu_release(struct inode *inode, struct file *flip)
 {
 	struct vpu_user *user = flip->private_data;
 
-	LOG_INF("%s cnt(%d) user->id : 0x%lx, tids(%d/%d)\n", __func__,
+	LOG_DBG("%s cnt(%d) user->id : 0x%lx, tids(%d/%d)\n", __func__,
 		vpu_num_users,
 		(unsigned long)(user->id),
 		user->open_pid, user->open_tgid);
@@ -1650,7 +1650,7 @@ static int vpu_mmap(struct file *flip, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	pfn = vma->vm_pgoff << PAGE_SHIFT;
 
-	LOG_INF("%s:%s=0x%lx,%s=0x%x,%s=0x%lx,%s=0x%lx,%s=0x%lx,%s=0x%lx\n",
+	LOG_DBG("%s:%s=0x%lx,%s=0x%x,%s=0x%lx,%s=0x%lx,%s=0x%lx,%s=0x%lx\n",
 			__func__,
 			"vm_pgoff", vma->vm_pgoff,
 			"pfn", pfn,
@@ -1738,14 +1738,14 @@ static int vpu_probe(struct platform_device *pdev)
 	smi_node = NULL;
 
 	if (core == MTK_VPU_CORE) {
-		LOG_INF("%s(%d), core(%d) = core(%d)+2 in FPGA, return\n",
+		LOG_DBG("%s(%d), core(%d) = core(%d)+2 in FPGA, return\n",
 			"vpu_num_devs", vpu_num_devs, core, MTK_VPU_CORE);
 		return ret;
 	}
 
 	node = pdev->dev.of_node;
 	vpu_device->dev[vpu_num_devs] = &pdev->dev;
-	LOG_INF("probe 0, pdev id = %d name = %s, name = %s\n",
+	LOG_DBG("probe 0, pdev id = %d name = %s, name = %s\n",
 			pdev->id, pdev->name,
 			pdev->dev.of_node->name);
 
@@ -1786,7 +1786,7 @@ static int vpu_probe(struct platform_device *pdev)
 	/* emulator will fill vpu_base and bin_base */
 	vpu_init_emulator(vpu_device);
 #else
-	LOG_INF("[vpu] core/total : %d/%d\n", core, MTK_VPU_CORE);
+	LOG_DBG("[vpu] core/total : %d/%d\n", core, MTK_VPU_CORE);
 	vpu_device->vpu_base[core] = (unsigned long) of_iomap(node, 0);
 	/* get physical address of binary data loaded by LK */
 	if (vpu_num_devs == 0) {
@@ -1805,7 +1805,7 @@ static int vpu_probe(struct platform_device *pdev)
 		vpu_device->bin_pa = phy_addr;
 		vpu_device->bin_size = phy_size;
 
-		LOG_INF("probe core:%d, %s=0x%lx %s=0x%x, %s=0x%x\n",
+		LOG_DBG("probe core:%d, %s=0x%lx %s=0x%x, %s=0x%x\n",
 			core,
 			"bin_base", (unsigned long)vpu_device->bin_base,
 			"phy_addr", phy_addr,
@@ -1831,11 +1831,11 @@ static int vpu_probe(struct platform_device *pdev)
 		vpu_device->vpu_vcorecfg_base =
 			   (unsigned long) of_iomap(ipu_vcore_node, 0);
 
-		LOG_INF("probe, smi_cmn_base: 0x%lx, ipu_conn:0x%lx\n",
+		LOG_DBG("probe, smi_cmn_base: 0x%lx, ipu_conn:0x%lx\n",
 				vpu_device->smi_cmn_base,
 				vpu_device->vpu_syscfg_base);
 
-		LOG_INF("probe, vcorecfg_base: 0x%lx\n",
+		LOG_DBG("probe, vcorecfg_base: 0x%lx\n",
 				vpu_device->vpu_vcorecfg_base);
 	}
 #endif

@@ -293,7 +293,7 @@ int vpu_init_reg(int core, struct vpu_device *device)
 	vpu_write_reg32(device->vpu_syscfg_base, 0xF0, 0x3FE0E000);
 	vpu_write_reg32(device->vpu_syscfg_base, 0x118, 0x3FE0E000);
 
-	LOG_INF("After 0x1900_00F0=0x%08X, 0x1900_0118=0x%08X\n",
+	LOG_DBG("After 0x1900_00F0=0x%08X, 0x1900_0118=0x%08X\n",
 			vpu_read_reg32(device->vpu_syscfg_base, 0xF0),
 			vpu_read_reg32(device->vpu_syscfg_base, 0x118));
 

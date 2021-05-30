@@ -168,7 +168,7 @@ int vpu_get_algo_id_by_name(int core, char *name)
 	}
 
 	algo_id = algo->id[core];
-	LOG_INF("vpu(%d)_get algo_id:%d\n", core, algo_id);
+	LOG_DBG("vpu(%d)_get algo_id:%d\n", core, algo_id);
 	return algo_id;
 
 out:
@@ -245,7 +245,7 @@ int vpu_create_algo(int core, char *name,
 	LOG_DBG("[vpu] vpu_hw_load_algo done, (%d/0x%lx/0x%x)\n",
 		id, (unsigned long)mva, length);
 
-	LOG_INF("[vpu_%d] vpu_hw_load_algo done, (%d/0x%lx/0x%x)\n",
+	LOG_DBG("[vpu_%d] vpu_hw_load_algo done, (%d/0x%lx/0x%x)\n",
 		core, algo->id[core],
 		(unsigned long)(algo->bin_ptr), algo->bin_length);
 
@@ -264,7 +264,7 @@ int vpu_create_algo(int core, char *name,
 			goto out;
 		}
 
-		LOG_INF("[vpu_%d] vpu_hw_get_algo_info done\n", core);
+		LOG_DBG("[vpu_%d] vpu_hw_get_algo_info done\n", core);
 
 		ret = vpu_calc_prop_offset(algo->info_descs,
 				algo->info_desc_count, &algo->info_length);
@@ -273,7 +273,7 @@ int vpu_create_algo(int core, char *name,
 			goto out;
 		}
 
-		LOG_INF("[vpu_%d] vpu_calc_prop_offset done, %s(0x%x)\n",
+		LOG_DBG("[vpu_%d] vpu_calc_prop_offset done, %s(0x%x)\n",
 				core,
 				"algo->info_length", algo->info_length);
 
@@ -284,7 +284,7 @@ int vpu_create_algo(int core, char *name,
 			goto out;
 		}
 
-		LOG_INF("[vpu_%d] vpu_calc_prop_offset done, %s(0x%x)\n",
+		LOG_DBG("[vpu_%d] vpu_calc_prop_offset done, %s(0x%x)\n",
 				core,
 				"algo->sett_length", algo->sett_length);
 	}

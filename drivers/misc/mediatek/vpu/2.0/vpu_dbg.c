@@ -166,7 +166,7 @@ static void vpu_test_wpp(void)
 	/* compare with golden */
 	ret = memcmp(buf_va + img_size,
 				g_datadst_640x360_golden_wpp, img_size);
-	LOG_INF("comparison result:%d", ret);
+	LOG_DBG("comparison result:%d", ret);
 	vpu_save_file("/data/vpu_result_wpp.raw",
 				buf_va + img_size, img_size);
 
@@ -253,7 +253,7 @@ static void vpu_test_be_true(void)
 	 */
 	memset(buf_va, 0x2, width * height);
 	ret = memcmp(buf_va, buf_va + width * height, width * height);
-	LOG_INF("vpu test: comparison result=%d and param5=%d",
+	LOG_DBG("vpu test: comparison result=%d and param5=%d",
 			ret, sett->param5);
 
 	vpu_free_request(req);
@@ -429,7 +429,7 @@ static int vpu_test_set(void *data, u64 val)
 	/* CHRISTODO */
 	int TEMP_CORE = 0;
 
-	LOG_INF("%s:val=%llu\n", __func__, val);
+	LOG_DBG("%s:val=%llu\n", __func__, val);
 
 	switch (val) {
 	case 0:
@@ -437,11 +437,11 @@ static int vpu_test_set(void *data, u64 val)
 		break;
 	case 1:
 		vpu_boot_up(TEMP_CORE);
-		LOG_INF("[vpu_%d] vpu_boot_up\n", TEMP_CORE);
+		LOG_DBG("[vpu_%d] vpu_boot_up\n", TEMP_CORE);
 		break;
 	case 2:
 		vpu_shut_down(TEMP_CORE);
-		LOG_INF("[vpu_%d] vpu_shut_down\n", TEMP_CORE);
+		LOG_DBG("[vpu_%d] vpu_shut_down\n", TEMP_CORE);
 		break;
 
 	case 10 ... 39: /* use algo's id to load algo */
@@ -451,14 +451,14 @@ static int vpu_test_set(void *data, u64 val)
 		if (vpu_find_algo_by_id(TEMP_CORE, id, &algo)) {
 			LOG_DBG("vpu test: algo(%d) is not existed\n", id);
 		} else {
-			LOG_INF("vpu test: load algo(%d)\n", id);
+			LOG_DBG("vpu test: load algo(%d)\n", id);
 
 			if (vpu_hw_load_algo(TEMP_CORE, algo)) {
 				LOG_ERR("[vpu_%d] vpu_hw_load_algo failed!\n\n",
 						TEMP_CORE);
 			}
 
-			LOG_INF("[vpu_%d] vpu_hw_load_algo done\n", TEMP_CORE);
+			LOG_DBG("[vpu_%d] vpu_hw_load_algo done\n", TEMP_CORE);
 		}
 
 		break;
@@ -559,7 +559,7 @@ static int vpu_test_set(void *data, u64 val)
 		vpu_user_test_case3(NULL);
 		break;
 	default:
-		LOG_INF("%s error,val=%llu\n", __func__, val);
+		LOG_DBG("%s error,val=%llu\n", __func__, val);
 	}
 
 	test_value = val;
@@ -580,7 +580,7 @@ DEFINE_SIMPLE_ATTRIBUTE(vpu_debug_test_fops, vpu_test_get,
 static int vpu_log_level_set(void *data, u64 val)
 {
 	g_vpu_log_level = val & 0xf;
-	LOG_INF("g_vpu_log_level: %d\n", g_vpu_log_level);
+	LOG_DBG("g_vpu_log_level: %d\n", g_vpu_log_level);
 
 	return 0;
 }
@@ -598,7 +598,7 @@ DEFINE_SIMPLE_ATTRIBUTE(vpu_debug_log_level_fops, vpu_log_level_get,
 static int vpu_internal_log_level_set(void *data, u64 val)
 {
 	g_vpu_internal_log_level = val;
-	LOG_INF("g_vpu_internal_log_level: %d\n", g_vpu_internal_log_level);
+	LOG_DBG("g_vpu_internal_log_level: %d\n", g_vpu_internal_log_level);
 
 	return 0;
 }
@@ -619,7 +619,7 @@ DEFINE_SIMPLE_ATTRIBUTE(vpu_debug_internal_log_level_fops,
 static int vpu_func_mask_set(void *data, u64 val)
 {
 	g_func_mask = val & 0xffffffff;
-	LOG_INF("g_func_mask: 0x%x\n", g_func_mask);
+	LOG_DBG("g_func_mask: 0x%x\n", g_func_mask);
 
 	return 0;
 }
