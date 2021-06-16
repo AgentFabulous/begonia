@@ -57,7 +57,7 @@ void mtk_idle_power_pre_process(int idle_type, unsigned int op_cond)
 
 	ret = spm_to_sspm_command_async(cmd, &spm_d);
 	if (ret < 0)
-		printk_deferred("[name:spm&]%s: ret %d", __func__, ret);
+		pr_debug("[name:spm&]%s: ret %d", __func__, ret);
 }
 
 void mtk_idle_power_pre_process_async_wait(int idle_type, unsigned int op_cond)
@@ -72,7 +72,7 @@ void mtk_idle_power_pre_process_async_wait(int idle_type, unsigned int op_cond)
 
 	ret = spm_to_sspm_command_async_wait(cmd);
 	if (ret < 0)
-		printk_deferred("[name:spm&]%s: ret %d", __func__, ret);
+		pr_debug("[name:spm&]%s: ret %d", __func__, ret);
 }
 
 void mtk_idle_power_post_process(int idle_type, unsigned int op_cond)
@@ -108,7 +108,7 @@ void mtk_idle_power_post_process(int idle_type, unsigned int op_cond)
 
 	ret = spm_to_sspm_command_async(cmd, &spm_d);
 	if (ret < 0)
-		printk_deferred("[name:spm&]%s: ret %d", __func__, ret);
+		pr_debug("[name:spm&]%s: ret %d", __func__, ret);
 }
 
 void mtk_idle_power_post_process_async_wait(int idle_type, unsigned int op_cond)
@@ -123,6 +123,6 @@ void mtk_idle_power_post_process_async_wait(int idle_type, unsigned int op_cond)
 
 	ret = spm_to_sspm_command_async_wait(cmd);
 	if (ret < 0)
-		printk_deferred("[name:spm&]%s: ret %d", __func__, ret);
+		pr_debug("[name:spm&]%s: ret %d", __func__, ret);
 }
 

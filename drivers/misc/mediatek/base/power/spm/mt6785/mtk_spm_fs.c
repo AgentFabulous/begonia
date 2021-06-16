@@ -1058,7 +1058,7 @@ static ssize_t store_pwr_ctrl(int id, struct pwr_ctrl *pwrctrl,
 	if (sscanf(buf, "%63s %x", cmd, &val) != 2)
 		return -EPERM;
 
-	printk_deferred("[name:spm&] pwr_ctrl: cmd = %s, val = 0x%x\n",
+	pr_debug("[name:spm&] pwr_ctrl: cmd = %s, val = 0x%x\n",
 		cmd, val);
 
 
@@ -2130,7 +2130,7 @@ int spm_fs_init(void)
 	/* create /sys/power/spm/xxx */
 	r = mtk_idle_sysfs_power_create_group(&spm_attr_group);
 	if (r)
-		printk_deferred("[name:spm&][SPM] FAILED TO CREATE /sys/power/spm (%d)\n",
+		pr_debug("[name:spm&][SPM] FAILED TO CREATE /sys/power/spm (%d)\n",
 			r);
 
 	return r;

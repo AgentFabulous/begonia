@@ -60,33 +60,33 @@ u64 md_slp_duration;
 
 int __attribute__ ((weak)) mtk_enter_idle_state(int idx)
 {
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
+	pr_debug("[name:spm&]NO %s !!!\n", __func__);
 	return -1;
 }
 
 int __attribute__ ((weak)) vcorefs_get_curr_ddr(void)
 {
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
+	pr_debug("[name:spm&]NO %s !!!\n", __func__);
 	return -1;
 }
 
 int  __attribute__ ((weak)) vcorefs_get_curr_vcore(void)
 {
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
+	pr_debug("[name:spm&]NO %s !!!\n", __func__);
 	return -1;
 }
 
 #if defined(CONFIG_MTK_WATCHDOG) && defined(CONFIG_MTK_WD_KICKER)
 int  __attribute__ ((weak)) get_wd_api(struct wd_api **obj)
 {
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
+	pr_debug("[name:spm&]NO %s !!!\n", __func__);
 	return -1;
 }
 #endif
 
 void __attribute__ ((weak)) mtk8250_backup_dev(void)
 {
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
+	pr_debug("[name:spm&]NO %s !!!\n", __func__);
 }
 
 static u32 suspend_pcm_flags = {
@@ -153,7 +153,7 @@ static void spm_trigger_wfi_for_sleep(struct pwr_ctrl *pwrctrl)
 
 	if (spm_dormant_sta < 0) {
 		aee_sram_printk("spm_dormant_sta %d", spm_dormant_sta);
-		printk_deferred("[name:spm&][SPM] spm_dormant_sta %d"
+		pr_debug("[name:spm&][SPM] spm_dormant_sta %d"
 			, spm_dormant_sta);
 	}
 }
@@ -236,16 +236,16 @@ static unsigned int spm_output_wake_reason(unsigned int ex_flag,
 
 	aee_sram_printk("dormant = %d, sleep_count = %d\n",
 		spm_dormant_sta, spm_sleep_count);
-	printk_deferred("[name:spm&][SPM] dormant = %d, sleep_count = %d\n",
+	pr_debug("[name:spm&][SPM] dormant = %d, sleep_count = %d\n",
 		spm_dormant_sta, spm_sleep_count);
 	if (spm_ap_mdsrc_req_cnt != 0) {
 		aee_sram_printk("warning: spm_ap_mdsrc_req_cnt = %d, ",
 			spm_ap_mdsrc_req_cnt);
-		printk_deferred("[name:spm&][SPM ]warning: spm_ap_mdsrc_req_cnt = %d, ",
+		pr_debug("[name:spm&][SPM ]warning: spm_ap_mdsrc_req_cnt = %d, ",
 			spm_ap_mdsrc_req_cnt);
 	}
 
-	printk_deferred("[name:spm&][SPM] Suspended for %d.%03d seconds",
+	pr_debug("[name:spm&][SPM] Suspended for %d.%03d seconds",
 		PCM_TICK_TO_SEC(wakesta->timer_out),
 		PCM_TICK_TO_SEC((wakesta->timer_out % PCM_32K_TICKS_PER_SEC)
 		* 1000));
@@ -323,7 +323,7 @@ bool spm_get_is_infra_pdn(void)
 /* extern int get_dlpt_imix_spm(void); */
 int __attribute__((weak)) get_dlpt_imix_spm(void)
 {
-	printk_deferred("[name:spm&]NO %s !!!\n", __func__);
+	pr_debug("[name:spm&]NO %s !!!\n", __func__);
 	return 0;
 }
 #endif
@@ -380,7 +380,7 @@ unsigned int spm_go_to_sleep_ex(unsigned int ex_flag)
 		wd_api->wd_spmwdt_mode_config(WD_REQ_EN, WD_REQ_RST_MODE);
 		wd_api->wd_suspend_notify();
 	} else
-		printk_deferred("[name:spm&]FAILED TO GET WD API\n");
+		pr_debug("[name:spm&]FAILED TO GET WD API\n");
 #endif
 
 	spin_lock_irqsave(&__spm_lock, flags);
@@ -390,7 +390,7 @@ unsigned int spm_go_to_sleep_ex(unsigned int ex_flag)
 	aee_sram_printk("sec = %u, wakesrc = 0x%x (%u)(%u)\n",
 		  sec, pwrctrl->wake_src, is_cpu_pdn(pwrctrl->pcm_flags),
 		  is_infra_pdn(pwrctrl->pcm_flags));
-	printk_deferred("[name:spm&][SPM] sec = %u, wakesrc = 0x%x (%u)(%u)\n",
+	pr_debug("[name:spm&][SPM] sec = %u, wakesrc = 0x%x (%u)(%u)\n",
 		  sec, pwrctrl->wake_src, is_cpu_pdn(pwrctrl->pcm_flags),
 		  is_infra_pdn(pwrctrl->pcm_flags));
 
@@ -403,7 +403,7 @@ unsigned int spm_go_to_sleep_ex(unsigned int ex_flag)
 		app_last_sleep_time =
 			(u64)_golden_read_reg(WORLD_CLK_CNTCV_H) << 32
 			| _golden_read_reg(WORLD_CLK_CNTCV_L);
-		printk_deferred(
+		pr_debug(
 			"[name:spm&][SPM] Awaked for %lld.%03lld seconds",
 			WORLD_CLK_TICK_TO_SEC((app_last_sleep_time
 				- app_last_wakeup_time)),
@@ -417,7 +417,7 @@ unsigned int spm_go_to_sleep_ex(unsigned int ex_flag)
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
 	if (mtk8250_request_to_sleep()) {
 		last_wr = WR_UART_BUSY;
-		printk_deferred("[name:spm&]Fail to request uart sleep\n");
+		pr_debug("[name:spm&]Fail to request uart sleep\n");
 		goto RESTORE_IRQ;
 	}
 #endif
@@ -456,7 +456,7 @@ RESTORE_IRQ:
 
 	if (slp_dump_subsys_sleep_duration &&
 		spm_wakesta.timer_out >= PCM_32K_TICKS_FIVE_SEC)
-		printk_deferred("[name:spm&][SPM] md_slp_duration = %llu",
+		pr_debug("[name:spm&][SPM] md_slp_duration = %llu",
 			get_md_slp_duration() - md_slp_duration);
 
 	spin_unlock_irqrestore(&__spm_lock, flags);
@@ -479,7 +479,7 @@ RESTORE_IRQ:
 	if (pwrctrl->wakelock_timer_val) {
 		aee_sram_printk("#@# %s(%d) calling spm_pm_stay_awake()\n",
 			__func__, __LINE__);
-		printk_deferred("[name:spm&][SPM ]#@# %s(%d) calling spm_pm_stay_awake()\n",
+		pr_debug("[name:spm&][SPM ]#@# %s(%d) calling spm_pm_stay_awake()\n",
 			__func__, __LINE__);
 		spm_pm_stay_awake(pwrctrl->wakelock_timer_val);
 	}

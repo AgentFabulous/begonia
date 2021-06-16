@@ -272,22 +272,22 @@ unsigned int __spm_output_wake_reason(
 		/* add size check for vcoredvfs */
 		aee_sram_printk("SPM ABORT (%s), r13 = 0x%x, ",
 			scenario, wakesta->r13);
-		printk_deferred("[name:spm&][SPM] ABORT (%s), r13 = 0x%x, ",
+		pr_debug("[name:spm&][SPM] ABORT (%s), r13 = 0x%x, ",
 			scenario, wakesta->r13);
 
 		aee_sram_printk(" debug_flag = 0x%x 0x%x\n",
 			wakesta->debug_flag, wakesta->debug_flag1);
-		printk_deferred("[name:spm&][SPM] debug_flag = 0x%x 0x%x\n",
+		pr_debug("[name:spm&][SPM] debug_flag = 0x%x 0x%x\n",
 			wakesta->debug_flag, wakesta->debug_flag1);
 
 		aee_sram_printk(" sw_flag = 0x%x 0x%x\n",
 			wakesta->sw_flag0, wakesta->sw_flag1);
-		printk_deferred("[name:spm&][SPM] sw_flag = 0x%x 0x%x\n",
+		pr_debug("[name:spm&][SPM] sw_flag = 0x%x 0x%x\n",
 			wakesta->sw_flag0, wakesta->sw_flag1);
 
 		aee_sram_printk(" b_sw_flag = 0x%x 0x%x\n",
 			wakesta->b_sw_flag0, wakesta->b_sw_flag1);
-		printk_deferred("[name:spm&][SPM] b_sw_flag = 0x%x 0x%x\n",
+		pr_debug("[name:spm&][SPM] b_sw_flag = 0x%x 0x%x\n",
 			wakesta->b_sw_flag0, wakesta->b_sw_flag1);
 
 		wr =  WR_ABORT;
@@ -443,10 +443,10 @@ unsigned int __spm_output_wake_reason(
 	WARN_ON(log_size >= 1024);
 
 	if (!suspend)
-		printk_deferred("[name:spm&][SPM] %s", log_buf);
+		pr_debug("[name:spm&][SPM] %s", log_buf);
 	else {
 		aee_sram_printk("%s", log_buf);
-		printk_deferred("[name:spm&][SPM] %s", log_buf);
+		pr_debug("[name:spm&][SPM] %s", log_buf);
 	}
 
 #ifdef CONFIG_LPM_STATE_RECORDS
@@ -475,7 +475,7 @@ void spm_set_dummy_read_addr(int debug)
 int __attribute__ ((weak)) get_dynamic_period(
 	int first_use, int first_wakeup_time, int battery_capacity_level)
 {
-	/* printk_deferred("[name:spm&]NO %s !!!\n", __func__); */
+	/* pr_debug("[name:spm&]NO %s !!!\n", __func__); */
 	return 5401;
 }
 
@@ -488,13 +488,13 @@ u32 __spm_get_wake_period(int pwake_time, unsigned int last_wr)
 		period = get_dynamic_period(last_wr != WR_PCM_TIMER
 				? 1 : 0, SPM_WAKE_PERIOD, 1);
 		if (period <= 0) {
-			printk_deferred("[name:spm&][SPM] CANNOT GET PERIOD FROM FUEL GAUGE\n");
+			pr_debug("[name:spm&][SPM] CANNOT GET PERIOD FROM FUEL GAUGE\n");
 			period = SPM_WAKE_PERIOD;
 		}
 	} else {
 		period = pwake_time;
 		aee_sram_printk("pwake = %d\n", pwake_time);
-		printk_deferred("[name:spm&][SPM] pwake = %d\n", pwake_time);
+		pr_debug("[name:spm&][SPM] pwake = %d\n", pwake_time);
 	}
 
 	if (period > 36 * 3600)	/* max period is 36.4 hours */

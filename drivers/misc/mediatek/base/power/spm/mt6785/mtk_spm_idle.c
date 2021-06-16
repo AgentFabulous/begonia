@@ -196,7 +196,7 @@ int mtk_idle_trigger_wfi(int idle_type, unsigned int idle_flag, int cpu)
 	print_ftrace_tag(idle_type, cpu, 0);
 
 	if (spm_dormant_sta < 0)
-		printk_deferred("[name:spm&]mtk_enter_idle_state(%d) ret %d\n",
+		pr_debug("[name:spm&]mtk_enter_idle_state(%d) ret %d\n",
 			cpuidle_mode[idle_type], spm_dormant_sta);
 
 	return spm_dormant_sta;
@@ -368,7 +368,7 @@ static unsigned int mtk_idle_output_log(
 	}
 
 	if (print_log) {
-		printk_deferred("[name:spm&]Power/swap op_cond = 0x%x\n"
+		pr_debug("[name:spm&]Power/swap op_cond = 0x%x\n"
 			, op_cond);
 		wr = __spm_output_wake_reason(
 			wakesta, false, mtk_idle_name(idle_type));

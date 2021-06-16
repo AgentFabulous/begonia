@@ -48,21 +48,21 @@ DEFINE_SPINLOCK(__spm_lock);
 void __attribute__ ((weak)) mtk_idle_cond_check_init(void)
 {
 	aee_sram_printk("NO %s !!!\n", __func__);
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
+	pr_debug("[name:spm&][SPM] NO %s !!!\n", __func__);
 }
 
 /* Note: implemented in mtk_spm_vcorefs.c */
 void  __attribute__ ((weak)) spm_vcorefs_init(void)
 {
 	aee_sram_printk("NO %s !!!\n", __func__);
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
+	pr_debug("[name:spm&][SPM] NO %s !!!\n", __func__);
 }
 
 /* Note: implemented in mtk_spm_dram.c */
 int __attribute__ ((weak)) spm_get_spmfw_idx(void)
 {
 	aee_sram_printk("NO %s !!!\n", __func__);
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
+	pr_debug("[name:spm&][SPM] NO %s !!!\n", __func__);
 	return 0;
 }
 
@@ -70,7 +70,7 @@ int __attribute__ ((weak)) spm_get_spmfw_idx(void)
 int __attribute__ ((weak)) mtk_spm_irq_register(unsigned int spmirq0)
 {
 	aee_sram_printk("NO %s !!!\n", __func__);
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
+	pr_debug("[name:spm&][SPM] NO %s !!!\n", __func__);
 	return 0;
 }
 
@@ -81,14 +81,14 @@ int __attribute__ ((weak)) mtk_cpuidle_init(void) { return -EOPNOTSUPP; }
 void __attribute__((weak)) spm_do_dram_config_check(void)
 {
 	aee_sram_printk("NO %s !!!\n", __func__);
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
+	pr_debug("[name:spm&][SPM] NO %s !!!\n", __func__);
 }
 
 /* Note: implemented in mtk_spm_fs.c */
 int __attribute__((weak)) spm_fs_init(void)
 {
 	aee_sram_printk("NO %s !!!\n", __func__);
-	printk_deferred("[name:spm&][SPM] NO %s !!!\n", __func__);
+	pr_debug("[name:spm&][SPM] NO %s !!!\n", __func__);
 	return 0;
 }
 
@@ -156,25 +156,25 @@ static void spm_register_init(unsigned int *spm_irq_0_ptr)
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,sleep");
 	if (!node)
-		printk_deferred("[name:spm&][SPM] find sleep node failed\n");
+		pr_debug("[name:spm&][SPM] find sleep node failed\n");
 
 	spm_base = of_iomap(node, 0);
 	if (!spm_base)
-		printk_deferred("[name:spm&][SPM] base spm_base failed\n");
+		pr_debug("[name:spm&][SPM] base spm_base failed\n");
 	spmirq0 = irq_of_parse_and_map(node, 0);
 	if (!spmirq0)
-		printk_deferred("[name:spm&][SPM] get spm_irq_0 failed\n");
+		pr_debug("[name:spm&][SPM] get spm_irq_0 failed\n");
 	*spm_irq_0_ptr = spmirq0;
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,sleep_reg_md");
 	if (!node)
-		printk_deferred("[name:spm&][SPM] find sleep_reg_md node failed\n");
+		pr_debug("[name:spm&][SPM] find sleep_reg_md node failed\n");
 
 	sleep_reg_md_base = of_iomap(node, 0);
 	if (!sleep_reg_md_base)
-		printk_deferred("[name:spm&][SPM] base sleep_reg_md_base failed\n");
+		pr_debug("[name:spm&][SPM] base sleep_reg_md_base failed\n");
 
-	printk_deferred("[name:spm&][SPM] spm_base = %p, sleep_reg_md_base = %p, spm_irq_0 = %d\n",
+	pr_debug("[name:spm&][SPM] spm_base = %p, sleep_reg_md_base = %p, spm_irq_0 = %d\n",
 		spm_base, sleep_reg_md_base, spmirq0);
 }
 
@@ -261,12 +261,12 @@ static int spm_pm_event(struct notifier_block *notifier, unsigned long pm_event,
 		ret = spm_to_sspm_command(SPM_SUSPEND_PREPARE, &spm_d);
 		spin_unlock_irqrestore(&__spm_lock, flags);
 		if (ret < 0) {
-			printk_deferred("[name:spm&]#@# %s(%d) PM_SUSPEND_PREPARE return %d!!!\n",
+			pr_debug("[name:spm&]#@# %s(%d) PM_SUSPEND_PREPARE return %d!!!\n",
 				__func__, __LINE__, ret);
 			return NOTIFY_BAD;
 		}
 #endif
-		printk_deferred(
+		pr_debug(
 		"[name:spm&][SPM] PM: suspend entry %d-%02d-%02d %02d:%02d:%02d.%09lu UTC\n",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
@@ -279,13 +279,13 @@ static int spm_pm_event(struct notifier_block *notifier, unsigned long pm_event,
 		ret = spm_to_sspm_command(SPM_POST_SUSPEND, &spm_d);
 		spin_unlock_irqrestore(&__spm_lock, flags);
 		if (ret < 0) {
-			printk_deferred("[name:spm&]#@# %s(%d) PM_POST_SUSPEND return %d!!!\n",
+			pr_debug("[name:spm&]#@# %s(%d) PM_POST_SUSPEND return %d!!!\n",
 				__func__, __LINE__, ret);
 			return NOTIFY_BAD;
 		}
 
 #endif
-		printk_deferred(
+		pr_debug(
 		"[name:spm&][SPM] PM: suspend exit %d-%02d-%02d %02d:%02d:%02d.%09lu UTC\n",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);

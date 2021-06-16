@@ -193,7 +193,7 @@ enum idle_fp_step {
 int __attribute__((weak)) mtk_idle_trigger_wfi(
 	int idle_type, unsigned int idle_flag, int cpu)
 {
-	printk_deferred("[name:spm&]Power/swap %s is not implemented!\n"
+	pr_debug("[name:spm&]Power/swap %s is not implemented!\n"
 		, __func__);
 
 	do {
@@ -356,7 +356,7 @@ int mtk_idle_enter(int idle_type,
 	#if defined(CONFIG_SERIAL_8250_MT6577)
 	if (!(idle_flag & MTK_IDLE_LOG_DUMP_LP_GS)) {
 		if (mtk8250_request_to_sleep()) {
-			printk_deferred("[name:spm&]Power/swap Fail to request uart sleep\n");
+			pr_debug("[name:spm&]Power/swap Fail to request uart sleep\n");
 			goto RESTORE_UART;
 		}
 	}

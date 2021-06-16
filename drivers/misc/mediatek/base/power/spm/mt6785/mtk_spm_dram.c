@@ -120,11 +120,11 @@ static int spm_dram_golden_setting_cmp(bool en)
 					ddrphy_setting[i].offset);
 		if ((value & ddrphy_setting[i].mask) !=
 				ddrphy_setting[i].value) {
-			printk_deferred(
+			pr_debug(
 				"[name:spm&][SPM] NO dramc mismatch addr: 0x%.2x, offset: 0x%.3x, ",
 				ddrphy_setting[i].base,
 				ddrphy_setting[i].offset);
-			printk_deferred(
+			pr_debug(
 				"[name:spm&]mask: 0x%.8x, val: 0x%x, read: 0x%x\n",
 				ddrphy_setting[i].mask,
 				ddrphy_setting[i].value,

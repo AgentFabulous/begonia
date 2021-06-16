@@ -130,7 +130,7 @@ void spm_twam_enable_monitor(bool en_monitor,
 
 	spin_unlock_irqrestore(&__spm_lock, flags);
 
-	printk_deferred("[name:spm&][SPM] enable TWAM for signal %u, %u, %u, %u (%u)\n",
+	pr_debug("[name:spm&][SPM] enable TWAM for signal %u, %u, %u, %u (%u)\n",
 		  twamcfg.byte[0].id, twamcfg.byte[1].id, twamcfg.byte[2].id,
 		  twamcfg.byte[3].id, twam_speed_mode);
 }
@@ -147,7 +147,7 @@ void spm_twam_disable_monitor(void)
 	spm_write(SPM_IRQ_STA, ISRC_TWAM);
 	spin_unlock_irqrestore(&__spm_lock, flags);
 
-	printk_deferred("[name:spm&]disable TWAM\n");
+	pr_debug("[name:spm&]disable TWAM\n");
 }
 EXPORT_SYMBOL(spm_twam_disable_monitor);
 
