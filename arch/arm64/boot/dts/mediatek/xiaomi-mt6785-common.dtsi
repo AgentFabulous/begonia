@@ -46,6 +46,110 @@
 	};
 };
 
+/* NFC start */
+&pio {
+	nfc_default: nfc_default {
+	};
+	nfc_int_active: nfc_int_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO88__FUNC_GPIO88>;
+			slew-rate = <0>;
+			drive-strength = <MTK_DRIVE_2mA>;
+			bias-pull-up;
+		};
+	};
+
+	nfc_int_suspend: nfc_int_suspend {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO88__FUNC_GPIO88>;
+			slew-rate = <0>;
+			drive-strength = <MTK_DRIVE_2mA>;
+			bias-pull-up;
+		};
+	};
+
+	nfc_enable_active: nfc_enable_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO168__FUNC_GPIO168>;
+			slew-rate = <1>;
+			output-high;
+			drive-strength = <MTK_DRIVE_2mA>;
+			bias-pull-up=<MTK_PUPD_SET_R1R0_11>;
+		};
+	};
+
+	nfc_enable_suspend: nfc_enable_suspend {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO168__FUNC_GPIO168>;
+			slew-rate = <1>;
+			drive-strength = <MTK_DRIVE_2mA>;
+			bias-disable;
+		};
+	};
+	nfc_firmwaredownload_active: nfc_firmwaredownload_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO87__FUNC_GPIO87>;
+			slew-rate = <1>;
+			drive-strength = <MTK_DRIVE_2mA>;
+			bias-pull-up;
+		};
+	};
+
+	nfc_firmwaredownload_suspend: nfc_firmwaredownload_suspend {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO87__FUNC_GPIO87>;
+			slew-rate = <1>;
+			drive-strength = <MTK_DRIVE_2mA>;
+			bias-disable;
+		};
+	};
+	nfc_clk_req_active: nfc_clk_req_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO25__FUNC_SRCLKENAI0>;
+			slew-rate = <0>;
+			input-enable;
+			drive-strength = <MTK_DRIVE_2mA>;
+			bias-pull-up;
+		};
+	};
+
+	nfc_clk_req_suspend: nfc_clk_req_suspend {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO25__FUNC_SRCLKENAI0>;
+			slew-rate = <0>;
+			input-enable;
+			drive-strength = <MTK_DRIVE_2mA>;
+			bias-pull-down;
+		};
+	};
+};
+
+&i2c3 {
+	status = "okay";
+	nxp@28 {
+		compatible = "qcom,nq-nci";
+		reg = <0x28>;
+		qcom,nq-irq = <&pio 88 0x00>;
+		interrupt-parent = <&pio>;
+		interrupts = <88 IRQ_TYPE_LEVEL_HIGH 88 0>;
+		qcom,nq-ven = <&pio 168 0x0>;
+		qcom,nq-firm = <&pio 87 0x0>;
+		qcom,nq-clkreq = <&pio 25 0x0>;
+		//qcom,nq-esepwr = <&tlmm 42 0x00>;
+		//interrupt-parent = <&tlmm>;
+		//interrupts = <47 0>;
+		interrupt-names = "nfc_irq";
+		pinctrl-names = "default", "nfc_active", "nfc_suspend";
+		pinctrl-0 = <&nfc_default>;
+		pinctrl-1 = <&nfc_int_active &nfc_enable_active
+				&nfc_clk_req_active &nfc_firmwaredownload_active>;
+		pinctrl-2 = <&nfc_int_suspend &nfc_enable_suspend
+                             &nfc_clk_req_suspend &nfc_firmwaredownload_suspend>;
+	};
+
+};
+/* NFC end */
+
 /* accdet start */
 &accdet {
 	/* accdet micbias voltage: 0x09:2.85v 0x08:2.8v 0x07,
@@ -60,7 +164,7 @@
 	headset-mode-setting = <0x500 0x500 1 0x1f0
 				0x800 0x1000 0x20 0x44
 				0x4 0x1
-				0x5 0x3 0x3 0x5 0xe>;
+				0x5 0x3 0x3 0x7 0xe>;
 	accdet-plugout-debounce = <1>;
 	/*1:ACC mode, 2:low cost without in bias, 6:low cost with in bias*/
 	accdet-mic-mode = <2>;
@@ -134,6 +238,22 @@
 
 /* DISPSYS GPIO standardization */
 &pio {
+	mtkfb_pins_lcd_bl_bias_en1: lcd_bl_bias_en1_gpio {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO22__FUNC_GPIO22>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	mtkfb_pins_lcd_bl_bias_en0: lcd_bl_bias_en0_gpio {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO22__FUNC_GPIO22>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
 	mtkfb_pins_lcd_bias_enp1: lcd_bias_enp1_gpio {
 		pins_cmd_dat {
 			pinmux = <PINMUX_GPIO23__FUNC_GPIO23>;
@@ -192,7 +312,7 @@
 	pinctrl-names = "lcd_bias_enp1_gpio", "lcd_bias_enp0_gpio",
 		"lcd_bias_enn1_gpio", "lcd_bias_enn0_gpio",
 		"lcm_rst_out1_gpio", "lcm_rst_out0_gpio",
-		"mode_te_te";
+		"mode_te_te", "lcd_bl_bias_en1", "lcd_bl_bias_en0";
 	pinctrl-0 = <&mtkfb_pins_lcd_bias_enp1>;
 	pinctrl-1 = <&mtkfb_pins_lcd_bias_enp0>;
 	pinctrl-2 = <&mtkfb_pins_lcd_bias_enn1>;
@@ -200,6 +320,8 @@
 	pinctrl-4 = <&mtkfb_pins_lcm_rst_out1_gpio>;
 	pinctrl-5 = <&mtkfb_pins_lcm_rst_out0_gpio>;
 	pinctrl-6 = <&mtkfb_pins_lcm_dsi_te>;
+	pinctrl-7 = <&mtkfb_pins_lcd_bl_bias_en1>;
+	pinctrl-8 = <&mtkfb_pins_lcd_bl_bias_en0>;
 	status = "okay";
 };
 
@@ -390,6 +512,7 @@
 };
 /* CONSYS end */
 
+
 /* IRTX GPIO Start */
 &irtx_pwm {
 	pinctrl-names = "irtx_gpio_led_default", "irtx_gpio_led_set";
@@ -420,5 +543,6 @@
 }; /* IRTX GPIO Settings -End */
 
 #include <k85v1_64/cust.dtsi>
+
 #include "mediatek/cust_mt6785_touch_1080x2160.dtsi"
 /*End of this file, DO NOT ADD ANYTHING HERE*/

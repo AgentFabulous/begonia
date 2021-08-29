@@ -2,6 +2,7 @@
  * Mediatek's MT6785 SoC device tree source
  *
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -375,8 +376,8 @@ page_owner=on loop.max_part=7";
 			no-map;
 #if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) || \
 	defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
-			size = <0 0x800000>;
-			alignment = <0 0x1000000>;
+			size = <0 0xc00000>;
+			alignment = <0 0xc00000>;
 #else
 			size = <0 0x200000>;
 			alignment = <0 0x200000>;
@@ -2388,7 +2389,7 @@ page_owner=on loop.max_part=7";
 
 	spi5: spi5@11019000 {
 		compatible = "mediatek,mt6765-spi";
-		mediatek,pad-select = <1>;
+		mediatek,pad-select = <0>;
 		reg = <0 0x11019000 0 0x1000>;
 		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
 		clocks = <&topckgen TOP_MAINPLL_D5_D2>,
@@ -2437,6 +2438,12 @@ page_owner=on loop.max_part=7";
 		compatible = "mediatek,mtboard-thermistor2";
 		io-channels = <&auxadc 1>;
 		io-channel-names = "thermistor-ch1";
+	};
+
+	tboard_thermistor3: thermal-sensor3 {
+		compatible = "mediatek,mtboard-thermistor3";
+		io-channels = <&auxadc 2>;
+		io-channel-names = "thermistor-ch2";
 	};
 
 	drcc: drcc {
@@ -2842,7 +2849,7 @@ page_owner=on loop.max_part=7";
 		mtk_spk_i2s_in = <0>;
 		/* mtk_spk_i2s_mck = <3>; */
 		mediatek,speaker-codec {
-			sound-dai = <&speaker_amp>;
+                        sound-dai = <&tfa98xx>;
 		};
 	};
 
@@ -2858,9 +2865,9 @@ page_owner=on loop.max_part=7";
 		mtk_dsp_capture1 = <0x1 0xffffffff 0xc 0x12 0x20000>;
 		mtk_dsp_a2dp = <0x0 0xffffffff 0xffffffff 0xffffffff 0x40000>;
 		mtk_dsp_dataprovider = <0x0 0xffffffff 0xf 0xffffffff 0x30000>;
-		mtk_dsp_call_final = <0x1 0x4 0xf 0x13 0x18000>;
+		mtk_dsp_call_final = <0x5 0x0 0xf 0x13 0x18000>;
 		mtk_dsp_fast = <0x0 0xffffffff 0xffffffff 0xffffffff 0x5000>;
-		mtk_dsp_ktv = <0x1 0x8 0x11 0xffffffff 0x10000>;
+		mtk_dsp_ktv = <0x0 0x8 0x11 0xffffffff 0x10000>;
 		mtk_dsp_capture_raw = <0x1 0xffffffff 0xffffffff 0xffffffff 0x20000>;
 		mtk_dsp_ver = <0x0>;
 		swdsp_smartpa_process_enable = <0x5>;
@@ -2945,6 +2952,22 @@ page_owner=on loop.max_part=7";
 		#ifndef CONFIG_FPGA_EARLY_PORTING
 		vcc-supply = <&mt_pmic_vemc_ldo_reg>;
 		vcc-fixed-regulator;
+		/*
+		 * vcc-voltage can only set 2700000/2800000/2900000/3000000/
+		 * 3300000/3400000/3500000 due to pmic limitation.
+		 * Other value will not work, and voltage will be default
+		 * 3000000. By the way, only 3000000 is mtk guarantee.
+		 * The other voltage is not.
+		 */
+		vcc-voltage = <3000000>; /* uv */
+		/*
+		 * vcc-vcc-voltage-plus can only set 0/10000/20000/30000/40000/
+		 * 50000/60000/70000/80000/90000/100000 due to pmic limitation.
+		 * Other value will not work, and voltage plus will be default
+		 * 0. By the way, only 0 is mtk guarantee.
+		 * The other voltage plus is not.
+		 */
+		vcc-voltage-plus = <0>; /* uv */
 		#endif
 
 		/* Number of lanes available per direction - either 1 or 2 */
@@ -3391,6 +3414,7 @@ page_owner=on loop.max_part=7";
 	vdec_gcon: vdec_gcon@16000000 {
 		compatible = "mediatek,vdec_gcon", "syscon";
 		reg = <0 0x16000000 0 0x1000>,		/* VDEC_SYS */
+			 <0 0x16020000 0 0x400>,		/* VDEC_VLD */
 			 <0 0x16025000 0 0x1000>;		/* VDEC_MISC */
 #ifdef CONFIG_MTK_IOMMU_V2
 		iommus = <&iommu0 M4U_PORT_HW_VDEC_MC_EXT>;
@@ -4351,10 +4375,6 @@ page_owner=on loop.max_part=7";
 		reg = <0 0x80210000 0 0x1000>;
 	};
 
-	goodix_fp: fingerprint {
-		compatible = "mediatek,goodix-fp";
-	};
-
 	accdet: accdet {
 		compatible = "mediatek,pmic-accdet";
 		/* ACCDET GPIO standardization for AP EINT */
@@ -4377,6 +4397,10 @@ page_owner=on loop.max_part=7";
 	 *	};
 	 *};
 	 */
+
+        goodix_fp: fingerprint {
+                compatible = "mediatek,fpc1022_irq", "mediatek,goodix-fp";
+        };
 
 	mt6359_gauge {
 		compatible = "mediatek,mt6359_gauge";
@@ -5185,7 +5209,7 @@ page_owner=on loop.max_part=7";
 		/* enable_pe_plus; */
 		enable_pd20_reset;
 		power_path_support;
-		max_charger_voltage = <6500000>;
+		max_charger_voltage = <10500000>;
 		fast_charge_voltage = <3000000>;
 
 		/* charging current */
@@ -5205,19 +5229,20 @@ page_owner=on loop.max_part=7";
 
 	charger: charger {
 		compatible = "mediatek,charger";
-		algorithm_name = "SwitchCharging";
+		algorithm_name = "DualSwitchCharging";
 		/* enable_sw_jeita; */
-		/* enable_pe_plus; */
-		/* enable_pe_2; */
-		/* enable_pe_3; */
-		/* enable_pe_4; */
+		enable_pe_plus;
+		enable_pe_2;
+		enable_pe_3;
+		enable_pe_4;
 		enable_type_c;
 		power_path_support;
 		enable_dynamic_mivr;
+		bc12_charger = <1>;
 
 		/* common */
-		battery_cv = <4350000>;
-		max_charger_voltage = <6500000>;
+		battery_cv = <4390000>;
+		max_charger_voltage = <10500000>;
 		min_charger_voltage = <4600000>;
 
 		/* dynamic mivr */
@@ -5230,8 +5255,8 @@ page_owner=on loop.max_part=7";
 		usb_charger_current_unconfigured = <70000>;
 		usb_charger_current_configured = <500000>;
 		usb_charger_current = <500000>;
-		ac_charger_current = <2050000>;
-		ac_charger_input_current = <3200000>;
+		ac_charger_current = <1800000>;
+		ac_charger_input_current = <3000000>;
 		non_std_ac_charger_current = <500000>;
 		charging_host_charger_current = <1500000>;
 		apple_1_0a_charger_current = <650000>;
@@ -5265,7 +5290,7 @@ page_owner=on loop.max_part=7";
 		max_charge_temp_minus_x_degree = <47>;
 
 		/* PE */
-		ta_12v_support;
+		//ta_12v_support;
 		ta_9v_support;
 		pe_ichg_level_threshold = <1000000>; /* uA */
 		ta_ac_12v_input_current = <3200000>;
@@ -5315,7 +5340,7 @@ page_owner=on loop.max_part=7";
 
 		/* PD */
 		pd_vbus_low_bound = <5000000>;
-		pd_vbus_upper_bound = <5000000>;
+		pd_vbus_upper_bound = <12000000>;
 		pd_ichg_level_threshold = <1000000>; /* uA */
 		pd_stop_battery_soc = <80>;
 
@@ -5363,6 +5388,15 @@ page_owner=on loop.max_part=7";
 		compatible = "goodix,touch", "mediatek,touch";
 	};
 
+	ts_novatek: ts_novatek {
+	};
+
+	ts_focal: ts_focal {
+	};
+
+	xiaomi_touch: xiaomi_touch{
+	};
+
 	tcpc_pd: tcpc_pd {
 	};
 
@@ -5384,16 +5418,23 @@ page_owner=on loop.max_part=7";
 
 	md1_sim2_hot_plug_eint:md1_sim2_hot_plug_eint{
 	};
-};
 
-&i2c6 {
-	speaker_amp: speaker_amp@34 {
-		compatible = "mediatek,speaker_amp";
-		#sound-dai-cells = <0>;
-		reg = <0x34>;
-		status = "okay";
+	thermal_message: thermal-message {
 	};
 };
+
+/*Begonia Audio SmartPA Start */
+&i2c6 {
+        tfa98xx: tfa98xx@34 {
+                status = "ok";
+                compatible = "mediatek,speaker_amp";
+                #sound-dai-cells = <0>;
+                reg = <0x34>;
+                reset-gpio = <&pio 24 0>;
+                irq-gpio = <&pio 69 0>;
+        };
+};
+/*Begonia Audio SmartPA End*/
 
 &pio {
 	aud_clk_mosi_off: aud_clk_mosi_off {
@@ -5605,6 +5646,7 @@ page_owner=on loop.max_part=7";
 
 #include "mediatek/mt6359.dtsi"
 #include "mediatek/cust_mt6785_msdc.dtsi"
+#include "mediatek/cust_mt6785_camera.dtsi"
 #include "mediatek/mt6360.dtsi"
 #include "mediatek/mt6360_pd.dtsi"
 #ifdef CONFIG_MTK_ENABLE_GENIEZONE

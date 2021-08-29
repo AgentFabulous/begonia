@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -73,7 +74,7 @@
 	gt9886@5d {
 		compatible = "goodix,gt9886";
 		reg = <0x5d>;
-		status = "ok";
+		status = "disable";
 		interrupt-parent = <&pio>;
 		interrupts = <21 IRQ_TYPE_EDGE_FALLING 21 0>;
 		vtouch-supply = <&mt_pmic_vtp_ldo_reg>;
@@ -171,6 +172,67 @@
 				<PINMUX_GPIO204__FUNC_SPI7_A_CLK>,
 				<PINMUX_GPIO205__FUNC_SPI7_A_CSB>;
 			drive-strength = <2>;
+		};
+	};
+};
+
+&i2c0 {
+	focaltech@38 {
+		compatible = "focaltech,focal";
+		reg = <0x38>;
+		status = "ok";
+		interrupt-parent = <&pio>;
+		interrupts = <21 IRQ_TYPE_EDGE_FALLING 21 0>;
+		avdd-supply = <&mt_pmic_vtp_ldo_reg>;
+		/*vddio-supply = <&mt_pmic_vcn33_1_wifi_ldo_reg>;*/
+		/* avdd-supply = <&pm8150a_l1>; */
+		/*focaltech,vdd-gpio = <&tlmm 8 0x0>;//3v*/
+		focaltech,avdd-load = <200000>; //rated current 200mA
+		focaltech,reset-gpio = <&pio 20 0x0>;
+		focaltech,irq-gpio = <&pio 21 0x0>;
+		focaltech,max-touch-number = <10>;
+		focaltech,display-coords = <0 0 1080 2400>;
+		focaltech,reset-when-resume;
+		focaltech,lockdown-info-addr = <0x1E000>;
+		focaltech,open-min = <2700>;
+		pinctrl-names = "pmx_tp_active", "pmx_tp_suspend";
+		pinctrl-0 = <&tp_int_active &tp_reset_active>;
+		pinctrl-1 = <&tp_int_suspend &tp_reset_suspend>;
+		/* focaltech,have-key; */
+	};
+};
+
+&pio {
+	tp_int_active: tp_int_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO21__FUNC_GPIO21>;
+			slew-rate = <0>;
+			bias-pull-up = <11>;
+		};
+	};
+
+	tp_reset_active: tp_reset_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO20__FUNC_GPIO20>;
+			slew-rate = <1>;
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+	};
+
+	tp_int_suspend: tp_int_suspend {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO21__FUNC_GPIO21>;
+			slew-rate = <1>;
+			input-enable;
+		};
+	};
+
+	tp_reset_suspend: tp_reset_suspend {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO20__FUNC_GPIO20>;
+			slew-rate = <1>;
+			bias-disable;
 		};
 	};
 };

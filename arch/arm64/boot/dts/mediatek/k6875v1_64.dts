@@ -2,6 +2,7 @@
  * Mediatek's mt6873 SoC device tree source
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -146,7 +147,8 @@
 };
 
 &camera_af_hw_node {
-	vcamaf-supply = <&mt_pmic_vcamio_ldo_reg>;
+	vcamaf-supply = <&fan53870_l7>;
+	vcamois-supply = <&fan53870_l6>;
 	status = "okay";
 };
 

@@ -2,6 +2,7 @@
  * Mediatek's mt6853 SoC device tree source
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -362,60 +363,6 @@
 	pinctrl-1 = <&mtkfb_pins_lcm_rst_out0_gpio>;
 	pinctrl-2 = <&mtkfb_pins_lcm_dsi_te>;
 	status = "okay";
-};
-&dsi0 {
-	status = "okay";
-	#address-cells = <1>;
-	#size-cells = <0>;
-	panel1@0 {
-		compatible = "nt35695b,auo,vdo";
-		reg = <0>;
-		pm-enable-gpios = <&pio 41 0>;
-		reset-gpios = <&pio 86 0>;
-		bias-gpios = <&pio 137 0>,
-			<&pio 138 0>;
-		pinctrl-names = "default";
-		port {
-			panel_in1: endpoint {
-				remote-endpoint = <&dsi_out>;
-			};
-		};
-	};
-	panel2@0 {
-		compatible = "nt36672a,rt4801,vdo";
-		reg = <1>;
-		pm-enable-gpios = <&pio 41 0>;
-		reset-gpios = <&pio 86 0>;
-		bias-gpios = <&pio 137 0>,
-			<&pio 138 0>;
-		pinctrl-names = "default";
-		port {
-			panel_in2: endpoint {
-				remote-endpoint = <&dsi_out>;
-			};
-		};
-	};
-	panel3@0 {
-		compatible = "truly,td4330,vdo";
-		reg = <2>;
-		pm-enable-gpios = <&pio 41 0>;
-		reset-gpios = <&pio 86 0>;
-		bias-gpios = <&pio 137 0>,
-			<&pio 138 0>;
-		pinctrl-names = "default";
-		port {
-			panel_in3: endpoint {
-				remote-endpoint = <&dsi_out>;
-			};
-		};
-	};
-	ports {
-		port {
-			dsi_out: endpoint {
-				remote-endpoint = <&panel_in1>;
-			};
-		};
-	};
 };
 
 /* accdet start */
