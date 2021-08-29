@@ -15,13 +15,40 @@ ifeq ($(notdir $(LOCAL_PATH)),$(strip $(LINUX_KERNEL_VERSION)))
 ifneq ($(strip $(TARGET_NO_KERNEL)),true)
 include $(LOCAL_PATH)/kenv.mk
 
+KERNEL_EXTLINK_FILES := $(KERNEL_DIR)/drivers/staging/rtmm \
+			$(KERNEL_DIR)/include/linux/rtmm.h \
+			$(KERNEL_DIR)/drivers/staging/ktrace \
+			$(KERNEL_DIR)/include/linux/ktrace.h
+
+.PHONY: link_ext
+link_ext:
+	echo "Creating kernel symbol link to miui/kernel."
+	rm -rf $(KERNEL_EXTLINK_FILES)
+	if [ -f "$(abspath miui/kernel/memory/rtmm/include/linux/rtmm.h)" ]; then \
+		ln -s -f $(abspath miui/kernel/memory/rtmm) $(KERNEL_DIR)/drivers/staging/rtmm; \
+		ln -s -f $(abspath miui/kernel/trace/ktrace) $(KERNEL_DIR)/drivers/staging/ktrace; \
+		ln -s -f $(abspath miui/kernel/memory/rtmm/include/linux/rtmm.h) $(KERNEL_DIR)/include/linux/rtmm.h; \
+		ln -s -f $(abspath miui/kernel/trace/ktrace/include/linux/ktrace.h) $(KERNEL_DIR)/include/linux/ktrace.h; \
+	fi
+
+$(TARGET_FACTORY_BUILD_CONFIG): \
+	$(info $(shell if [ $(FACTORY_BUILD) = 1 ]; then \
+		echo "FACTORY_BUILD: add CONFIG_FACTORY_BUILD=y to $(KERNEL_CONFIG_FILE)"; \
+		echo "CONFIG_FACTORY_BUILD=y" >> $(KERNEL_CONFIG_FILE); \
+		echo "FACTORY_BUILD: remove CONFIG_MTK_KERNEL_POWER_OFF_CHARGING=y from $(KERNEL_CONFIG_FILE)"; \
+		sed -i '/CONFIG_MTK_KERNEL_POWER_OFF_CHARGING=y/d' $(KERNEL_CONFIG_FILE); \
+	else \
+		echo "Not FACTORY_BUILD: remove CONFIG_FACTORY_BUILD=y from $(KERNEL_CONFIG_FILE)"; \
+		sed -i '/CONFIG_FACTORY_BUILD=y/d' $(KERNEL_CONFIG_FILE); \
+	fi))
+
 ifeq ($(wildcard $(TARGET_PREBUILT_KERNEL)),)
 KERNEL_MAKE_DEPENDENCIES := $(shell find $(KERNEL_DIR) -name .git -prune -o -type f | sort)
 KERNEL_MAKE_DEPENDENCIES := $(filter-out %/.git %/.gitignore %/.gitattributes,$(KERNEL_MAKE_DEPENDENCIES))
 
 $(TARGET_KERNEL_CONFIG): PRIVATE_DIR := $(KERNEL_DIR)
 $(TARGET_KERNEL_CONFIG): $(KERNEL_CONFIG_FILE) $(LOCAL_PATH)/Android.mk
-$(TARGET_KERNEL_CONFIG): $(KERNEL_MAKE_DEPENDENCIES)
+$(TARGET_KERNEL_CONFIG): $(KERNEL_MAKE_DEPENDENCIES) $(TARGET_FACTORY_BUILD_CONFIG)
 	$(hide) mkdir -p $(dir $@)
 	$(PREBUILT_MAKE_PREFIX)$(MAKE) -C $(PRIVATE_DIR) $(KERNEL_MAKE_OPTION) $(KERNEL_DEFCONFIG)
 
@@ -29,7 +56,7 @@ $(BUILT_DTB_OVERLAY_TARGET): $(KERNEL_ZIMAGE_OUT)
 
 .KATI_RESTAT: $(KERNEL_ZIMAGE_OUT)
 $(KERNEL_ZIMAGE_OUT): PRIVATE_DIR := $(KERNEL_DIR)
-$(KERNEL_ZIMAGE_OUT): $(TARGET_KERNEL_CONFIG) $(KERNEL_MAKE_DEPENDENCIES)
+$(KERNEL_ZIMAGE_OUT): link_ext $(TARGET_KERNEL_CONFIG) $(KERNEL_MAKE_DEPENDENCIES)
 	$(hide) mkdir -p $(dir $@)
 	$(PREBUILT_MAKE_PREFIX)$(MAKE) -C $(PRIVATE_DIR) $(KERNEL_MAKE_OPTION)
 	$(hide) $(call fixup-kernel-cmd-file,$(KERNEL_OUT)/arch/$(KERNEL_TARGET_ARCH)/boot/compressed/.piggy.xzkern.cmd)
