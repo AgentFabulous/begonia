@@ -737,6 +737,9 @@ config HW_PERF_EVENTS
 	def_bool y
 	depends on ARM_PMU
 
+config BOOT_INFO
+	def_bool y
+
 config SYS_SUPPORTS_HUGETLBFS
 	def_bool y
 
@@ -1316,3 +1319,10 @@ source "arch/arm64/crypto/Kconfig"
 endif
 
 source "lib/Kconfig"
+
+config HWCONF_MANAGER
+	bool "Hardware configuration and monitor information"
+	default y
+	help
+	It provides all kinds of components configuration information and
+	monitor values.
