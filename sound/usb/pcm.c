@@ -827,12 +827,12 @@ static int snd_usb_hw_params(struct snd_pcm_substream *substream,
 	/* add the qos request and set the latency */
 	if (pm_qos_request_active(&subs->pm_qos)) {
 		pm_qos_update_request(&subs->pm_qos,
-					US_PER_FRAME * PM_QOS_COUNT);
+					US_PER_FRAME);
 		pr_info("%s: (pm_qos @%p) update\n",
 			   __func__, &subs->pm_qos);
 	} else {
 		pm_qos_add_request(&subs->pm_qos,
-			   PM_QOS_CPU_DMA_LATENCY, US_PER_FRAME * PM_QOS_COUNT);
+			   PM_QOS_CPU_DMA_LATENCY, US_PER_FRAME);
 		pr_info("%s: (pm_qos @%p) request\n",
 			   __func__, &subs->pm_qos);
 	}
@@ -1595,6 +1595,8 @@ static void prepare_playback_urb(struct snd_usb_substream *subs,
 	for (i = 0; i < ctx->packets; i++) {
 		if (ctx->packet_size[i])
 			counts = ctx->packet_size[i];
+		else if (ep->sync_master)
+			counts = snd_usb_endpoint_slave_next_packet_size(ep);
 		else
 			counts = snd_usb_endpoint_next_packet_size(ep);
 

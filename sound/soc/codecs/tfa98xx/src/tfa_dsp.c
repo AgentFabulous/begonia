@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2014 NXP Semiconductors, All Rights Reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -2666,50 +2667,47 @@ enum Tfa98xx_Error show_current_state(struct tfa_device *tfa)
 		if (manstate < 0)
 			return -manstate;
 
-		//pr_debug("Current HW manager state: ");
+		pr_debug("Current HW manager state: ");
 
 		switch (manstate) {
 		case 0:
-			pr_debug("%s(), power_down_state\n", __func__);
+			pr_debug("power_down_state\n");
 			break;
 		case 1:
-			pr_debug("%s(), wait_for_source_settings_state\n",
-				 __func__);
+			pr_debug("wait_for_source_settings_state\n");
 			break;
 		case 2:
-			pr_debug("%s(), connnect_pll_input_state\n", __func__);
+			pr_debug("connnect_pll_input_state\n");
 			break;
 		case 3:
-			pr_debug("%s(), disconnect_pll_input_state\n",
-				 __func__);
+			pr_debug("disconnect_pll_input_state\n");
 			break;
 		case 4:
-			pr_debug("%s(), enable_pll_state\n", __func__);
+			pr_debug("enable_pll_state\n");
 			break;
 		case 5:
-			pr_debug("%s(), enable_cgu_state\n", __func__);
+			pr_debug("enable_cgu_state\n");
 			break;
 		case 6:
-			pr_debug("%s(), init_cf_state\n", __func__);
+			pr_debug("init_cf_state\n");
 			break;
 		case 7:
-			pr_debug("%s(), enable_amplifier_state\n", __func__);
+			pr_debug("enable_amplifier_state\n");
 			break;
 		case 8:
-			pr_debug("%s(), alarm_state\n", __func__);
+			pr_debug("alarm_state\n");
 			break;
 		case 9:
-			pr_debug("%s(), operating_state\n", __func__);
+			pr_debug("operating_state\n");
 			break;
 		case 10:
-			pr_debug("%s(), mute_audio_state\n", __func__);
+			pr_debug("mute_audio_state\n");
 			break;
 		case 11:
-			pr_debug("%s(), disable_cgu_pll_state\n", __func__);
+			pr_debug("disable_cgu_pll_state\n");
 			break;
 		default:
-			pr_debug("%s(), Unable to find current state\n",
-				 __func__);
+			pr_debug("Unable to find current state\n");
 			break;
 		}
 	}
@@ -3294,7 +3292,7 @@ enum tfa_error tfa_dev_stop(struct tfa_device *tfa)
 		manstate = TFA_GET_BF(tfa, MANSTATE);
 		retry++;
 	}
-	//pr_debug("exit....  MANSTATE=%d\n", manstate);
+	pr_info("exit....  MANSTATE=%d\n", manstate);
 
 error_exit:
 	if (err != Tfa98xx_Error_Ok) {

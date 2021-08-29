@@ -3,6 +3,7 @@
 // Mediatek ALSA BT SCO CVSD/MSBC Driver
 //
 // Copyright (c) 2019 MediaTek Inc.
+// Copyright (C) 2021 XiaoMi, Inc.
 // Author: KaiChieh Chuang <kaichieh.chuang@mediatek.com>
 
 #include <linux/mfd/syscon.h>

@@ -21,6 +21,8 @@ ccflags-y += -Isound/soc/codecs/tfa98xx/inc
 ccflags-y += -DDEBUG -DTFA_NON_DSP_SOLUTION
 ccflags-y += -Werror
 ccflags-y += $(call cc-option,-Wno-date-time,)
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/audio_ipi/common/framework
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/audio_ipi/common/tasks/audplayback
 
 snd-soc-tfa98xx-objs += src/tfa98xx.o
 snd-soc-tfa98xx-objs += src/tfa_container.o
