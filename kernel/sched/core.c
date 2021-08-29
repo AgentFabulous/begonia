@@ -874,14 +874,14 @@ void init_opp_capacity_tbl(void)
 	struct sched_group *sg;
 	const struct sched_group_energy *sge;
 	struct cpufreq_policy *policy;
-	unsigned int *tbl;
 
 	count = system_opp_count();
 	if (count < 0)
 		return;
 
-	tbl = kmalloc_array(count, sizeof(unsigned int), GFP_KERNEL);
-	if (!tbl)
+	opp_capacity_tbl =
+		kmalloc_array(count, sizeof(unsigned int), GFP_KERNEL);
+	if (!opp_capacity_tbl)
 		return;
 
 	rcu_read_lock();
@@ -907,7 +907,7 @@ void init_opp_capacity_tbl(void)
 
 		for (i = 0; i < sge->nr_cap_states; i++) {
 			cap = get_opp_capacity(policy, i);
-			tbl[idx] = cap;
+			opp_capacity_tbl[idx] = cap;
 			idx++;
 		}
 		cpufreq_cpu_put(policy);
@@ -915,17 +915,16 @@ void init_opp_capacity_tbl(void)
 	}
 	rcu_read_unlock();
 
-	sort(tbl, count, sizeof(unsigned int),
+	sort(opp_capacity_tbl, count, sizeof(unsigned int),
 			&cap_compare, NULL);
-	tbl[count - 1] = SCHED_CAPACITY_SCALE;
+	opp_capacity_tbl[count - 1] = SCHED_CAPACITY_SCALE;
 	total_opp_count = count;
-	opp_capacity_tbl = tbl;
 	opp_capacity_tbl_ready = 1;
 
 	return;
 free_unlock:
 	rcu_read_unlock();
-	kfree(tbl);
+	kfree(opp_capacity_tbl);
 }
 
 unsigned int find_fit_capacity(unsigned int cap)
@@ -1561,7 +1560,7 @@ retry:
 		/* Refcounting is expected to be always 0 for free groups */
 		if (unlikely(uc_cpu->group[clamp_id][group_id].tasks)) {
 #ifdef CONFIG_SCHED_DEBUG
-			pr_warn("invalid CPU[%d] clamp group [%u:%u] refcount: [%u]\n",
+			WARN(1, "invalid CPU[%d] clamp group [%u:%u] refcount: [%u]\n",
 			     cpu, clamp_id, group_id,
 			     uc_cpu->group[clamp_id][group_id].tasks);
 #endif
@@ -4346,6 +4345,9 @@ void scheduler_tick(void)
 #ifdef CONFIG_MTK_CACHE_CONTROL
 	hook_ca_scheduler_tick(cpu);
 #endif
+#ifdef CONFIG_MTK_PERF_TRACKER
+	perf_tracker(ktime_get_ns());
+#endif
 
 #ifdef CONFIG_SMP
 	rq->idle_balance = idle_cpu(cpu);
@@ -4355,10 +4357,6 @@ void scheduler_tick(void)
 
 #ifdef CONFIG_MTK_SCHED_RQAVG_KS
 	sched_max_util_task_tracking();
-#endif
-
-#ifdef CONFIG_MTK_PERF_TRACKER
-	perf_tracker(ktime_get_ns());
 #endif
 
 #ifdef CONFIG_MTK_SCHED_CPULOAD
@@ -6916,14 +6914,6 @@ static void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf,
 			break;
 
 		/*
-		 * put_prev_task() and pick_next_task() sched
-		 * class method both need to have an up-to-date
-		 * value of rq->clock[_task],
-		 * this value may be changed, so must update again.
-		 */
-		if (!(rq->clock_update_flags & RQCF_UPDATED))
-			update_rq_clock(rq);
-		/*
 		 * pick_next_task() assumes pinned rq->lock:
 		 */
 		next = pick_next_task(rq, &fake_task, rf);
@@ -7142,7 +7132,6 @@ out:
 			__func__, iso_prio, cpu, cpu_isolated_mask->bits[0]);
 	return ret_code;
 }
-EXPORT_SYMBOL(_sched_isolate_cpu);
 
 /*
  * Note: The client calling sched_isolate_cpu() is repsonsible for ONLY
@@ -7150,7 +7139,7 @@ EXPORT_SYMBOL(_sched_isolate_cpu);
  * Client is also responsible for deisolating when a core goes offline
  * (after CPU is marked offline).
  */
-int sched_deisolate_cpu_unlocked(int cpu)
+int __sched_deisolate_cpu_unlocked(int cpu)
 {
 	int ret_code = 0;
 	struct rq *rq = cpu_rq(cpu);
@@ -7202,11 +7191,10 @@ int _sched_deisolate_cpu(int cpu)
 	int ret_code;
 
 	cpu_maps_update_begin();
-	ret_code = sched_deisolate_cpu_unlocked(cpu);
+	ret_code = __sched_deisolate_cpu_unlocked(cpu);
 	cpu_maps_update_done();
 	return ret_code;
 }
-EXPORT_SYMBOL(_sched_deisolate_cpu);
 
 void iso_cpumask_init(void)
 {
@@ -7477,11 +7465,6 @@ int sched_cpu_deactivate(unsigned int cpu)
 static void sched_rq_cpu_starting(unsigned int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
-	struct rq_flags rf;
-
-	rq_lock_irqsave(rq, &rf);
-	walt_set_window_start(rq, &rf);
-	rq_unlock_irqrestore(rq, &rf);
 
 	rq->calc_load_update = calc_load_update;
 	update_max_interval();

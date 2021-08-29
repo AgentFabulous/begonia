@@ -804,12 +804,6 @@ void post_init_entity_util_avg(struct sched_entity *se)
 	struct sched_avg *sa = &se->avg;
 	long cpu_scale = arch_scale_cpu_capacity(NULL, cpu_of(rq_of(cfs_rq)));
 	long cap = (long)(cpu_scale - cfs_rq->avg.util_avg) / 2;
-	int forked_ramup_factor = sched_forked_ramup_factor();
-
-	if (forked_ramup_factor != 0) {
-
-		cap = (long) SCHED_CAPACITY_SCALE * forked_ramup_factor / 100;
-	}
 
 	if (cap > 0) {
 		if (cfs_rq->avg.util_avg != 0) {
@@ -3498,9 +3492,6 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 {
 	struct sched_avg *sa = &cfs_rq->avg;
 	int decayed, removed_load = 0, removed_util = 0;
-	struct rq *rq = rq_of(cfs_rq);
-	bool is_clamped = false;
-	int clamp_id = 0;
 
 	if (atomic_long_read(&cfs_rq->removed_load_avg)) {
 		s64 r = atomic_long_xchg(&cfs_rq->removed_load_avg, 0);
@@ -3525,12 +3516,7 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 	cfs_rq->load_last_update_time_copy = sa->last_update_time;
 #endif
 
-	for (clamp_id = UCLAMP_MIN; clamp_id < UCLAMP_CNT; clamp_id++) {
-		if (rq && rq->uclamp.value[clamp_id] != uclamp_none(clamp_id))
-			is_clamped = true;
-	}
-
-	if (decayed || removed_util || is_clamped)
+	if (decayed || removed_util)
 		cfs_rq_util_change(cfs_rq);
 
 	return decayed || removed_load;
@@ -5340,7 +5326,6 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
 	int task_new = !(flags & ENQUEUE_WAKEUP);
-	int is_idle = idle_cpu(cpu_of(rq));
 
 	/*
 	 * The code below (indirectly) updates schedutil which looks at
@@ -5410,12 +5395,6 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		add_nr_running(rq, 1);
-		/* if first is idle, some governors may not
-		 * update frequency, we must update again,
-		 * because idle_cpu return false until now.
-		 */
-		if (is_idle)
-			cfs_rq_util_change(&rq->cfs);
 #ifdef CONFIG_MTK_SCHED_RQAVG_US
 		inc_nr_heavy_running(2, p, 1, false);
 #endif
@@ -7606,6 +7585,8 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 			if (walt_cpu_high_irqload(i))
 				continue;
 
+			if(cpu_rq(i)->rt.rt_nr_running)
+				continue;
 			/*
 			 * p's blocked utilization is still accounted for on prev_cpu
 			 * so prev_cpu will receive a negative bias due to the double
@@ -10041,7 +10022,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 		}
 	}
 	/* Isolated CPU has no weight */
-	if (!group->group_weight || !group->sgc->capacity) {
+	if (!group->group_weight) {
 		sgs->group_capacity = 0;
 		sgs->avg_load = 0;
 		sgs->group_no_capacity = 1;
@@ -10633,10 +10614,6 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 
 	local = &sds.local_stat;
 	busiest = &sds.busiest_stat;
-
-	/* if cpu was isolated, then discard load balance*/
-	if (local->group_capacity == 0 || busiest->group_capacity == 0)
-		goto out_balanced;
 
 	/* ASYM feature bypasses nice load balance check */
 	if (check_asym_packing(env, &sds))

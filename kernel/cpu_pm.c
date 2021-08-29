@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
