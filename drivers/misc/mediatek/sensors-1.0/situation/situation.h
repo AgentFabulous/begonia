@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -38,6 +39,10 @@ enum situation_index_table {
 	tilt_detector,
 	flat,
 	sar,
+	ps_factory_strm,
+	als_factory_strm,
+	sar_algo,
+	elevator_detect,
 	max_situation_support,
 };
 
@@ -46,6 +51,8 @@ struct situation_control_path {
 	int (*batch)(int flag, int64_t samplingPeriodNs,
 		int64_t maxBatchReportLatencyNs);
 	int (*flush)(void);
+	int (*set_cali)(uint8_t *data, uint8_t count);
+	//bool is_report_input_direct;
 	bool is_support_wake_lock;
 	bool is_support_batch;
 };
@@ -58,6 +65,7 @@ struct situation_init_info {
 	char *name;
 	int (*init)(void);
 	int (*uninit)(void);
+	struct platform_driver *platform_diver_addr;
 };
 
 struct situation_data_control_context {
@@ -92,6 +100,13 @@ extern int situation_register_control_path(
 	struct situation_control_path *ctl, int handle);
 extern int situation_register_data_path(struct situation_data_path *data,
 	int handle);
-extern int sar_data_report(int32_t value[3]);
 extern int sar_data_report_t(int32_t value[3], int64_t time_stamp);
+extern int sar_data_report(int32_t value[3]);
+extern int sar_cali_report_t(int32_t value[3], int64_t time_stamp);
+extern int sar_cali_report(int32_t value[3]);
+extern int elevator_data_report_t(int32_t value[1], int64_t time_stamp);
+extern int elevator_data_report(int32_t value[1]);
+extern int als_factory_strm_data_report_t(int32_t value[3], int64_t time_stamp);
+
+
 #endif

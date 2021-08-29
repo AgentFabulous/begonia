@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2020 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -141,9 +142,6 @@ void mdw_usr_print_mem_usage(void)
 			if (u == NULL)
 				goto free_mutex;
 			memcpy(u, user, sizeof(struct mdw_usr));
-
-			//Force string end
-			u->comm[TASK_COMM_LEN-1] = '\0';
 
 			list_add_tail(&u->m_item, &u_stat.list);
 
@@ -908,8 +906,10 @@ rewait:
 	/* Remove u_item anyway */
 	mutex_lock(&c->usr->mtx);
 	list_del(&c->u_item);
-	if (c->file)
+	if (c->file && c->file->private_data) {
+		kfree(c->file->private_data);
 		c->file->private_data = NULL;
+	}
 	mutex_unlock(&c->usr->mtx);
 
 	if (ret < 0) { /* Wait fail handle */

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -65,6 +66,7 @@ static struct m4u_msg *m4u_dci_msg;
 static struct m4u_client_t *ion_m4u_client;
 int m4u_log_level = 2;
 int m4u_log_to_uart = 2;
+int m4u_last_leakage_domain = -1;
 
 LIST_HEAD(pseudo_sglist);
 /* this is the mutex lock to protect mva_sglist->list*/
@@ -1590,6 +1592,7 @@ int __pseudo_alloc_mva(struct m4u_client_t *client,
 	unsigned int i;
 	unsigned int err_port = 0, err_size = 0;
 	struct scatterlist *s;
+	dma_addr_t orig_addr = ARM_MAPPING_ERROR;
 	dma_addr_t offset = 0;
 	struct m4u_buf_info_t *pbuf_info;
 	unsigned long long current_ts = 0;
@@ -1685,6 +1688,34 @@ int __pseudo_alloc_mva(struct m4u_client_t *client,
 	dma_addr = sg_dma_address(table->sgl);
 	current_ts = sched_clock();
 
+{ /* before copy */
+	dma_addr_t dma_addr_dbg;
+	struct scatterlist *s_dbg;
+	unsigned long long ts_start_dbg, ts_end_dbg; /* for performance */
+	int i, flag = 0;
+
+	ts_start_dbg = sched_clock();
+	dma_addr = sg_dma_address(table->sgl);
+	for_each_sg(table->sgl, s_dbg, table->nents, i) {
+		if (i > 0 && sg_dma_len(s_dbg) != 0) {
+			flag = 1;
+			pr_info("hc3 %s warning before, sz:0x%lx, i:%d--%u, dma_addr:0x%pa, 0x%lx+0x%lx, pa:0x%lx\n",
+				__func__, size, i, table->nents, &dma_addr_dbg,
+				(unsigned long)sg_dma_address(s_dbg),
+				(unsigned long)sg_dma_len(s_dbg),
+				(unsigned long)sg_phys(s_dbg));
+		}
+
+		if (flag && i > 10)
+			break;
+	}
+
+	ts_end_dbg = sched_clock();
+	if (ts_end_dbg - ts_start_dbg > 1000000) //1ms
+		pr_info("hc3 %s before check sg_table time:%llu, nents:%u\n",
+			__func__, (ts_end_dbg - ts_start_dbg), table->nents);
+}
+
 	if (!dma_addr || dma_addr == ARM_MAPPING_ERROR) {
 		unsigned long base, max;
 		int domain, owner;
@@ -1701,7 +1732,15 @@ int __pseudo_alloc_mva(struct m4u_client_t *client,
 			&dma_addr, size, &paddr,
 			flags, table->nents, table->orig_nents,
 			(unsigned long long)sg_table);
-		__m4u_dump_pgtable(NULL, 1, true, 0);
+
+		if (m4u_last_leakage_domain != domain) {
+			__m4u_dump_pgtable(NULL, 1, true, 0);
+			pr_notice("%s, %d, update m4u last leakage domain from %d to %d\n",
+				  __func__, __LINE__,
+				  m4u_last_leakage_domain, domain);
+			m4u_last_leakage_domain = domain;
+		}
+
 		if (owner < 0)
 			m4u_find_max_port_size(base, max, &err_port, &err_size);
 		else {
@@ -1715,12 +1754,53 @@ int __pseudo_alloc_mva(struct m4u_client_t *client,
 	}
 	/* local table should copy to buffer->sg_table */
 	if (sg_table) {
+		orig_addr = sg_dma_address(sg_table->sgl);
+		if (orig_addr == dma_addr)
+			M4U_ERR("Warning, iova_s=pa, %pa/0x%lx, 0x%p--0x%p\n",
+				&dma_addr,
+				(unsigned long)sg_phys(sg_table->sgl),
+				sg_table, table);
+
 		for_each_sg(sg_table->sgl, s, sg_table->nents, i) {
 			sg_dma_address(s) = dma_addr + offset;
 			offset += s->length;
 		}
 	}
 	*retmva = dma_addr;
+
+{ /* after copy */
+	dma_addr_t expected1, dma_addr1;
+	unsigned long s_pa = 0;
+	struct scatterlist *s1;
+	unsigned long long ts_start1, ts_end1; /* for performance */
+	int i, flag = 0;
+
+	ts_start1 = sched_clock();
+	dma_addr1 = sg_dma_address(sg_table->sgl);
+	expected1 = sg_dma_address(sg_table->sgl);
+	s_pa = (unsigned long)sg_phys(sg_table->sgl);
+	for_each_sg(sg_table->sgl, s1, sg_table->nents, i) {
+		if (sg_dma_address(s1) != expected1) {
+			flag = 1;
+			pr_info("hc3 %s after warn, sz:0x%lx, i:%d--%u, dma_addr:0x%pa--0x%pa, 0x%lx+0x%lx, pa:0x%lx(0x%lx), 0x%p--0x%p\n",
+			       __func__, size, i, sg_table->nents,
+			       &dma_addr, &expected1,
+			       (unsigned long)sg_dma_address(s1),
+			       (unsigned long)sg_dma_len(s1),
+			       (unsigned long)sg_phys(s1),
+			       s_pa,
+			       sg_table, table);
+		}
+		if (flag && i > 10)
+			break;
+		expected1 = sg_dma_address(s1) + sg_dma_len(s1);
+	}
+
+	ts_end1 = sched_clock();
+	if (ts_end1 - ts_start1 > 1000000) //1ms
+		pr_info("hc3 %s check after sg_table time:%llu, nents:%u\n",
+			__func__, (ts_end1 - ts_start1), sg_table->nents);
+}
 
 	mva_sg = kzalloc(sizeof(*mva_sg), GFP_KERNEL);
 	mva_sg->table = table;

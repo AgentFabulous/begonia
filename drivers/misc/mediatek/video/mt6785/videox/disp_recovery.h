@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -31,6 +32,10 @@ void set_esd_check_mode(unsigned int mode);
 int do_lcm_vdo_lp_read(struct dsi_cmd_desc *cmd_tab,
 			unsigned int count);
 int do_lcm_vdo_lp_write(struct dsi_cmd_desc *write_table,
+			unsigned int count);
+int do_lcm_vdo_lp_read_without_lock(struct dsi_cmd_desc *cmd_tab,
+			unsigned int count);
+int do_lcm_vdo_lp_write_without_lock(struct dsi_cmd_desc *write_table,
 			unsigned int count);
 
 int primary_display_ovl_recovery(void);

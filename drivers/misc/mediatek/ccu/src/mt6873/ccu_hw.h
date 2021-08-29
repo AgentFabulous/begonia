@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -39,7 +40,7 @@ extern void cam_mtcmos_check(void);
 #define SPREG_18_DBG_SRAM_LOG_CUR_POS CCU_INFO18
 #define SPREG_19_DBG_SRAM_LOG_SLOT    CCU_INFO19
 #define SPREG_20_DBG_ASSET_ERRNO      CCU_INFO20
-#define SPREG_21_CTRL_BUF_ADDR        CCU_INFO21
+#define SPREG_21                 CCU_INFO21
 #define SPREG_22                 CCU_INFO22
 #define SPREG_23                 CCU_INFO23
 #define SPREG_24                 CCU_INFO24

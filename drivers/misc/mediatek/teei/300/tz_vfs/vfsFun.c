@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2019, MICROTRUST Incorporated
+ * Copyright (C) 2021 XiaoMi, Inc.
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -27,6 +28,7 @@
 #include <linux/semaphore.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/sched/types.h>
 #include <teei_ioc.h>
 #include "TEEI.h"
 #include "teei_id.h"
@@ -91,6 +93,8 @@ int notify_vfs_handle(void)
 
 static int tz_vfs_open(struct inode *inode, struct file *filp)
 {
+	struct sched_param param = {.sched_priority = 52 };
+
 	if (vfs_devp == NULL)
 		return -EINVAL;
 
@@ -101,6 +105,9 @@ static int tz_vfs_open(struct inode *inode, struct file *filp)
 		return -EINVAL;
 
 	filp->private_data = vfs_devp;
+
+	sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
+
 	return 0;
 }
 

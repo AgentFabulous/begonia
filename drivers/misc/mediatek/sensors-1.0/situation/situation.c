@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,11 +15,11 @@
 #define pr_fmt(fmt) "<SITUATION> " fmt
 
 #include "situation.h"
+#include <linux/vmalloc.h>
 
 static struct situation_context *situation_context_obj;
 
-static struct situation_init_info *
-	situation_init_list[max_situation_support] = {0};
+static struct situation_init_info *situation_init_list[max_situation_support] = { 0 };
 
 static struct situation_context *situation_context_alloc_object(void)
 {
@@ -80,18 +81,30 @@ static int handle_to_index(int handle)
 	case ID_SAR:
 		index = sar;
 		break;
+	case ID_PS_FACTORY_STRM:
+		index = ps_factory_strm;
+		break;
+	case ID_ALS_FACTORY_STRM:
+		index = als_factory_strm;
+		break;
+	case ID_SAR_ALGO:
+		index = sar_algo;
+		break;
+	case ID_ELEVATOR_DETECT:
+		index = elevator_detect;
+		break;
 	default:
 		index = -1;
-		pr_err("%s invalid handle:%d,index:%d\n", __func__,
-			handle, index);
+		pr_err("%s invalid handle:%d,index:%d\n", __func__, handle,
+		       index);
 		return index;
 	}
-	pr_debug("%s handle:%d, index:%d\n", __func__, handle, index);
+	pr_info("%s handle:%d, index:%d\n", __func__, handle, index);
 	return index;
 }
 
 int situation_data_report_t(int handle, uint32_t one_sample_data,
-	int64_t time_stamp)
+			    int64_t time_stamp)
 {
 	int err = 0, index = -1;
 	struct sensor_event event;
@@ -148,6 +161,83 @@ int sar_data_report(int32_t value[3])
 {
 	return sar_data_report_t(value, 0);
 }
+
+int sar_cali_report_t(int32_t data[3], int64_t time_stamp)
+{
+	int err = 0;
+	struct sensor_event event;
+	memset(&event, 0, sizeof(struct sensor_event));
+	event.time_stamp = time_stamp;
+	event.handle = ID_SAR;
+	event.flush_action = CALI_ACTION;
+	event.word[0] = data[0];
+	event.word[1] = data[1];
+	event.word[2] = data[2];
+	err = sensor_input_event(situation_context_obj->mdev.minor, &event);
+	return err;
+}
+
+int sar_cali_report(int32_t data[3])
+{
+	return sar_cali_report_t(data, 0);
+}
+
+
+int elevator_data_report_t(int32_t value[1], int64_t time_stamp)
+{
+	int err = 0, index = -1;
+	struct sensor_event event;
+	struct situation_context *cxt = situation_context_obj;
+
+	memset(&event, 0, sizeof(struct sensor_event));
+
+	index = handle_to_index(ID_ELEVATOR_DETECT);
+	if (index < 0) {
+		pr_err("[%s] invalid index\n", __func__);
+		return -1;
+	}
+	event.time_stamp = time_stamp;
+	event.handle = ID_ELEVATOR_DETECT;
+	event.flush_action = DATA_ACTION;
+	event.word[0] = value[0];
+	err = sensor_input_event(situation_context_obj->mdev.minor, &event);
+	if (cxt->ctl_context[index].situation_ctl.open_report_data != NULL &&
+	    cxt->ctl_context[index].situation_ctl.is_support_wake_lock)
+		__pm_wakeup_event(&cxt->ws[index], 250);
+	return err;
+}
+
+int elevator_data_report(int32_t value[1])
+{
+    return elevator_data_report_t(value, 0);
+}
+
+int als_factory_strm_data_report_t(int32_t value[3], int64_t time_stamp)
+{
+	int err = 0, index = -1;
+	struct sensor_event event;
+	struct situation_context *cxt = situation_context_obj;
+
+	memset(&event, 0, sizeof(struct sensor_event));
+
+	index = handle_to_index(ID_ALS_FACTORY_STRM);
+	if (index < 0) {
+		pr_err("[%s] invalid index\n", __func__);
+		return -1;
+	}
+	event.time_stamp = time_stamp;
+	event.handle = ID_ALS_FACTORY_STRM;
+	event.flush_action = DATA_ACTION;
+	event.word[0] = value[0];
+	event.word[1] = value[1];
+	event.word[2] = value[2];
+	err = sensor_input_event(situation_context_obj->mdev.minor, &event);
+	if (cxt->ctl_context[index].situation_ctl.open_report_data != NULL &&
+	    cxt->ctl_context[index].situation_ctl.is_support_wake_lock)
+		__pm_wakeup_event(&cxt->ws[index], 250);
+	return err;
+}
+
 int situation_notify_t(int handle, int64_t time_stamp)
 {
 	return situation_data_report_t(handle, 1, time_stamp);
@@ -182,8 +272,7 @@ static int situation_enable_and_batch(int index)
 		/* turn off the power */
 		err = cxt->ctl_context[index].situation_ctl.open_report_data(0);
 		if (err) {
-			pr_err("situation turn off power err = %d\n",
-				err);
+			pr_err("situation turn off power err = %d\n", err);
 			return -1;
 		}
 		pr_debug("situation turn off power done\n");
@@ -195,11 +284,11 @@ static int situation_enable_and_batch(int index)
 	}
 	/* power off -> power on */
 	if (cxt->ctl_context[index].power == 0 &&
-		cxt->ctl_context[index].enable == 1) {
+	    cxt->ctl_context[index].enable == 1) {
 		pr_debug("SITUATION power on\n");
 		err = cxt->ctl_context[index].situation_ctl.open_report_data(1);
 		if (err) {
-			pr_err("situation turn on power err = %d\n",
+			pr_err("situation turn on power err = %d\n", err);
 				err);
 			return -1;
 		}
@@ -425,6 +514,32 @@ static ssize_t situation_show_devnum(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", 0);	/* TODO: why +5? */
 }
 
+static ssize_t sar_store_cali(struct device *dev, struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct situation_context *cxt = NULL;
+	int err = 0;
+	uint8_t *cali_buf = NULL;
+
+	cali_buf = vzalloc(count);
+	if (cali_buf == NULL)
+		return -EFAULT;
+	memcpy(cali_buf, buf, count);
+
+	mutex_lock(&situation_context_obj->situation_op_mutex);
+	cxt = situation_context_obj;
+	if (cxt->ctl_context[sar].situation_ctl.set_cali != NULL) {
+		err =
+		    cxt->ctl_context[sar].situation_ctl.set_cali(cali_buf,
+								 count);
+	} else
+		pr_err("DON'T SUPPORT SAR COMMONVERSION CALIBRATION\n");
+	if (err < 0)
+		pr_err("sar set cali err %d\n", err);
+	mutex_unlock(&situation_context_obj->situation_op_mutex);
+	vfree(cali_buf);
+	return count;
+}
 
 static int situation_real_driver_init(void)
 {
@@ -515,18 +630,18 @@ static int situation_misc_init(struct situation_context *cxt)
 	return err;
 }
 
-DEVICE_ATTR(situactive, 0644,
-	situation_show_active, situation_store_active);
+DEVICE_ATTR(situactive, 0644, situation_show_active, situation_store_active);
 DEVICE_ATTR(situbatch, 0644, situation_show_batch, situation_store_batch);
 DEVICE_ATTR(situflush, 0644, situation_show_flush, situation_store_flush);
 DEVICE_ATTR(situdevnum, 0644, situation_show_devnum, NULL);
-
+DEVICE_ATTR(sarcali, 0644, NULL, sar_store_cali);
 
 static struct attribute *situation_attributes[] = {
 	&dev_attr_situactive.attr,
 	&dev_attr_situbatch.attr,
 	&dev_attr_situflush.attr,
 	&dev_attr_situdevnum.attr,
+	&dev_attr_sarcali.attr,
 	NULL
 };
 
@@ -581,7 +696,8 @@ int situation_register_control_path(struct situation_control_path *ctl,
 	cxt->ctl_context[index].situation_ctl.is_support_wake_lock =
 		ctl->is_support_wake_lock;
 	cxt->ctl_context[index].situation_ctl.is_support_batch =
-		ctl->is_support_batch;
+	    ctl->is_support_batch;
+	cxt->ctl_context[index].situation_ctl.set_cali = ctl->set_cali;
 
 	cxt->wake_lock_name[index] = kzalloc(64, GFP_KERNEL);
 	if (!cxt->wake_lock_name[index])

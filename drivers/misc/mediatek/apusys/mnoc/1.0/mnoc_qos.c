@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1014,7 +1015,7 @@ int apu_cmd_qos_end(uint64_t cmd_id, uint64_t sub_cmd_id,
 		}
 #if MNOC_QOS_BOOST_ENABLE
 		mutex_lock(&apu_qos_boost_mtx);
-		if (!apu_qos_boost_flag) {
+		if (apu_qos_boost_flag == false) {
 			apu_bw_vcore_opp = NR_APU_VCORE_OPP - 1;
 			apu_qos_set_vcore(vcore_opp_map[apu_bw_vcore_opp]);
 		}

@@ -13,7 +13,7 @@
 
 obj-$(CONFIG_MACH_MT6853) += ptp3_v1/
 obj-$(CONFIG_MACH_MT6893) += ptp3_v1/
-obj-$(CONFIG_MACH_MT6833) += ptp3_v1/
+#obj-$(CONFIG_MACH_MT6833) += ptp3_v1/
 obj-$(CONFIG_MACH_MT6885) += credit_didt_v1/
 obj-$(CONFIG_MACH_MT6873) += credit_didt_v1/
 obj-$(CONFIG_MACH_MT6885) += brisket_v1/
@@ -41,8 +41,6 @@ ifeq ($(CONFIG_MTK_UNIFY_POWER), y)
 obj-$(CONFIG_MACH_MT6771) += upower_v2/
 obj-$(CONFIG_MACH_MT6739) += upower_v2/
 obj-$(CONFIG_MACH_MT8168) += upower_v2/
-obj-$(CONFIG_MACH_MT6893) += upower_v2/
-obj-$(CONFIG_MACH_MT6833) += upower_v2/
 endif
 ifneq ($(CONFIG_FPGA_EARLY_PORTING), y)
 obj-$(CONFIG_MACH_MT6771) += pbm_v3/
@@ -108,6 +106,7 @@ obj-$(CONFIG_MACH_MT6885) += cpuhotplug/
 obj-$(CONFIG_MACH_MT6893) += cpuhotplug/
 obj-$(CONFIG_MACH_MT6873) += cpuhotplug/
 obj-$(CONFIG_MACH_MT6853) += cpuhotplug/
+obj-$(CONFIG_MACH_MT6833) += cpuhotplug/
 obj-$(CONFIG_MACH_MT6771) += ppm_v3/
 obj-$(CONFIG_MACH_MT6739) += ppm_v3/
 obj-$(CONFIG_MACH_MT6768) += ppm_v3/
@@ -124,6 +123,7 @@ obj-$(CONFIG_MACH_MT6885) += ppm_v3/
 obj-$(CONFIG_MACH_MT6893) += ppm_v3/
 obj-$(CONFIG_MACH_MT6873) += ppm_v3/
 obj-$(CONFIG_MACH_MT6853) += ppm_v3/
+obj-$(CONFIG_MACH_MT6833) += ppm_v3/
 obj-$(CONFIG_MACH_MT6771) += spm_v4/
 obj-$(CONFIG_MACH_MT6739) += spm_v4/
 obj-$(CONFIG_MACH_MT6771) += clkbuf_v1/

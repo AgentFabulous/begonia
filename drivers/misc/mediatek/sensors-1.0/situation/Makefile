@@ -14,3 +14,7 @@ obj-$(CONFIG_MTK_MOTION_DETECT_HUB)			+=	motion_detect/
 obj-$(CONFIG_MTK_TILTDETECTHUB)				+=	tilt_detector/
 obj-$(CONFIG_MTK_FLAT_HUB)				+=	flat/
 obj-$(CONFIG_MTK_SAR_HUB)				+=	sar/
+obj-$(CONFIG_PS_FACTORY_STRM)				+=	ps_factory_stream/
+obj-$(CONFIG_ALS_FACTORY_STRM)				+=	als_factory_stream/
+obj-$(CONFIG_SAR_ALGO)				+=	sar_algo/
+obj-$(CONFIG_ELEVATOR_DETECT)				+=	elevator_detect/

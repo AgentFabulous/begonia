@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1787,7 +1788,7 @@ static struct opp_table_info *__mt_gpufreq_get_segment_table(void)
 		return g_opp_table_segment_3;
 	default:
 		gpufreq_pr_info("invalid efuse id: 0x%x\n", efuse_id);
-		return g_opp_table_segment_1;
+		return g_opp_table_segment_3;
 	}
 #endif
 }
@@ -3502,13 +3503,9 @@ static int __mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 
 	__mt_gpufreq_init_power();
 
-#if defined(CONFIG_ARM64) && defined(CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES)
-	if (strstr(CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES,
-						"aging") != NULL) {
-		gpufreq_pr_info("@%s: AGING flavor name: %s\n",
-			__func__, CONFIG_BUILD_ARM64_DTB_OVERLAY_IMAGE_NAMES);
-		g_aging_enable = 1;
-	}
+#if defined(AGING_LOAD)
+	gpufreq_pr_info("@%s: AGING load\n", __func__);
+	g_aging_enable = 1;
 #endif
 
 #if MT_GPUFREQ_DFD_DEBUG

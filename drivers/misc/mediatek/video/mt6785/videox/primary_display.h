@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -222,6 +223,7 @@ enum mtkfb_power_mode {
 
 enum arr_fps_type {
 	REQ_ARR_DFPS = 0,
+	LAST_ARR_DFPS,
 	WORKING_ARR_DFPS,
 	HW_CURRENT_FPS,
 	LCM_MAX_FPS,
@@ -234,6 +236,7 @@ struct display_primary_path_context {
 	 * next_frame_fps is the fps of the frame
 	 * which immediately will be shown on display
 	 */
+	unsigned int last_arr_dfps;
 	unsigned int working_dfps;
 	unsigned int hw_current_fps;
 	unsigned int lcm_refresh_rate; /*real fps*/
@@ -275,7 +278,7 @@ struct display_primary_path_context {
 	cmdqBackupSlotHandle dither_status_info;
 	cmdqBackupSlotHandle dsi_vfp_line;
 	cmdqBackupSlotHandle dsi_vfp_changed;
-	cmdqBackupSlotHandle next_working_fps;
+	cmdqBackupSlotHandle next_working_fps_slot;
 	cmdqBackupSlotHandle night_light_params;
 	cmdqBackupSlotHandle hrt_idx_id;
 	cmdqBackupSlotHandle trigger_record_slot;
@@ -570,6 +573,7 @@ void primary_display_dynfps_chg_fps(int cfg_id);
 void primary_display_dynfps_get_vfp_info(
 	unsigned int *vfp, unsigned int *vfp_for_lp);
 
+
 #if 0
 bool primary_display_need_update_golden_fps(
 	unsigned int last_fps, unsigned int new_fps);
@@ -579,4 +583,9 @@ bool primary_display_need_update_hrt_fps(
 
 /**************function for DynFPS end************************/
 #endif
+
+void _primary_display_arr_send_lcm_cmd(
+		unsigned int from_fps, unsigned int to_fps);
+int primary_display_set_panel_param(unsigned int param);
+
 #endif

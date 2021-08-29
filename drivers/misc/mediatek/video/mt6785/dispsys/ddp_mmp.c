@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -488,6 +489,10 @@ void init_ddp_mmp_events(void)
 	DDP_MMP_Events.primary_chg_fps_notify =
 		mmprofile_register_event(DDP_MMP_Events.session_Parent,
 					 "chg_fps_notify_to_user");
+	DDP_MMP_Events.primary_chg_fps_send_lcm_cmd =
+		mmprofile_register_event(DDP_MMP_Events.session_Parent,
+					 "chg_fps_send_lcm_cmd");
+
 	/***************add for ARR end***********************/
 
 	mmprofile_enable_event_recursive(DDP_MMP_Events.DDP, 1);
@@ -506,6 +511,7 @@ void init_ddp_mmp_events(void)
 	mmprofile_enable_event(DDP_MMP_Events.primary_chg_fps_wait, 1);
 	mmprofile_enable_event(DDP_MMP_Events.primary_chg_fps_req, 1);
 	mmprofile_enable_event(DDP_MMP_Events.primary_chg_fps_notify, 1);
+	mmprofile_enable_event(DDP_MMP_Events.primary_chg_fps_send_lcm_cmd, 1);
 	/***************add for ARR end***********************/
 }
 

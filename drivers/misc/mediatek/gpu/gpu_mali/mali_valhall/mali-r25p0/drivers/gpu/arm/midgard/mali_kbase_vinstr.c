@@ -1218,7 +1218,6 @@ void MTK_kbasep_vinstr_hwcnt_release(void)
 		gpu_ptr->gpu_enable = 0;
 		MTK_reset_urate();
 #endif
-		mtk_cli->vctx->suspend_count = 0;
 		mtk_cli->vctx->client_count--;
 		list_del(&mtk_cli->node);
 		mutex_unlock(&mtk_cli->vctx->lock);
@@ -1249,7 +1248,7 @@ void MTK_reset_urate(void)
 
 void MTK_update_gpu_swpm(void)
 {
-	unsigned int pm_gpu_loading = 0;
+	unsigned int pm_gpu_loading;
 	unsigned int exec_active;
 	unsigned int exec_instr_fma, exec_instr_cvt, exec_instr_sfu;
 	unsigned int tfilt_num;
@@ -1305,7 +1304,7 @@ void MTK_update_gpu_swpm(void)
 
 void MTK_update_gpu_LTR(void)
 {
-	unsigned int pm_gpu_loading = 0;
+	unsigned int pm_gpu_loading;
 	struct mtk_gpu_perf gpu_perf_counter;
 	unsigned int stall_counter[4] = {0};
 	mtk_get_gpu_loading(&pm_gpu_loading);

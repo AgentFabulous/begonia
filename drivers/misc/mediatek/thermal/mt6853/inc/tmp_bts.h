@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -54,7 +55,6 @@
 #define BTSNRPA_RAP_NTC_TABLE		7
 
 #define BTSNRPA_RAP_ADC_CHANNEL		AUX_IN2_NTC
-
 
 
 extern int IMM_GetOneChannelValue(int dwChannel, int data[4], int *rawdata);

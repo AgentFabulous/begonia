@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -70,8 +71,18 @@ int disp_lcm_is_partial_support(struct disp_lcm_handle *plcm);
 int disp_lcm_validate_roi(struct disp_lcm_handle *plcm, int *x, int *y,
 			  int *w, int *h);
 int disp_lcm_aod(struct disp_lcm_handle *plcm, int enter);
+int disp_lcm_set_param(struct disp_lcm_handle *plcm, unsigned int param);
 
 int disp_lcm_is_arr_support(struct disp_lcm_handle *plcm);
+int disp_lcm_arr_inform_lcm_way(struct disp_lcm_handle *plcm);
+unsigned int disp_lcm_arr_need_inform_lcm(
+	struct disp_lcm_handle *plcm, enum LCM_DFPS_FRAME_ID frame_id);
+void disp_lcm_arr_send_cmd(
+	struct disp_lcm_handle *plcm,
+	enum LCM_DFPS_SEND_CMD_WAY dfps_send_cmd_way,
+	void *cmdq_handle, unsigned int from_fps, unsigned int to_fps,
+	enum LCM_DFPS_FRAME_ID frame_id);
+
 
 #ifdef CONFIG_MTK_HIGH_FRAME_RATE
 /*-----------------------DynFPS start-----------------------------------*/

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -41,7 +42,7 @@ static enum IMGSENSOR_RETURN regulator_init(
 	struct IMGSENSOR_HW_DEVICE_COMMON *pcommon)
 {
 	struct REGULATOR *preg = (struct REGULATOR *)pinstance;
-	int type, idx, ret;
+	int type, idx;
 	char str_regulator_name[LENGTH_FOR_SNPRINTF];
 
 	for (idx = IMGSENSOR_SENSOR_IDX_MIN_NUM;
@@ -50,13 +51,11 @@ static enum IMGSENSOR_RETURN regulator_init(
 		for (type = 0; type < REGULATOR_TYPE_MAX_NUM; type++) {
 			memset(str_regulator_name, 0,
 				sizeof(str_regulator_name));
-			ret = snprintf(str_regulator_name,
+			snprintf(str_regulator_name,
 				sizeof(str_regulator_name),
 				"cam%d_%s",
 				idx,
 				regulator_control[type].pregulator_type);
-			if (ret < 0)
-				return ret;
 			preg->pregulator[idx][type] = regulator_get(
 					&pcommon->pplatform_device->dev,
 					str_regulator_name);
@@ -110,8 +109,7 @@ static enum IMGSENSOR_RETURN regulator_set(
 	if (pin > IMGSENSOR_HW_PIN_DOVDD   ||
 	    pin < IMGSENSOR_HW_PIN_AVDD    ||
 	    pin_state < IMGSENSOR_HW_PIN_STATE_LEVEL_0 ||
-	    pin_state >= IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH ||
-	    sensor_idx < 0)
+	    pin_state >= IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH)
 		return IMGSENSOR_RETURN_ERROR;
 
 	reg_type_offset = REGULATOR_TYPE_VCAMA;

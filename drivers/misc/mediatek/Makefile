@@ -81,6 +81,7 @@ obj-$(CONFIG_MTK_AUXADC)	+= auxadc/
 obj-$(CONFIG_MTK_GPT_SCHEME_SUPPORT)	+= partition/
 obj-$(CONFIG_MTK_PWM)	    += pwm/
 obj-$(CONFIG_MTK_IRTX_PWM_SUPPORT)	    += irtx/
+obj-$(CONFIG_AW8622_HAPTIC)    += aw8622_haptic/
 ifeq ($(subst ",,$(CONFIG_MTK_SENSOR_ARCHITECTURE)),1.0)
 obj-y += sensors-1.0/
 else
@@ -172,5 +173,7 @@ obj-$(CONFIG_MTK_UNIFIED_DEBUG_INTERFACE) += udi/
 obj-y += rps/
 obj-$(CONFIG_MTK_MDDP_SUPPORT) += mddp/
 obj-$(CONFIG_MTK_USB2JTAG_SUPPORT) += usb2jtag/
+obj-$(CONFIG_XIAOMI_AKM09970)      +=akm09970.o
 obj-y += subpmic/
+obj-$(CONFIG_XIAOMI_MOTOR_DRV8846) +=drv8846.o
 obj-$(CONFIG_MTK_OTP) += otp/

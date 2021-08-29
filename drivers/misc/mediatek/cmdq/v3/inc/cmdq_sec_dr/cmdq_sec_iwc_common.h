@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #ifndef __CMDQ_SEC_IWC_COMMON_H__
@@ -17,9 +18,7 @@
 #define CMDQ_SEC_SHARED_RESET_CNT		0x308
 
 /* commanad buffer & metadata */
-#define CMDQ_TZ_CMD_BLOCK_SIZE	 (79 * 1024)
-
-#define CMDQ_IWC_MAX_CMD_LENGTH (CMDQ_TZ_CMD_BLOCK_SIZE / 4)
+#define CMDQ_IWC_MAX_CMD_LENGTH (5 << 12)
 
 #define CMDQ_IWC_MAX_ADDR_LIST_LENGTH (30)
 

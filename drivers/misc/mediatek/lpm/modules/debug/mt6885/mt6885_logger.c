@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
+
 
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -12,8 +14,7 @@
 #include <linux/rtc.h>
 #include <linux/wakeup_reason.h>
 #include <linux/syscore_ops.h>
-#include <mt6885_cond.h>
-#include <mtk_lpm_module.h>
+
 #include <aee.h>
 #include <mtk_lpm.h>
 
@@ -28,6 +29,52 @@
 
 #define MT6885_LOG_MONITOR_STATE_NAME	"mcusysoff"
 #define MT6885_LOG_DEFAULT_MS		5000
+/**********MI ADD START*****************/
+#define CONFIG_LPM_STATE_RECORDS
+#ifdef CONFIG_LPM_STATE_RECORDS
+#include <linux/proc_fs.h>
+#include <linux/rtc.h>
+#endif
+
+#define WORLD_CLK_CNTCV_L        (0x10017008)
+#define WORLD_CLK_CNTCV_H        (0x1001700C)
+
+#define CONN_SLEEP_MASK          (0xe010)
+#define MODEM_SLEEP_MASK         (0x110c)
+#define SUBSYS_SLEEP_MASK        (0xff)
+
+#ifdef CONFIG_LPM_STATE_RECORDS
+#define MAX_LSR_RECORDS		1024
+#define MAX_LWR_RECORDS		1024
+#define MAX_LPM_SHORT_TIME	(30*32*1024)
+
+static DEFINE_SPINLOCK(lsr_lock);
+static DEFINE_SPINLOCK(lwr_lock);
+
+struct lpm_state_records_buff {
+	char msg[256];
+	struct timespec key_time;
+};
+
+struct lpm_wakeup_records_buff {
+	char msg[256];
+	struct timespec key_time;
+};
+
+struct lpm_state_records_buff lsr_buff[MAX_LSR_RECORDS];
+struct lpm_wakeup_records_buff lwr_buff[MAX_LWR_RECORDS];
+
+static u32 lsr_num;
+static u32 index_head;
+static u32 index_tail;
+static u32 lwr_num;
+static u32 lwr_index_head;
+static u32 lwr_index_tail;
+
+static void lsr_record(const struct mt6885_spm_wake_status *wakesta, unsigned int spm_26M_off_pct);
+static void lwr_record(char *buf);
+#endif
+/**********MI ADD END*****************/
 
 static struct mt6885_spm_wake_status mt6885_wake;
 void __iomem *mt6885_spm_base;
@@ -41,17 +88,6 @@ struct mt6885_log_helper mt6885_logger_help = {
 	.wakesrc = &mt6885_wake,
 	.cur = 0,
 	.prev = 0,
-};
-
-static char *mt6885_spm_cond_cg_str[PLAT_SPM_COND_MAX] = {
-	[PLAT_SPM_COND_MTCMOS_0]	= "MTCMOS_0",
-	[PLAT_SPM_COND_CG_INFRA_0]	= "INFRA_0",
-	[PLAT_SPM_COND_CG_INFRA_1]	= "INFRA_1",
-	[PLAT_SPM_COND_CG_INFRA_2]	= "INFRA_2",
-	[PLAT_SPM_COND_CG_INFRA_3]	= "INFRA_3",
-	[PLAT_SPM_COND_CG_MMSYS_0]	= "MMSYS_0",
-	[PLAT_SPM_COND_CG_MMSYS_1]	= "MMSYS_1",
-	[PLAT_SPM_COND_CG_MMSYS_2]	= "MMSYS_2",
 };
 
 const char *mt6885_wakesrc_str[32] = {
@@ -339,22 +375,6 @@ static void mt6885_suspend_show_detailed_wakeup_reason
 		}
 	}
 }
-static void dump_lp_cond(void)
-{
-#define MT6885_DBG_SMC(_id, _act, _rc, _param) ({\
-	(u32) mtk_lpm_smc_spm_dbg(_id, _act, _rc, _param); })
-
-	int i;
-	u32 blkcg;
-
-	for (i = 1 ; i < PLAT_SPM_COND_MAX ; i++) {
-		blkcg = MT6885_DBG_SMC(MT_SPM_DBG_SMC_UID_BLOCK_DETAIL, MT_LPM_SMC_ACT_GET, 0, i);
-		if (blkcg != 0)
-			printk_deferred("suspend warning: CG: %6s = 0x%08lx\n"
-				, mt6885_spm_cond_cg_str[i], blkcg);
-
-	}
-}
 
 static void mt6885_suspend_spm_rsc_req_check
 	(struct mt6885_spm_wake_status *wakesta)
@@ -434,11 +454,10 @@ static u32 is_blocked_cnt;
 			LOG_BUF_SIZE - log_size, "apu ");
 
 	src_req = plat_mmio_read(SPM_SRC_REQ);
-	if (src_req & 0x9B) {
-		dump_lp_cond();
+	if (src_req & 0x9B)
 		log_size += scnprintf(log_buf + log_size,
 			LOG_BUF_SIZE - log_size, "spm ");
-	}
+
 	WARN_ON(strlen(log_buf) >= LOG_BUF_SIZE);
 
 	printk_deferred("[name:spm&][SPM] %s", log_buf);
@@ -587,9 +606,12 @@ static int mt6885_show_message(struct mt6885_spm_wake_status *wakesrc, int type,
 
 		log_size += scnprintf(log_buf + log_size,
 			LOG_BUF_OUT_SZ - log_size,
-			"%s wake up by %s, timer_out = %u, r13 = 0x%x, debug_flag = 0x%x 0x%x, ",
+			"%s wake up by %s, timer_out = %u, r13 = 0x%x, debug_flag = 0x%x 0x%x, %s,%s,%s",
 			scenario, buf, wakesrc->timer_out, wakesrc->r13,
-			wakesrc->debug_flag, wakesrc->debug_flag1);
+			wakesrc->debug_flag, wakesrc->debug_flag1,
+			(wakesrc->r13 & CONN_SLEEP_MASK) ? "connectivity not sleep" : "connectivity sleep",
+			(wakesrc->r13 & MODEM_SLEEP_MASK) ? "modem not sleep" : "modem sleep",
+			(wakesrc->debug_flag & SUBSYS_SLEEP_MASK) == SUBSYS_SLEEP_MASK ? "subsys sleep" : "subsys not sleep");
 
 		log_size += scnprintf(log_buf + log_size,
 			LOG_BUF_OUT_SZ - log_size,
@@ -655,6 +677,13 @@ static int mt6885_show_message(struct mt6885_spm_wake_status *wakesrc, int type,
 		rcu_irq_exit_irqson();
 	} else
 		pr_info("[name:spm&][SPM] %s", log_buf);
+
+#ifdef CONFIG_LPM_STATE_RECORDS
+	if (type == MT_LPM_ISSUER_SUSPEND) {
+		lsr_record(wakesrc, spm_26M_off_pct);
+		lwr_record(buf);
+	}
+#endif
 
 	return wr;
 }
@@ -817,10 +846,8 @@ int __init mt6885_logger_init(void)
 	mtk_lpm_sysfs_root_entry_create();
 	mt6885_logger_timer_debugfs_init();
 
-	preempt_disable();
 	dev = cpuidle_get_device();
 	drv = cpuidle_get_cpu_driver(dev);
-	preempt_enable();
 	mt6885_logger_fired.state_index = -1;
 
 	if (drv) {
@@ -849,5 +876,191 @@ int __init mt6885_logger_init(void)
 
 	return 0;
 }
+#ifdef CONFIG_LPM_STATE_RECORDS
+static void lsr_record(const struct mt6885_spm_wake_status *wakesta, unsigned int spm_26M_off_pct)
+{
+	static int m;
+	int conn_sleep = 0;
+	int modem_sleep = 0;
+	int subsys_sleep = 0;
+
+	if (!wakesta)
+		return;
+
+	if (!spin_trylock(&lsr_lock))
+		return;
+
+	if (wakesta->timer_out > MAX_LPM_SHORT_TIME) {
+		conn_sleep = (wakesta->r13 & CONN_SLEEP_MASK) ? 0 : 1;
+		modem_sleep = (wakesta->r13 & MODEM_SLEEP_MASK) ? 0 : 1;
+		subsys_sleep = (wakesta->debug_flag & SUBSYS_SLEEP_MASK) == SUBSYS_SLEEP_MASK ? 1 : 0;
+
+		if (!conn_sleep || !modem_sleep || !subsys_sleep) {
+			index_tail = m;
+			getnstimeofday(&lsr_buff[m].key_time);
+			sprintf(lsr_buff[m++].msg, "%u, %s, %s, %s, req_sta = 0x%x 0x%x 0x%x 0x%x 0x%x, %u", wakesta->timer_out,
+					conn_sleep ? "connectivity sleep" : "connectivity not sleep",
+					modem_sleep ? "modem sleep" : "modem not sleep",
+					subsys_sleep ? "subsys sleep" : "subsys not sleep",
+					wakesta->req_sta0, wakesta->req_sta1, wakesta->req_sta2,
+					wakesta->req_sta3, wakesta->req_sta4, spm_26M_off_pct);
+
+			if (m >= MAX_LSR_RECORDS)
+				m = 0;
+
+			lsr_num++;
+			if (lsr_num >= MAX_LSR_RECORDS) {
+				lsr_num = MAX_LSR_RECORDS;
+				index_head = index_tail + 1;
+				if (index_head >= MAX_LSR_RECORDS)
+					index_head = 0;
+			}
+		}
+	}
+
+	spin_unlock(&lsr_lock);
+}
+
+static int lsr_seq_show(struct seq_file *seq, void *v)
+{
+	struct rtc_time tm;
+	int i = 0;
+
+	spin_lock(&lsr_lock);
+	if (lsr_num < MAX_LSR_RECORDS) {
+		for (i = 0; i < lsr_num; i++) {
+			rtc_time_to_tm(lsr_buff[i].key_time.tv_sec, &tm);
+			seq_printf(seq, "%d-%02d-%02d %02d:%02d:%02d UTC - lpm_state { %s }\n",
+					tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+					lsr_buff[i].msg);
+		}
+	} else {
+		for (i = index_head; i < MAX_LSR_RECORDS; i++) {
+			rtc_time_to_tm(lsr_buff[i].key_time.tv_sec, &tm);
+			seq_printf(seq, "%d-%02d-%02d %02d:%02d:%02d UTC - lpm_state { %s }\n",
+					tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+					lsr_buff[i].msg);
+		}
+
+		if (index_head > index_tail) {
+			for (i = 0; i <= index_tail; i++) {
+				rtc_time_to_tm(lsr_buff[i].key_time.tv_sec, &tm);
+				seq_printf(seq, "%d-%02d-%02d %02d:%02d:%02d UTC - lpm_state { %s }\n",
+						tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+						lsr_buff[i].msg);
+			}
+		}
+	}
+	spin_unlock(&lsr_lock);
+
+	return 0;
+}
+
+static int lsr_record_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, lsr_seq_show, NULL);
+}
+
+static const struct file_operations lpm_state_records_ops = {
+	.open           = lsr_record_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static void lwr_record(char *buf)
+{
+	static int m;
+
+	if (!buf || (strlen(buf) > LOG_BUF_SIZE))
+		return;
+
+	if (!spin_trylock(&lwr_lock))
+		return;
+
+	lwr_index_tail = m;
+	getnstimeofday(&lwr_buff[m].key_time);
+	sprintf(lwr_buff[m++].msg, "%s", buf);
+
+	if (m >= MAX_LWR_RECORDS)
+		m = 0;
+
+	lwr_num++;
+	if (lwr_num >= MAX_LWR_RECORDS) {
+		lwr_num = MAX_LWR_RECORDS;
+		lwr_index_head = lwr_index_tail + 1;
+		if (lwr_index_head >= MAX_LWR_RECORDS)
+			lwr_index_head = 0;
+	}
+
+	spin_unlock(&lwr_lock);
+}
+
+static int lwr_seq_show(struct seq_file *seq, void *v)
+{
+	struct rtc_time tm;
+	int i = 0;
+
+	spin_lock(&lwr_lock);
+	if (lwr_num < MAX_LWR_RECORDS) {
+		for (i = 0; i < lwr_num; i++) {
+			rtc_time_to_tm(lwr_buff[i].key_time.tv_sec, &tm);
+			seq_printf(seq, "%d-%02d-%02d %02d:%02d:%02d UTC - lpm_wakeup { %s }\n",
+					tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+					lwr_buff[i].msg);
+		}
+	} else {
+		for (i = lwr_index_head; i < MAX_LWR_RECORDS; i++) {
+			rtc_time_to_tm(lwr_buff[i].key_time.tv_sec, &tm);
+			seq_printf(seq, "%d-%02d-%02d %02d:%02d:%02d UTC - lpm_wakeup { %s }\n",
+					tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+					lwr_buff[i].msg);
+		}
+
+		if (lwr_index_head > lwr_index_tail) {
+			for (i = 0; i <= lwr_index_tail; i++) {
+				rtc_time_to_tm(lwr_buff[i].key_time.tv_sec, &tm);
+				seq_printf(seq, "%d-%02d-%02d %02d:%02d:%02d UTC - lpm_wakeup { %s }\n",
+						tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+						lwr_buff[i].msg);
+			}
+		}
+	}
+	spin_unlock(&lwr_lock);
+
+	return 0;
+}
+
+static int lwr_record_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, lwr_seq_show, NULL);
+}
+
+static const struct file_operations lpm_wakeup_records_ops = {
+	.open           = lwr_record_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int __init lpm_state_records(void)
+{
+	struct proc_dir_entry *entry;
+	struct proc_dir_entry *wp_entry;
+
+	entry = proc_create("lpm_state_records", 0444, NULL, &lpm_state_records_ops);
+	if (!entry)
+		printk(KERN_ERR "%s: create proc lpm_state_records node failed\n", __func__);
+
+	wp_entry = proc_create("lpm_wakeup_records", 0444, NULL, &lpm_wakeup_records_ops);
+	if (!entry)
+		printk(KERN_ERR "%s: create proc node lpm_wakeup_records failed\n", __func__);
+
+	return 0;
+}
+
+late_initcall(lpm_state_records);
+#endif
+
 late_initcall_sync(mt6885_logger_init);
 

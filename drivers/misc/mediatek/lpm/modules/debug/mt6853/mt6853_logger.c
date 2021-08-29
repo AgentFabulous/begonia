@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 
@@ -809,4 +810,3 @@ int __init mt6853_logger_init(void)
 	return 0;
 }
 late_initcall_sync(mt6853_logger_init);
-

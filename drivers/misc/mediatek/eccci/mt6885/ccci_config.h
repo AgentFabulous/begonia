@@ -53,7 +53,7 @@
 
 /* feature option, always try using platform info first! */
 #ifdef CONFIG_MTK_TINYSYS_SCP_SUPPORT
-#define FEATURE_SCP_CCCI_SUPPORT
+//#define FEATURE_SCP_CCCI_SUPPORT
 #endif
 /*#define ENABLE_EMI_PROTECTION*/
 /* #define FEATURE_LOW_BATTERY_SUPPORT */
@@ -85,6 +85,4 @@
 #define ENABLE_CPU_AFFINITY
 #define REFINE_BAT_OFFSET_REMOVE
 #define PIT_USING_CACHE_MEM
-#define USING_TX_DONE_KERNEL_THREAD
-
 #endif

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2020 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -689,13 +690,6 @@ static int mdw_rsc_check_dev_state(struct mdw_dev_info *in)
 {
 	struct mdw_rsc_tab *tab = NULL;
 	int type = 0;
-
-	if (in->idx >= MDW_RSC_TAB_DEV_MAX ||
-		in->idx < 0) {
-		mdw_drv_err("dev(%s-#%d) idx over array size(%d)\n",
-			in->name, in->idx, MDW_RSC_TAB_DEV_MAX);
-		return -EINVAL;
-	}
 
 	if (in->type < APUSYS_DEVICE_RT)
 		type = in->type + APUSYS_DEVICE_RT;

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -98,10 +99,12 @@ char *leds_name[TYPE_TOTAL] = {
 /****************************************************************************
  * DEBUG MACROS
  ***************************************************************************/
+#undef pr_fmt
+#define pr_fmt(fmt) KBUILD_MODNAME " %s(%d) :" fmt, __func__, __LINE__
 static int debug_enable_led_hal = 1;
 #define LEDS_DEBUG(format, args...) do { \
 	if (debug_enable_led_hal) {	\
-		pr_debug("[LED]"format, ##args);\
+		pr_info("[LED]"format, ##args);\
 	} \
 } while (0)
 /*****************PWM *************************************************/
@@ -162,7 +165,7 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 	struct device_node *led_node = NULL;
 	bool isSupportDTS = false;
 	int i, ret;
-	int mode, data, led_bits;
+	int mode, data;
 	int pwm_config[5] = { 0 };
 
 	if (pled_dtsi)
@@ -223,19 +226,6 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 			    pled_dtsi[i].name);
 			pled_dtsi[i].data = -1;
 		}
-
-		ret =
-		    of_property_read_u32(led_node, "led_bits",
-					 &led_bits);
-		if (!ret) {
-			pled_dtsi[i].led_bits = led_bits;
-			LEDS_DEBUG("The %s's led led_bits is : %d\n",
-			     pled_dtsi[i].name, pled_dtsi[i].led_bits);
-		} else {
-			pled_dtsi[i].led_bits = 8;
-			pr_info("[LED]led dts can not get %s led led_bits\n",
-			    pled_dtsi[i].name);
-		}
 		ret = of_property_read_u32_array(led_node, "pwm_config",
 				pwm_config, ARRAY_SIZE(pwm_config));
 		if (!ret) {
@@ -252,11 +242,13 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 
 		switch (pled_dtsi[i].mode) {
 		case MT65XX_LED_MODE_CUST_LCM:
+			DDPDSIINFO("%s:%d, backlight func\n", __func__, __LINE__);
 #if defined(CONFIG_BACKLIGHT_SUPPORT_LM3697)
 			pled_dtsi[i].data =
 			   (long)chargepump_set_backlight_level;
 			LEDS_DEBUG("BL set by chargepump\n");
 #else
+			DDPDSIINFO("%s:%d, backlight func\n", __func__, __LINE__);
 			pled_dtsi[i].data = (long)mtkfb_set_backlight_level;
 #endif
 			LEDS_DEBUG("kernel:the BL hw mode is LCM.\n");
@@ -776,6 +768,7 @@ int mt_mt65xx_led_set_cust(struct cust_mt65xx_led *cust, int level)
 	unsigned int BacklightLevelSupport =
 	    Cust_GetBacklightLevelSupport_byPWM();
 #endif
+	DDPDSIINFO("%s:%d, backlight level= %d, mode = %d\n", __func__, __LINE__, level, cust->mode);
 	static bool button_flag;
 
 	switch (cust->mode) {
@@ -842,6 +835,7 @@ int mt_mt65xx_led_set_cust(struct cust_mt65xx_led *cust, int level)
 		if (strcmp(cust->name, "lcd-backlight") == 0)
 			bl_brightness_hal = level;
 		LEDS_DEBUG("%s backlight control by LCM\n", __func__);
+		DDPDSIINFO("%s:%d, backlight level= %d\n", __func__, __LINE__, level);
 		/* warning for this API revork */
 		return ((cust_brightness_set) (cust->data)) (level, bl_div_hal);
 
@@ -903,11 +897,8 @@ void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 	backlight_debug_log(led_data->level, level);
 	trans_level = ((((1 << MT_LED_INTERNAL_LEVEL_BIT_CNT)
 				- 1) * level +
-				(((1 << led_data->cust.led_bits) - 1) / 2))
-				/ ((1 << led_data->cust.led_bits) - 1));
-
-	pr_info("[LED] disp_pq_notify_backlight_changed: %d-%d(%d)",
-			level, trans_level, led_data->cust.led_bits);
+				(((1 << 8) - 1) / 2))
+				/ ((1 << 8) - 1));
 	disp_pq_notify_backlight_changed(trans_level);
 #ifdef CONFIG_MTK_AAL_SUPPORT
 	disp_aal_notify_backlight_changed(trans_level);

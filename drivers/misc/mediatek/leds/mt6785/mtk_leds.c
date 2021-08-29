@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -158,7 +159,7 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 	struct device_node *led_node = NULL;
 	bool isSupportDTS = false;
 	int i, ret;
-	int mode, data;
+	int mode, data, led_bits;
 	int pwm_config[5] = { 0 };
 
 	if (pled_dtsi)
@@ -218,6 +219,19 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 			LEDS_DEBUG("led dts can not get %s led data\n",
 			    pled_dtsi[i].name);
 			pled_dtsi[i].data = -1;
+		}
+
+		ret =
+		    of_property_read_u32(led_node, "led_bits",
+					 &led_bits);
+		if (!ret) {
+			pled_dtsi[i].led_bits = led_bits;
+			LEDS_DEBUG("The %s's led led_bits is : %d\n",
+			     pled_dtsi[i].name, pled_dtsi[i].led_bits);
+		} else {
+			pled_dtsi[i].led_bits = 8;
+			LEDS_DEBUG("led dts can not get %s led led_bits\n",
+			    pled_dtsi[i].name);
 		}
 
 		ret = of_property_read_u32_array(led_node, "pwm_config",
@@ -855,9 +869,10 @@ void mt_mt65xx_led_work(struct work_struct *work)
 	mt_mt65xx_led_set_cust(&led_data->cust, led_data->level);
 	mutex_unlock(&leds_mutex);
 }
-
+extern void cabc_backlight_value_notification(int backlight_value);
 void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 {
+	int trans_level;
 	struct mt65xx_led_data *led_data =
 	    container_of(led_cdev, struct mt65xx_led_data, cdev);
 	/* unsigned long flags; */
@@ -876,23 +891,27 @@ void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 		schedule_work(&led_data->work);
 		return;
 	}
+
+	sysfs_notify(&led_cdev->dev->kobj, NULL, "brightness");
+
 	if (level != 0 && level * CONFIG_LIGHTNESS_MAPPING_VALUE < 255)
 		level = 1;
 	else
 		level = (level * CONFIG_LIGHTNESS_MAPPING_VALUE) / 255;
 
 	backlight_debug_log(led_data->level, level);
-	disp_pq_notify_backlight_changed((((1 << MT_LED_INTERNAL_LEVEL_BIT_CNT)
-					    - 1) * level + 127) / 255);
+	trans_level = ((((1 << MT_LED_INTERNAL_LEVEL_BIT_CNT)
+				    - 1) * level +
+				    (((1 << led_data->cust.led_bits) - 1) / 2))
+				    / ((1 << led_data->cust.led_bits) - 1));
+
+	disp_pq_notify_backlight_changed(trans_level);
 #ifdef CONFIG_MTK_AAL_SUPPORT
-	disp_aal_notify_backlight_changed((((1 <<
-					MT_LED_INTERNAL_LEVEL_BIT_CNT)
-					    - 1) * level + 127) / 255);
+	disp_aal_notify_backlight_changed(trans_level);
+	cabc_backlight_value_notification(trans_level);
 #else
 	if (led_data->cust.mode == MT65XX_LED_MODE_CUST_BLS_PWM)
-		mt_mt65xx_led_set_cust(&led_data->cust,
-			((((1 << MT_LED_INTERNAL_LEVEL_BIT_CNT)
-				- 1) * level + 127) / 255));
+		mt_mt65xx_led_set_cust(&led_data->cust, trans_level);
 	else
 		mt_mt65xx_led_set_cust(&led_data->cust, level);
 #endif

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -59,6 +60,10 @@
 #define AFDRV_MT9P017AF "MT9P017AF"
 #define AFDRV_OV8825AF "OV8825AF"
 #define AFDRV_WV511AAF "WV511AAF"
+#define AFDRV_DW9800AF "DW9800AF"
+
+
+#define CONVERT_CCU_TIMESTAMP 0x1000
 
 /* Structures */
 struct stAF_MotorInfo {
@@ -96,6 +101,20 @@ struct stAF_MotorName {
 struct stAF_MotorCmd {
 	u32 u4CmdID;
 	u32 u4Param;
+};
+
+/* Structures */
+struct stAF_CtrlCmd {
+	long long i8CmdID;
+	long long i8Param[2];
+};
+
+/* Structures */
+struct stAF_MotorOisInfo {
+	int i4OISHallPosXum;
+	int i4OISHallPosYum;
+	int i4OISHallFactorX;
+	int i4OISHallFactorY;
 };
 
 /* Structures */
@@ -154,5 +173,7 @@ struct stAF_DrvList {
 #define AFIOC_S_SETDRVINIT _IOW(AF_MAGIC, 16, u32)
 
 #define AFIOC_G_GETDRVNAME _IOWR(AF_MAGIC, 17, struct stAF_MotorName)
+
+#define AFIOC_X_CTRLPARA _IOWR(AF_MAGIC, 18, struct stAF_CtrlCmd)
 
 #endif

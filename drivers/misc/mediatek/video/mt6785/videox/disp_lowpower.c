@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -330,6 +331,7 @@ int _blocking_flush(void)
 #endif
 	return ret;
 }
+#if 0
 static int _vfp_chg_callback(unsigned long userdata);
 
 int _vfp_chg_callback(unsigned long userdata)
@@ -356,6 +358,7 @@ int _vfp_chg_callback(unsigned long userdata)
 	}
 	return 0;
 }
+
 static int primary_display_dsi_vfp_change(int state)
 {
 	int ret = 0;
@@ -432,7 +435,7 @@ static int primary_display_dsi_vfp_change(int state)
 	/*can send cmd here, after change VFP,maybe late?*/
 	return ret;
 }
-
+#endif
 static void _idle_set_golden_setting(void)
 {
 	struct cmdqRecStruct *qhandle = NULL;
@@ -843,7 +846,9 @@ static void _primary_display_enable_mmsys_clk(void)
 /* share WROT SRAM end */
 static void _vdo_mode_enter_idle(void)
 {
+#if 0
 	struct LCM_PARAMS *params;
+#endif
 #ifdef MTK_FB_MMDVFS_SUPPORT
 	unsigned long long bandwidth;
 	unsigned int out_fps = 60;
@@ -872,7 +877,8 @@ static void _vdo_mode_enter_idle(void)
 	    (disp_helper_get_option(DISP_OPT_IDLEMGR_SWTCH_DECOUPLE) ||
 	     disp_helper_get_option(DISP_OPT_SMART_OVL))) {
 		/* switch to decouple mode */
-		if ((!disp_input_has_yuv()) &&
+		if ((!disp_idle_check_rsz()) &&
+			(!disp_input_has_yuv()) &&
 			disp_helper_get_option(DISP_OPT_IDLEMGR_BY_REPAINT)) {
 			if (atomic_read(&real_input_layer) > 1) {
 				atomic_set(&idle_need_repaint, 1);
@@ -885,7 +891,7 @@ static void _vdo_mode_enter_idle(void)
 			set_is_dc(1);
 		}
 	}
-
+#if 0
 	/* disable IRQ & increase VFP */
 	if (!primary_is_sec()) {
 		if (disp_helper_get_option(
@@ -938,6 +944,7 @@ static void _vdo_mode_enter_idle(void)
 			}
 		}
 	}
+#endif
 
 	if (disp_helper_get_option(DISP_OPT_SHARE_SRAM))
 		enter_share_sram(CMDQ_SYNC_RESOURCE_WROT1);
@@ -984,7 +991,7 @@ static void _vdo_mode_leave_idle(void)
 	set_is_display_idle(0);
 	if (disp_helper_get_option(DISP_OPT_DYNAMIC_RDMA_GOLDEN_SETTING))
 		_idle_set_golden_setting();
-
+#if 0
 	/* enable IRQ & restore VFP */
 	if (!primary_is_sec()) {
 		if (idlemgr_pgc->cur_lp_cust_mode) {
@@ -1004,6 +1011,7 @@ static void _vdo_mode_leave_idle(void)
 					      DDP_IRQ_LEVEL_ALL);
 		}
 	}
+#endif
 
 	/* DC -> DL */
 	if (disp_helper_get_option(DISP_OPT_IDLEMGR_SWTCH_DECOUPLE) &&

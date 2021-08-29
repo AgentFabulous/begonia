@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,7 +29,7 @@
 #define USE_CM_MGR_AT_SSPM
 /* #define USE_SINGLE_CLUSTER */
 /* #define USE_CPU_TO_DRAM_MAP */
-/* #define USE_BCPU_WEIGHT */
+#define USE_BCPU_WEIGHT
 
 #define CM_MGR_EMI_OPP 5
 #define CM_MGR_LOWER_OPP 6

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -32,6 +33,10 @@
 #define ROUNDUP(a, b)		        (((a) + ((b)-1)) & ~((b)-1))
 #define PLT_LOG_ENABLE              0x504C5402 /*magic*/
 #define SCP_IPI_RETRY_TIMES         (5000)
+
+#ifdef SCP_LOGGER_OVERWRITE
+#define HW_SEM_LOGGER                1
+#endif
 
 /* bit0 = 1, logger is on, else off*/
 #define SCP_LOGGER_ON_BIT       (1<<0)
@@ -200,9 +205,19 @@ ssize_t scp_A_log_read(char __user *data, size_t len)
 
 	mutex_lock(&scp_A_log_mutex);
 
-	r_pos = SCP_A_buf_info->r_pos;
 	w_pos = SCP_A_buf_info->w_pos;
 
+#ifdef SCP_LOGGER_OVERWRITE
+	//pr_err("scp_A_log_read: len= %d\n", len);
+
+	if (get_scp_semaphore(HW_SEM_LOGGER) < 0) {
+		pr_err("[SCP]: HW_semaphore Get fail.\n");
+		mutex_unlock(&scp_A_log_mutex);
+		return 0;
+	}
+#endif
+
+	r_pos = SCP_A_buf_info->r_pos;
 	if (r_pos == w_pos)
 		goto error;
 
@@ -238,6 +253,13 @@ ssize_t scp_A_log_read(char __user *data, size_t len)
 	SCP_A_buf_info->r_pos = r_pos;
 
 error:
+#ifdef SCP_LOGGER_OVERWRITE
+	if (release_scp_semaphore(HW_SEM_LOGGER) < 0) {
+		pr_err("[SCP]: HW_semaphore Release fail.\n");
+		mutex_unlock(&scp_A_log_mutex);
+		return 0;
+	}
+#endif
 	mutex_unlock(&scp_A_log_mutex);
 
 	return datalen;
@@ -477,9 +499,16 @@ static ssize_t scp_A_mobile_log_UT_show(struct device *kobj,
 
 	mutex_lock(&scp_A_log_mutex);
 
-	r_pos = SCP_A_buf_info->r_pos;
 	w_pos = SCP_A_buf_info->w_pos;
+#ifdef SCP_LOGGER_OVERWRITE
+	if (get_scp_semaphore(HW_SEM_LOGGER) < 0) {
+		pr_err("[SCP]: HW_semaphore Get fail.\n");
+		mutex_unlock(&scp_A_log_mutex);
+		return 0;
+	}
+#endif
 
+	r_pos = SCP_A_buf_info->r_pos;
 	if (r_pos == w_pos)
 		goto error;
 
@@ -505,6 +534,13 @@ static ssize_t scp_A_mobile_log_UT_show(struct device *kobj,
 	SCP_A_buf_info->r_pos = r_pos;
 
 error:
+#ifdef SCP_LOGGER_OVERWRITE
+	if (release_scp_semaphore(HW_SEM_LOGGER) < 0) {
+		pr_err("[SCP]: HW_semaphore Release fail.\n");
+		mutex_unlock(&scp_A_log_mutex);
+		return 0;
+	}
+#endif
 	mutex_unlock(&scp_A_log_mutex);
 
 	return len;

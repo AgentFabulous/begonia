@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -66,8 +67,8 @@
 /* chip dependent */
 int tscpu_polling_trip_temp1 = 40000;
 int tscpu_polling_trip_temp2 = 20000;
-int tscpu_polling_factor1 = 3;
-int tscpu_polling_factor2 = 4;
+int tscpu_polling_factor1 = 7;
+int tscpu_polling_factor2 = 8;
 
 #if MTKTSCPU_FAST_POLLING
 /* Combined fast_polling_trip_temp and fast_polling_factor,

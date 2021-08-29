@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -34,6 +35,8 @@ enum DTS_GPIO_STATE {
 	DTS_GPIO_STATE_TE_MODE_GPIO,	/* mode_te_gpio */
 	DTS_GPIO_STATE_TE_MODE_TE,	/* mode_te_te */
 	DTS_GPIO_STATE_TE1_MODE_TE,	/* mode_te1_te */
+	DTS_GPIO_STATE_LCD_BL_BIAS_EN1,	/* enable lm36273 chip select signal */
+	DTS_GPIO_STATE_LCD_BL_BIAS_EN0,	/* disable lm36273 chip select signal */
 	DTS_GPIO_STATE_MAX,		/* for array size */
 };
 

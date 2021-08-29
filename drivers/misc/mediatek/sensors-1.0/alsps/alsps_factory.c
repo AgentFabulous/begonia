@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -41,8 +42,9 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 	void __user *ptr = (void __user *)arg;
 	int data = 0;
 	uint32_t enable = 0;
-	int threshold_data[2] = {0, 0};
-	int als_cali = 0;
+	//int threshold_data[4] = {0};
+	PS_CALI_DATA thd_cali = {0};
+	PS_CALI_DATA als_cali = {0};
 
 	if (_IOC_DIR(cmd) & _IOC_READ)
 		err = !access_ok(VERIFY_WRITE, (void __user *)arg,
@@ -175,7 +177,7 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 		if (alsps_factory.fops != NULL &&
 		    alsps_factory.fops->ps_get_threshold != NULL) {
 			err = alsps_factory.fops->ps_get_threshold(
-				threshold_data);
+				&thd_cali);
 			if (err < 0) {
 				pr_err(
 					"ALSPS_GET_PS_THRESHOLD_HIGH read data fail!\n");
@@ -185,15 +187,15 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 			pr_err("ALSPS_GET_PS_THRESHOLD_HIGH NULL\n");
 			return -EINVAL;
 		}
-		if (copy_to_user(ptr, &threshold_data[0],
-				 sizeof(threshold_data[0])))
+		if (copy_to_user(ptr, &thd_cali,
+				 sizeof(thd_cali)))
 			return -EFAULT;
 		return 0;
 	case ALSPS_GET_PS_THRESHOLD_LOW:
 		if (alsps_factory.fops != NULL &&
 		    alsps_factory.fops->ps_get_threshold != NULL) {
 			err = alsps_factory.fops->ps_get_threshold(
-				threshold_data);
+				&thd_cali);
 			if (err < 0) {
 				pr_err(
 					"ALSPS_GET_PS_THRESHOLD_HIGH read data fail!\n");
@@ -203,17 +205,17 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 			pr_err("ALSPS_GET_PS_THRESHOLD_HIGH NULL\n");
 			return -EINVAL;
 		}
-		if (copy_to_user(ptr, &threshold_data[1],
-				 sizeof(threshold_data[1])))
+		if (copy_to_user(ptr, &thd_cali.threshold2,
+				 sizeof(thd_cali.threshold2)))
 			return -EFAULT;
 		return 0;
 	case ALSPS_SET_PS_THRESHOLD:
-		if (copy_from_user(threshold_data, ptr, sizeof(threshold_data)))
+		if (copy_from_user(&thd_cali, ptr, sizeof(thd_cali)))
 			return -EFAULT;
 		if (alsps_factory.fops != NULL &&
 		    alsps_factory.fops->ps_set_threshold != NULL) {
 			err = alsps_factory.fops->ps_set_threshold(
-				threshold_data);
+				thd_cali);
 			if (err < 0) {
 				pr_err("ALSPS_SET_PS_THRESHOLD fail!\n");
 				return -EINVAL;

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -296,6 +297,10 @@ enum LCM_DSI_PLL_CLOCK {
 	LCM_DSI_6589_PLL_CLOCK_520 = 50,
 };
 
+enum LM36273_REG_RW {
+	LM36273_REG_WRITE,
+	LM36273_REG_READ,
+};
 /* ------------------------------------------------------------------------- */
 
 struct LCM_DBI_DATA_FORMAT {
@@ -526,16 +531,39 @@ enum MIPITX_PHY_PORT {
 	MIPITX_PHY_PORT_1,
 	MIPITX_PHY_PORT_NUM
 };
+/*ARR*/
+/*#define DFPS_LEVELNUM 10*/
+enum DynFPS_LEVEL {
+	DPFS_LEVEL0,
+	DFPS_LEVEL1,
+	DFPS_LEVEL2,
+	DFPS_LEVELNUM,
+};
 
-#define DYNAMIC_FPS_LEVELS 10
 struct dynamic_fps_info {
+	enum DynFPS_LEVEL level;
 	unsigned int fps;
 	unsigned int vfp; /*lines*/
-	/*unsigned int idle_check_interval;*//*ms*/
+};
+enum LCM_DFPS_FRAME_ID {
+	LCM_DFPS_FRAME_PREV = 0,
+	LCM_DFPS_FRAME_CUR = 1,
+	LCM_DFPS_MAX_FRAME_CMD,
+};
+enum LCM_DFPS_SEND_CMD_WAY {
+	LCM_DFPS_SEND_CMD_STOP_VDO,
+	LCM_DFPS_SEND_CMD_VFP,
+	LCM_DFPS_SEND_CMD_VBP,
+};
+
+enum LCM_DFPS_SEND_CMD_SPEED {
+	LCM_DFPS_SEND_CMD_HS,
+	LCM_DFPS_SEND_CMD_LP,
 };
 
 
 /*DynFPS*/
+/*
 enum DynFPS_LEVEL {
 	DFPS_LEVEL0 = 0,
 	DFPS_LEVEL1,
@@ -543,6 +571,7 @@ enum DynFPS_LEVEL {
 };
 
 #define DFPS_LEVELS 2
+*/
 enum FPS_CHANGE_INDEX {
 	DYNFPS_NOT_DEFINED = 0,
 	DYNFPS_DSI_VFP = 1,
@@ -737,7 +766,14 @@ struct LCM_DSI_PARAMS {
 
 	/*for ARR*/
 	unsigned int dynamic_fps_levels;
-	struct dynamic_fps_info dynamic_fps_table[DYNAMIC_FPS_LEVELS];
+	struct dynamic_fps_info dynamic_fps_table[DFPS_LEVELNUM];
+	unsigned int dfps_need_inform_lcm[LCM_DFPS_MAX_FRAME_CMD];
+	unsigned int dfps_send_cmd_way;
+	unsigned int dfps_send_cmd_speed;
+#if 0
+	unsigned int max_fps;
+	unsigned int min_fps;
+#endif
 
 #ifdef CONFIG_MTK_HIGH_FRAME_RATE
 	/****DynFPS start****/
@@ -750,6 +786,7 @@ struct LCM_DSI_PARAMS {
 	/****DynFPS end****/
 #endif
 };
+
 
 /* ------------------------------------------------------------------------- */
 struct LCM_PARAMS {
@@ -970,6 +1007,11 @@ struct LCM_UTIL_FUNCS {
 		unsigned char count, unsigned char *para_list,
 		unsigned char force_update, enum LCM_Send_Cmd_Mode sendmode);
 
+	void (*dsi_arr_send_cmd)(enum LCM_DFPS_SEND_CMD_WAY dfps_send_cmd_way,
+		enum LCM_DFPS_SEND_CMD_SPEED dfps_send_cmd_speed,
+		void *cmdq, unsigned int cmd,
+		unsigned char count, unsigned char *para_list,
+		unsigned char force_update);
 };
 enum LCM_DRV_IOCTL_CMD {
 	LCM_DRV_IOCTL_ENABLE_CMD_MODE = 0x100,
@@ -983,6 +1025,8 @@ struct LCM_DRIVER {
 	void (*init)(void);
 	void (*suspend)(void);
 	void (*resume)(void);
+	void (*set_disp_param)(unsigned int param);
+	int (*get_lockdowninfo_for_tp)(unsigned char *plockdowninfo);
 
 	/* for power-on sequence refinement */
 	void (*init_power)(void);
@@ -1032,10 +1076,16 @@ struct LCM_DRIVER {
 	void (*aod)(int enter);
 
 	/* /////////////DynFPS///////////////////////////// */
-	void (*dfps_send_lcm_cmd)(void *cmdq_handle,
+	void (*dynfps_send_lcm_cmd)(void *cmdq_handle,
 		unsigned int from_level, unsigned int to_level, struct LCM_PARAMS *params);
 	bool (*dfps_need_send_cmd)(
 	unsigned int from_level, unsigned int to_level, struct LCM_PARAMS *params);
+	int (*led_i2c_reg_op)(char *buffer, int op, int count);
+	/* /////////////ARR-DFPS///////////////////////////// */
+	void (*dfps_send_lcm_cmd)(enum LCM_DFPS_SEND_CMD_WAY dfps_send_cmd_way,
+	enum LCM_DFPS_SEND_CMD_SPEED dfps_send_cmd_speed,
+	void *cmdq_handle, unsigned int from_fps, unsigned int to_fps,
+	enum LCM_DFPS_FRAME_ID frame_id);
 };
 
 /* LCM Driver Functions */
@@ -1051,6 +1101,29 @@ extern int display_bias_enable(void);
 extern int display_bias_disable(void);
 extern int display_bias_regulator_init(void);
 
+#ifdef CONFIG_BACKLIGHT_SUPPORT_LM36273
+extern int lm36273_reg_write_bytes(unsigned char addr, unsigned char value) ;
+extern int lm36273_reg_read_bytes(char addr, char *buf);
+extern int lm36273_bl_bias_conf(void);
+extern int lm36273_bias_enable(int enable, int delayMs);
+#else
+int lm36273_reg_write_bytes(unsigned char addr, unsigned char value)
+{
+	return 0;
+}
+int lm36273_reg_read_bytes(char addr, char *buf)
+{
+	return 0;
+}
 
+int lm36273_bl_bias_conf(void)
+{
+	return 0;
+}
+int lm36273_bias_enable(int enable, int delayMs)
+{
+	return 0;
+}
+#endif
 
 #endif /* __LCM_DRV_H__ */

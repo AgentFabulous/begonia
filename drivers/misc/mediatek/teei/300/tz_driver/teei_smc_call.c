@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2019, MICROTRUST Incorporated
+ * Copyright (C) 2021 XiaoMi, Inc.
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -36,7 +37,7 @@ int teei_forward_call(unsigned long long cmd, unsigned long long cmd_addr,
 
 	KATRACE_BEGIN("teei_forward_call");
 
-	cpus_read_lock();
+	teei_cpus_read_lock();
 
 	wait_completion = kmalloc(sizeof(struct completion), GFP_KERNEL);
 	if (wait_completion == NULL) {
@@ -50,7 +51,7 @@ int teei_forward_call(unsigned long long cmd, unsigned long long cmd_addr,
 	if (retVal != 0) {
 		IMSG_ERROR("TEEI: Failed to add_work_entry[%s]\n", __func__);
 		kfree(wait_completion);
-		cpus_read_unlock();
+		teei_cpus_read_unlock();
 		KATRACE_END("teei_forward_call");
 		return retVal;
 	}
@@ -61,7 +62,7 @@ int teei_forward_call(unsigned long long cmd, unsigned long long cmd_addr,
 	if (retVal != 0) {
 		IMSG_ERROR("TEEI: Failed to add one nq to n_t_buffer\n");
 		kfree(wait_completion);
-		cpus_read_unlock();
+		teei_cpus_read_unlock();
 		KATRACE_END("teei_forward_call");
 		return retVal;
 	}
@@ -72,7 +73,7 @@ int teei_forward_call(unsigned long long cmd, unsigned long long cmd_addr,
 
 	kfree(wait_completion);
 
-	cpus_read_unlock();
+	teei_cpus_read_unlock();
 
 	KATRACE_END("teei_forward_call");
 

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,5 +19,7 @@
 /*        i2c interface from ccu_i2c_hw.c */
 /*---------------------------------------------------------------------------*/
 extern int ccu_i2c_set_n3d_base(unsigned long n3d_base);
+extern int ccu_trigger_i2c_hw(enum CCU_I2C_CHANNEL channel,
+	int transac_len, MBOOL do_dma_en);
 
 #endif

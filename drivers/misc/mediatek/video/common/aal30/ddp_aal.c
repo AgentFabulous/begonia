@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -69,7 +70,6 @@
 #endif
 #endif
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
-#include <disp_lowpower.h>
 #include <disp_helper.h>
 #endif
 #include <ddp_aal.h>
@@ -118,6 +118,10 @@
 	defined(CONFIG_MACH_MT6873) || defined(CONFIG_MACH_MT6853) || \
 	defined(CONFIG_MACH_MT6893) || defined(CONFIG_MACH_MT6833)
 #define AAL_SUPPORT_PARTIAL_UPDATE
+#endif
+
+#ifdef CONFIG_MACH_MT6785
+#define  MAX_LEVEL_BIT_CNT (11)
 #endif
 
 /* To enable debug log: */
@@ -1360,7 +1364,6 @@ void disp_aal_on_start_of_frame(enum disp_aal_id_t id)
 #endif
 }
 
-
 #define LOG_INTERVAL_TH 200
 #define LOG_BUFFER_SIZE 4
 static char g_aal_log_buffer[256] = "";
@@ -1435,8 +1438,12 @@ void disp_aal_notify_backlight_changed(int bl_1024)
 	disp_aal_notify_backlight_log(bl_1024);
 
 	disp_aal_exit_idle(__func__, 1);
-
+	#ifdef CONFIG_MACH_MT6785
+	max_backlight = (1 << MAX_LEVEL_BIT_CNT)  -1;
+	#else
 	max_backlight = disp_pwm_get_max_backlight(DISP_PWM0);
+	#endif
+	/* workaround, thermal set the max backlight to 0, so fix the max value*/
 	if (bl_1024 > max_backlight)
 		bl_1024 = max_backlight;
 
@@ -1707,21 +1714,22 @@ int disp_aal_set_param(struct DISP_AAL_PARAM __user *param,
 
 	if (atomic_read(&g_aal_backlight_notified) == 0)
 		backlight_value = 0;
-
+#if 0
 	if (ret == 0)
 		ret |= disp_pwm_set_backlight_cmdq(DISP_PWM0,
 			backlight_value, cmdq);
-
+#endif
 	AAL_DBG("(ESS = %d, DRE[0,8] = %d,%d",
 		g_aal_param.cabc_fltgain_force, g_aal_param.DREGainFltStatus[0],
 		g_aal_param.DREGainFltStatus[8]);
 	AAL_DBG("(latency = %d): ret = %d",
 		g_aal_param.refreshLatency, ret);
-
+#if 0
 	backlight_brightness_set(backlight_value);
-
+#endif
 	disp_aal_flip_sram(cmdq, __func__);
 	disp_aal_trigger_refresh(g_aal_param.refreshLatency);
+	backlight_brightness_set(backlight_value);
 
 	return ret;
 }
@@ -1942,6 +1950,7 @@ static int aal_config(enum DISP_MODULE_ENUM module,
 
 	width = pConfig->dst_w;
 	height = pConfig->dst_h;
+
 	if (pConfig->dst_dirty) {
 #ifdef DISP_PLATFORM_HAS_SHADOW_REG
 		if (disp_helper_get_option(DISP_OPT_SHADOW_REGISTER)) {
@@ -2015,6 +2024,8 @@ static int aal_config(enum DISP_MODULE_ENUM module,
 			module, DISP_REG_GET(DISP_AAL_CFG + offset),
 			DISP_REG_GET(DISP_AAL_SIZE + offset), width, height);
 	}
+	disp_aal_flip_sram(cmdq, __func__);
+
 	disp_aal_flip_sram(cmdq, __func__);
 
 	if ((pConfig->ovl_dirty || pConfig->rdma_dirty) &&

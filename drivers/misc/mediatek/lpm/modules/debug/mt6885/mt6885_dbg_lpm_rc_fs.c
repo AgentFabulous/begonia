@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/console.h>
@@ -578,6 +579,12 @@ int mt6885_dbg_lpm_fs_init(void)
 			MT_LPM_SMC_ACT_SET, MT_RM_CONSTRAINT_ID_SYSPLL, 0);
 	MT6885_DBG_SMC(MT_SPM_DBG_SMC_UID_RC_TRACE,
 			MT_LPM_SMC_ACT_SET, MT_RM_CONSTRAINT_ID_DRAM, 0);
+
+	MT6885_DBG_SMC(MT_SPM_DBG_SMC_UID_RC_RES_CTRL, MT_LPM_SMC_ACT_SET, MT_RM_CONSTRAINT_ID_DRAM, 0);
+	MT6885_DBG_SMC(MT_SPM_DBG_SMC_UID_RC_RES_CTRL, MT_LPM_SMC_ACT_SET, MT_RM_CONSTRAINT_ID_SYSPLL, 0);
+	MT6885_DBG_SMC(MT_SPM_DBG_SMC_UID_RC_RES_CTRL, MT_LPM_SMC_ACT_SET, MT_RM_CONSTRAINT_ID_BUS26M, 0);
+	mtk_lpm_timer_start(&rc_ratio_timer);
+
 	return 0;
 }
 

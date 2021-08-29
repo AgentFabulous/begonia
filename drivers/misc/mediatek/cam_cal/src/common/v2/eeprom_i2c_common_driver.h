@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -25,11 +26,6 @@ unsigned int Common_write_region(struct i2c_client *client,
 				 unsigned int size);
 
 unsigned int DW9763_write_region(struct i2c_client *client,
-				 unsigned int addr,
-				 unsigned char *data,
-				 unsigned int size);
-
-unsigned int BL24SA64_write_region(struct i2c_client *client,
 				 unsigned int addr,
 				 unsigned char *data,
 				 unsigned int size);

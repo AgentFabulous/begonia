@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2020 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -55,7 +56,6 @@
 
 #define VOW_WAITCHECK_INTERVAL_MS      1
 #define MAX_VOW_INFO_LEN               7
-#define VOW_VOICE_RECORD_LOG_THRESHOLD 320
 #define VOW_VOICE_RECORD_THRESHOLD     2560 /* 80ms */
 #define VOW_VOICE_RECORD_BIG_THRESHOLD 8320 /* 260ms */
 #define VOW_IPI_SEND_CNT_TIMEOUT       500 /* 500ms */
@@ -94,12 +94,11 @@
 #define RECOG_DUMP_TOTAL_BYTE_CNT      (RECOG_DUMP_BYTE_CNT * VOW_MAX_MIC_NUM)
 #define VFFP_DUMP_SMPL_CNT             (VOW_FRM_LEN * 16)
 #define VFFP_DUMP_BYTE_CNT             (VFFP_DUMP_SMPL_CNT * sizeof(short))
-#define VFFP_DUMP_TOTAL_BYTE_CNT       (VFFP_DUMP_BYTE_CNT * 2)  /* 2 = 2ch */
+#define VFFP_DUMP_TOTAL_BYTE_CNT       (VFFP_DUMP_BYTE_CNT)
 #define BARGEIN_DUMP_SMPL_CNT_MIC      (VOW_FRM_LEN * 16)
 #define BARGEIN_DUMP_BYTE_CNT_MIC      (BARGEIN_DUMP_SMPL_CNT_MIC * sizeof(short))
 #define BARGEIN_DUMP_SMPL_CNT_ECHO     (VOW_FRM_LEN * 16)
-#define BARGEIN_DUMP_BYTE_CNT_ECHO     (BARGEIN_DUMP_SMPL_CNT_ECHO * sizeof(short) * \
-					VOW_MAX_MIC_NUM)  /* dump size align with mic */
+#define BARGEIN_DUMP_BYTE_CNT_ECHO     (BARGEIN_DUMP_SMPL_CNT_ECHO * sizeof(short))
 #define BARGEIN_DUMP_TOTAL_BYTE_CNT    (BARGEIN_DUMP_BYTE_CNT_MIC * VOW_MAX_MIC_NUM + \
 					BARGEIN_DUMP_BYTE_CNT_ECHO)
 
@@ -145,10 +144,7 @@
 #define VOW_BARGEIN_IRQ_MAX_NUM       32
 #endif  /* #ifdef CONFIG_MTK_VOW_BARGE_IN_SUPPORT */
 
-#define VOICE_DATA_MSG_NUM            10
-
-#define KERNEL_VOW_DRV_VER              "2.0.13"
-#define DEFAULT_GOOGLE_ENGINE_VER       2147483647
+#define KERNEL_VOW_DRV_VER "2.0.13"
 
 struct dump_package_t {
 	uint32_t dump_data_type;
@@ -164,10 +160,8 @@ struct dump_package_t {
 #endif  /* #ifdef CONFIG_MTK_VOW_DUAL_MIC_SUPPORT */
 	uint32_t echo_offset;
 	uint32_t echo_data_size;
-	uint32_t vffp_data_offset_1st_ch;
-	uint32_t vffp_data_size_1st_ch;
-	uint32_t vffp_data_offset_2nd_ch;
-	uint32_t vffp_data_size_2nd_ch;
+	uint32_t vffp_data_offset;
+	uint32_t vffp_data_size;
 };
 
 struct dump_queue_t {
@@ -190,10 +184,8 @@ struct dump_work_t {
 #endif  /* #ifdef CONFIG_MTK_VOW_DUAL_MIC_SUPPORT */
 	uint32_t echo_offset;
 	uint32_t echo_data_size;
-	uint32_t vffp_data_offset_1st_ch;
-	uint32_t vffp_data_size_1st_ch;
-	uint32_t vffp_data_offset_2nd_ch;
-	uint32_t vffp_data_size_2nd_ch;
+	uint32_t vffp_data_offset;
+	uint32_t vffp_data_size;
 };
 
 enum { /* dump_data_t */
@@ -420,11 +412,6 @@ struct vow_payloaddump_info_kernel_t {
 	compat_size_t max_payloaddump_size;
 };
 
-struct voice_data_msg_t {
-	unsigned int offset;
-	unsigned int length;
-};
-
 #else  /* #ifdef CONFIG_COMPAT */
 
 struct vow_speaker_model_t {
@@ -465,11 +452,6 @@ struct vow_payloaddump_info_t {
 	long return_payloaddump_addr;
 	long return_payloaddump_size_addr;
 	long max_payloaddump_size;
-};
-
-struct voice_data_msg_t {
-	unsigned int offset;
-	unsigned int length;
 };
 
 #endif  /* #ifdef CONFIG_COMPAT */
@@ -526,7 +508,6 @@ struct vow_ipi_combined_info_t {
 	unsigned int payloaddump_len;
 	unsigned int vffp_dump_size;
 	unsigned int vffp_dump_offset;
-	unsigned int vffp_dump_offset_2nd_ch;
 };
 
 

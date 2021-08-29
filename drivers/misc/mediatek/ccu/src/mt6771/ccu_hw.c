@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -554,7 +555,6 @@ int ccu_power(struct ccu_power_s *power)
 
 	if (power->bON == 1) {
 		/*CCU power on sequence*/
-		ccu_clock_enable();
 
 		/*0. Set CCU_A_RESET. CCU_HW_RST=1*/
 		/*TSF be affected.*/
@@ -565,6 +565,7 @@ int ccu_power(struct ccu_power_s *power)
 		/*ccu_write_reg_bit(ccu_base, RESET, CCU_HW_RST, 1);*/
 
 		/*1. Enable CCU CAMSYS_CG_CON bit12 CCU_CGPDN=0*/
+		ccu_clock_enable();
 		ccu_irq_enable();
 		LOG_DBG("CCU CG released\n");
 

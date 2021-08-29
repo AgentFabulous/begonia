@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -88,8 +89,8 @@ static struct LCM_UTIL_FUNCS lcm_util;
 #define FRAME_HEIGHT (2340)
 
 /* physical size in um */
-#define LCM_PHYSICAL_WIDTH (68040)
-#define LCM_PHYSICAL_HEIGHT (136080)
+#define LCM_PHYSICAL_WIDTH (69498)
+#define LCM_PHYSICAL_HEIGHT (150579)
 #define LCM_DENSITY (480)
 
 #define REGFLAG_DELAY		0xFFFC
@@ -223,14 +224,16 @@ static struct LCM_setting_table lcm_suspend_setting[] = {
 	{0x28, 0, {} },
 	{REGFLAG_DELAY, 20, {} },
 	{0x10, 0, {} },
-	{REGFLAG_DELAY, 120, {} }
+	{REGFLAG_DELAY, 60, {} }
 };
 
 static struct LCM_setting_table init_setting_vdo[] = {
+	{0xFF, 1, {0x25}},
+	{0xFB, 1, {0x01}},
+	{0x05, 1, {0x04}},
+	{0xFF, 1, {0x10}},
 	{0x11, 0, {} },
 	{REGFLAG_DELAY, 120, {} },
-
-	{0xFF, 1, {0x10} },
 
 	{0x35, 1, {0x00} },
 	{0x51, 2, {0xFF, 0x00} },
@@ -322,20 +325,20 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 
 	params->dsi.PS = LCM_PACKED_PS_24BIT_RGB888;
 
-	params->dsi.vertical_sync_active = 2;
-	params->dsi.vertical_backporch = 10;
-	params->dsi.vertical_frontporch = 10;
+	params->dsi.vertical_sync_active = 1;
+	params->dsi.vertical_backporch = 70;
+	params->dsi.vertical_frontporch = 12;
 	params->dsi.vertical_frontporch_for_low_power = 620;
 	params->dsi.vertical_active_line = FRAME_HEIGHT;
 
-	params->dsi.horizontal_sync_active = 14;
-	params->dsi.horizontal_backporch = 25;
-	params->dsi.horizontal_frontporch = 25;
+	params->dsi.horizontal_sync_active = 4;
+	params->dsi.horizontal_backporch = 24;
+	params->dsi.horizontal_frontporch = 32;
 	params->dsi.horizontal_active_pixel = FRAME_WIDTH;
 	params->dsi.ssc_disable = 1;
 #ifndef CONFIG_FPGA_EARLY_PORTING
 	/* this value must be in MTK suggested table */
-	params->dsi.PLL_CLOCK = 490;
+	params->dsi.PLL_CLOCK = 540;
 #else
 	params->dsi.pll_div1 = 0;
 	params->dsi.pll_div2 = 0;
@@ -343,7 +346,7 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 #endif
 	params->dsi.CLK_HS_POST = 36;
 	params->dsi.clk_lp_per_line_enable = 0;
-	params->dsi.esd_check_enable = 1;
+	params->dsi.esd_check_enable = 0;
 	params->dsi.customization_esd_check_enable = 0;
 	params->dsi.lcm_esd_check_table[0].cmd = 0x53;
 	params->dsi.lcm_esd_check_table[0].count = 1;
@@ -360,55 +363,56 @@ static void lcm_get_params(struct LCM_PARAMS *params)
 
 static void lcm_init_power(void)
 {
+	SET_RESET_PIN(0);
 	if (lcm_util.set_gpio_lcd_enp_bias) {
 		/*HT BL enable*/
-		_lcm_i2c_write_bytes(0x08, 0x17);
-		_lcm_i2c_write_bytes(0x04, 0x07);
-		_lcm_i2c_write_bytes(0x05, 0xff);
-		_lcm_i2c_write_bytes(0x02, 0x68);
-		_lcm_i2c_write_bytes(0x10, 0x06);
+		_lcm_i2c_write_bytes(0x04, 0x06); /* LSB: limit I2C code 1374 level for 20mA*/
+		_lcm_i2c_write_bytes(0x05, 0xab); /* MSB: limit I2C code 1374 level for 20mA*/
+		_lcm_i2c_write_bytes(0x02, 0x6b); /* enable pwm*/
+		_lcm_i2c_write_bytes(0x03, 0xcd); /* 100ms dimming*/
+		_lcm_i2c_write_bytes(0x10, 0x07); /* 24M sample*/
+		_lcm_i2c_write_bytes(0x08, 0x17); /* enable BL and current sink*/
 
 		/*BIAS enable*/
 		//lcm_util.set_gpio_lcd_enp_bias(1);
-		_lcm_i2c_write_bytes(0x09, 0x9e);
-		/*set BIAS to 5.5v*/
-		_lcm_i2c_write_bytes(0x0c, 0x24);
-		_lcm_i2c_write_bytes(0x0d, 0x1e);
-		_lcm_i2c_write_bytes(0x0e, 0x1e);
 
+		/*set BIAS to 5.5v*/
+		_lcm_i2c_write_bytes(0x0c, 0x24); /* set LCM_OUT voltage*/
+		_lcm_i2c_write_bytes(0x0d, 0x1e); /* set vsp to +5.5V*/
+		_lcm_i2c_write_bytes(0x0e, 0x1e); /* set vsn to -5.5V*/
+		_lcm_i2c_write_bytes(0x09, 0x9c); /* enable vsp*/
+		MDELAY(10);
+		_lcm_i2c_write_bytes(0x09, 0x9e); /* enable vsn*/
+		MDELAY(10);
 	} else
 		LCM_LOGI("set_gpio_lcd_enp_bias not defined...\n");
+
+	SET_RESET_PIN(1);
+	MDELAY(130);
 }
 
 static void lcm_suspend_power(void)
 {
-	SET_RESET_PIN(0);
-	if (lcm_util.set_gpio_lcd_enp_bias)
+	if (lcm_util.set_gpio_lcd_enp_bias) {
 		//lcm_util.set_gpio_lcd_enp_bias(0);
+		_lcm_i2c_write_bytes(0x09, 0x9c);
+		MDELAY(10);
 		_lcm_i2c_write_bytes(0x09, 0x98);
-
-	else
+		MDELAY(10);
+	} else
 		LCM_LOGI("set_gpio_lcd_enp_bias not defined...\n");
+
+	SET_RESET_PIN(0);
 }
 
 /* turn on gate ic & control voltage to 5.5V */
 static void lcm_resume_power(void)
 {
-	SET_RESET_PIN(0);
 	lcm_init_power();
 }
 
 static void lcm_init(void)
 {
-	SET_RESET_PIN(0);
-	MDELAY(15);
-	SET_RESET_PIN(1);
-	MDELAY(1);
-	SET_RESET_PIN(0);
-	MDELAY(10);
-
-	SET_RESET_PIN(1);
-	MDELAY(10);
 	push_table(NULL, init_setting_vdo,
 			   sizeof(init_setting_vdo) /
 			   sizeof(struct LCM_setting_table), 1);

@@ -2,6 +2,7 @@
  * mtk_pwm.h PWM Drvier
  *
  * Copyright (c) 2016, Media Teck.inc
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public Licence,
@@ -124,5 +125,6 @@ void mt_set_pwm_3dlcm_inv(u32 pwm_no, u8 inv);
 s32 mt_set_intr_ack(u32 pwm_intr_ack_bit);
 s32 mt_set_intr_enable(u32 pwm_intr_enable_bit);
 s32 mt_get_intr_status(u32 pwm_intr_status_bit);
+void mt_pwm_power_on(u32 pwm_no, bool pmic_pad);
 
 #endif

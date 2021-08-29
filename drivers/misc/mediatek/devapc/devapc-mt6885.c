@@ -1516,8 +1516,6 @@ static const char *mt6885_bus_id_to_master(uint32_t bus_id, uint32_t vio_addr,
 const char *index_to_subsys(int slave_type, uint32_t vio_index,
 		uint32_t vio_addr)
 {
-	int i;
-
 	if (slave_type == SLAVE_TYPE_INFRA &&
 			vio_index < VIO_SLAVE_NUM_INFRA) {
 
@@ -1586,12 +1584,7 @@ const char *index_to_subsys(int slave_type, uint32_t vio_index,
 		case MDP_START ... MDP_END:
 			return "MMSYS_MDP";
 		default:
-			break;
-		}
-
-		for (i = 0; i < VIO_SLAVE_NUM_INFRA; i++) {
-			if (vio_index == mt6885_devices_infra[i].vio_index)
-				return mt6885_devices_infra[i].device;
+			return mt6885_devices_infra[vio_index].device;
 		}
 
 	} else if (slave_type == SLAVE_TYPE_PERI &&
@@ -1606,12 +1599,7 @@ const char *index_to_subsys(int slave_type, uint32_t vio_index,
 		case CONN_VIO_INDEX:
 			return "CONNSYS";
 		default:
-			break;
-		}
-
-		for (i = 0; i < VIO_SLAVE_NUM_PERI; i++) {
-			if (vio_index == mt6885_devices_peri[i].vio_index)
-				return mt6885_devices_peri[i].device;
+			return mt6885_devices_peri[vio_index].device;
 		}
 
 	} else if (slave_type == SLAVE_TYPE_PERI2 &&
@@ -1623,10 +1611,7 @@ const char *index_to_subsys(int slave_type, uint32_t vio_index,
 				 vio_addr <= GCE_M2_END_ADDR))
 			return "GCE";
 
-		for (i = 0; i < VIO_SLAVE_NUM_PERI2; i++) {
-			if (vio_index == mt6885_devices_peri2[i].vio_index)
-				return mt6885_devices_peri2[i].device;
-		}
+		return mt6885_devices_peri2[vio_index].device;
 	}
 
 	return "OUT_OF_BOUND";

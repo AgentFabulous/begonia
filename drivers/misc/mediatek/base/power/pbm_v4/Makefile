@@ -17,15 +17,13 @@ endif
 
 ifeq ($(CONFIG_MACH_MT6833),y)
 	PDIR = mt6833
-else ifeq ($(CONFIG_MACH_MT6893),y)
-	PDIR = mt6893
 else
 	PDIR = $(MTK_PLATFORM)
 endif
 
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/mach/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(PDIR)/include/mach/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/pbm_v4/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/pbm_v4/$(PDIR)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/thermal/$(PDIR)/inc/

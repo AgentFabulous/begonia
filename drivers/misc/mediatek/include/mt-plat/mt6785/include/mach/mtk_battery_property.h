@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,11 +16,11 @@
 #define _MTK_BATTERY_PROPERTY_H
 
 /* customize */
-#define DIFFERENCE_FULLOCV_ITH	200	/* mA */
+#define DIFFERENCE_FULLOCV_ITH	250	/* mA */
 #define MTK_CHR_EXIST 1
 #define KEEP_100_PERCENT 1
 #define R_FG_VALUE	5				/* mOhm */
-#define EMBEDDED_SEL 0
+#define EMBEDDED_SEL 1
 #define PMIC_SHUTDOWN_CURRENT 20	/* 0.01 mA */
 #define FG_METER_RESISTANCE	100
 #define CAR_TUNE_VALUE	100 /*1.00 */
@@ -76,7 +77,7 @@
 #define DIFFERENCE_FULL_CV 1000 /*0.01%*/
 #define PSEUDO1_EN 1
 #define PSEUDO100_EN 1
-#define PSEUDO100_EN_DIS 1
+#define PSEUDO100_EN_DIS 0
 
 #define DIFF_SOC_SETTING 50	/* 0.01% */
 #define DIFF_BAT_TEMP_SETTING 1
@@ -211,7 +212,7 @@
 
 #define MULTI_TEMP_GAUGE0 1	/* different temp using different gauge 0% */
 
-#define OVER_DISCHARGE_LEVEL -1500
+#define OVER_DISCHARGE_LEVEL -2000
 
 #define UISOC_UPDATE_TYPE 0
 /*
@@ -223,28 +224,28 @@
 
 /* using current to limit uisoc in 100% case*/
 /* UI_FULL_LIMIT_ITH0 3000 means 300ma */
-#define UI_FULL_LIMIT_EN 0
-#define UI_FULL_LIMIT_SOC0 9900
-#define UI_FULL_LIMIT_ITH0 2200
+#define UI_FULL_LIMIT_EN 1
+#define UI_FULL_LIMIT_SOC0 9800
+#define UI_FULL_LIMIT_ITH0 6000
 
-#define UI_FULL_LIMIT_SOC1 9900
-#define UI_FULL_LIMIT_ITH1 2200
+#define UI_FULL_LIMIT_SOC1 9800
+#define UI_FULL_LIMIT_ITH1 6000
 
 #define UI_FULL_LIMIT_SOC2 9900
-#define UI_FULL_LIMIT_ITH2 2200
+#define UI_FULL_LIMIT_ITH2 4000
 
 #define UI_FULL_LIMIT_SOC3 9900
-#define UI_FULL_LIMIT_ITH3 2200
+#define UI_FULL_LIMIT_ITH3 4000
 
 #define UI_FULL_LIMIT_SOC4 9900
-#define UI_FULL_LIMIT_ITH4 2200
+#define UI_FULL_LIMIT_ITH4 4000
 
 #define UI_FULL_LIMIT_TIME 99999
 
 
 /* using voltage to limit uisoc in 1% case */
 /* UI_LOW_LIMIT_VTH0=36000 means 3.6v */
-#define UI_LOW_LIMIT_EN 0
+#define UI_LOW_LIMIT_EN 1
 
 #define UI_LOW_LIMIT_SOC0 200
 #define UI_LOW_LIMIT_VTH0 34500

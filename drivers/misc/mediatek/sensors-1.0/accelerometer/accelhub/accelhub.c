@@ -1,6 +1,7 @@
 /* accelhub motion sensor driver
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,6 +20,8 @@
 #include <SCP_sensorHub.h>
 #include <accel.h>
 #include <hwmsensor.h>
+
+#define XIAOMI_FACTORY_CALIBRATION 1
 
 #define DEBUG 1
 #define SW_CALIBRATION
@@ -529,7 +532,20 @@ static int gsensor_factory_get_raw_data(int32_t data[3])
 }
 static int gsensor_factory_enable_calibration(void)
 {
+#if XIAOMI_FACTORY_CALIBRATION
+	int err = 0;
+	struct acc_data data;
+	struct accelhub_ipi_data *obj = obj_ipi_data;
+	spin_lock(&calibration_lock);
+	data.x = obj->static_cali[0];
+	data.y = obj->static_cali[1];
+	data.z = obj->static_cali[2];
+	spin_unlock(&calibration_lock);
+	err = acc_cali_report(&data);
+	return err;
+#else
 	return sensor_calibration_to_hub(ID_ACCELEROMETER);
+#endif
 }
 static int gsensor_factory_clear_cali(void)
 {
@@ -546,6 +562,24 @@ static int gsensor_factory_clear_cali(void)
 }
 static int gsensor_factory_set_cali(int32_t data[3])
 {
+#if XIAOMI_FACTORY_CALIBRATION
+	struct accelhub_ipi_data *obj = obj_ipi_data;
+	int32_t cali_data[6] = {0};
+
+	pr_err("gsensor_factory_set_cali data: (%d, %d, %d)!\n", data[0], data[1], data[2]);
+
+	spin_lock(&calibration_lock);
+	obj->static_cali[0] = data[0];
+	obj->static_cali[1] = data[1];
+	obj->static_cali[2] = data[2];
+
+	cali_data[3] = data[0];
+	cali_data[4] = data[1];
+	cali_data[5] = data[2];
+	spin_unlock(&calibration_lock);
+
+	return sensor_cfg_to_hub(ID_ACCELEROMETER, (uint8_t *)cali_data, sizeof(int32_t) * 6);
+#else
 #ifdef MTK_OLD_FACTORY_CALIBRATION
 	int err = 0;
 
@@ -556,10 +590,19 @@ static int gsensor_factory_set_cali(int32_t data[3])
 	}
 #endif
 	return 0;
+#endif
 }
 static int gsensor_factory_get_cali(int32_t data[3])
 {
 	int err = 0;
+#if XIAOMI_FACTORY_CALIBRATION
+	struct accelhub_ipi_data *obj = obj_ipi_data;
+	spin_lock(&calibration_lock);
+	data[ACCELHUB_AXIS_X] = obj->static_cali[ACCELHUB_AXIS_X];
+	data[ACCELHUB_AXIS_Y] = obj->static_cali[ACCELHUB_AXIS_Y];
+	data[ACCELHUB_AXIS_Z] = obj->static_cali[ACCELHUB_AXIS_Z];
+	spin_unlock(&calibration_lock);
+#else
 #ifndef MTK_OLD_FACTORY_CALIBRATION
 	struct accelhub_ipi_data *obj = obj_ipi_data;
 	uint8_t status = 0;
@@ -589,7 +632,8 @@ static int gsensor_factory_get_cali(int32_t data[3])
 		return -2;
 	}
 #endif
-	return 0;
+#endif
+	return err;
 }
 static int gsensor_factory_do_self_test(void)
 {
@@ -693,6 +737,9 @@ static int gsensor_set_cali(uint8_t *data, uint8_t count)
 {
 	int32_t *buf = (int32_t *)data;
 	struct accelhub_ipi_data *obj = obj_ipi_data;
+
+	pr_err("gsensor_set_cali data: (%d, %d, %d)!\n", buf[0], buf[1], buf[2]);
+	pr_err("gsensor_set_cali data: (%d, %d, %d)!\n", buf[3], buf[4], buf[5]);
 
 	spin_lock(&calibration_lock);
 	obj->dynamic_cali[0] = buf[0];

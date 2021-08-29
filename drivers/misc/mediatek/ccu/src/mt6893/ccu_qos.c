@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,7 +17,7 @@
 #include "ccu_hw.h"
 #include <mmdvfs_pmqos.h>
 #include "mt6885-larb-port.h"
-static PLIST_HEAD(ccu_request_list);
+static struct plist_head ccu_request_list;
 static struct mm_qos_request pccu_i_request;
 static struct mm_qos_request pccu_g_request;
 static struct mm_qos_request pccu_o_request;
@@ -31,6 +32,8 @@ void ccu_qos_init(void)
 	mutex_lock(&ccu_qos_mutex);
 
 	LOG_DBG_MUST("ccu qos init+");
+	/*Initialize request list*/
+	plist_head_init(&ccu_request_list);
 
 	/*Add request for dram input, output and single access*/
 	mm_qos_add_request(&ccu_request_list, &pccu_i_request,

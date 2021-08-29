@@ -39,7 +39,6 @@ enum _ENUM_BTIF_DBG_ID_ {
 	BTIF_ENABLE_RT_LOG = BTIF_DUMP_BTIF_REG + 1,
 	BTIF_DISABLE_RT_LOG = BTIF_ENABLE_RT_LOG + 1,
 	BTIF_DUMP_BTIF_IRQ = BTIF_DISABLE_RT_LOG + 1,
-	BTIF_DUMP_DMA_VFIFO = BTIF_DUMP_BTIF_IRQ + 1,
 	BTIF_DBG_MAX,
 };
 
@@ -290,20 +289,6 @@ int mtk_btif_exp_rx_has_pending_data(unsigned long u_id);
  *  negative means fail
  *****************************************************************************/
 int mtk_btif_exp_tx_has_pending_data(unsigned long u_id);
-
-/*****************************************************************************
- * FUNCTION
- *  mtk_btif_is_tx_complete
- * DESCRIPTION
- *  Check if tx is complete
- * PARAMETERS
- *  u_id      [IN] btif index
- * RETURNS
- *  positive means tx is complete
- *  zeor means tx is ongoing
- *  negative means fail
- *****************************************************************************/
-int mtk_btif_is_tx_complete(unsigned long u_id);
 
 /*****************************************************************************
  * FUNCTION

@@ -68,7 +68,6 @@ bool is_adsp_system_running(void)
 	}
 	return false;
 }
-EXPORT_SYMBOL(is_adsp_system_running);
 
 void __iomem *adsp_get_sharedmem_base(struct adsp_priv *pdata, int id)
 {

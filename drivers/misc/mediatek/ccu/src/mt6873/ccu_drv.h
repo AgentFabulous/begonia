@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -48,11 +49,6 @@ enum CCU_IRQ_TYPE_ENUM {
 
 enum CCU_ST_ENUM {
 	CCU_SIGNAL_INT = 0, CCU_DMA_INT, CCU_IRQ_ST_AMOUNT
-};
-
-enum CCU_BIN_TYPE {
-	CCU_DP_BIN,
-	CCU_DDR_BIN
 };
 
 struct CCU_IRQ_TIME_STRUCT {
@@ -275,19 +271,6 @@ struct compat_ccu_power_s {
 	struct compat_ccu_working_buffer_s workBuf;
 };
 #endif
-
-/*---------------------------------------------------------------------------*/
-/*  CCU Run                                                                */
-/*---------------------------------------------------------------------------*/
-struct ccu_run_s {
-	uint32_t log_level;
-	uint32_t log_taglevel;
-	uint32_t CtrlBufMva;
-	uint32_t CpuRefBufMva;
-	uint32_t CpuRefBufSz;
-	uint32_t bkdata_ddr_buf_mva;
-};
-
 /*---------------------------------------------------------------------------*/
 /*  CCU command                                                              */
 /*---------------------------------------------------------------------------*/
@@ -317,14 +300,6 @@ struct import_mem_s {
 };
 
 /*---------------------------------------------------------------------------*/
-/*  CCU Read/Write Reg                                                       */
-/*---------------------------------------------------------------------------*/
-struct ccu_reg_s {
-	uint32_t reg_no;
-	uint32_t reg_val;
-};
-
-/*---------------------------------------------------------------------------*/
 /*  CAM FREQ                                                                 */
 /*---------------------------------------------------------------------------*/
 #define CCU_REQ_CAM_FREQ_HIGH 2
@@ -343,30 +318,24 @@ struct ccu_reg_s {
 #define CCU_IOCTL_WAIT_AF_IRQ               _IOW(CCU_MAGICNO,   8, int)
 #define CCU_IOCTL_WAIT_IRQ                  _IOW(CCU_MAGICNO,   9, int)
 #define CCU_IOCTL_SEND_CMD                  _IOWR(CCU_MAGICNO, 10, int)
-#define CCU_IOCTL_SET_RUN                   _IOW(CCU_MAGICNO,   11, int)
+#define CCU_IOCTL_SET_RUN                   _IO(CCU_MAGICNO,   11)
 
 #define CCU_CLEAR_IRQ                       _IOW(CCU_MAGICNO,  12, int)
 #define CCU_REGISTER_IRQ_USER_KEY           _IOR(CCU_MAGICNO,  13, int)
 #define CCU_READ_REGISTER                   _IOWR(CCU_MAGICNO, 14, int)
 #define CCU_WRITE_REGISTER                  _IOWR(CCU_MAGICNO, 15, int)
-#define CCU_READ_STRUCT_SIZE                _IOWR(CCU_MAGICNO,  16, int)
-#define CCU_IOCTL_PRINT_REG                 _IOR(CCU_MAGICNO,  17, int)
-#define CCU_IOCTL_PRINT_SRAM_LOG            _IOR(CCU_MAGICNO,  18, int)
 
-#define CCU_IOCTL_SET_WORK_BUF              _IOW(CCU_MAGICNO,  19, int)
-#define CCU_IOCTL_FLUSH_LOG                 _IOW(CCU_MAGICNO,  20, int)
+#define CCU_IOCTL_SET_WORK_BUF              _IOW(CCU_MAGICNO,  18, int)
+#define CCU_IOCTL_FLUSH_LOG                 _IOW(CCU_MAGICNO,  19, int)
 
+#define CCU_IOCTL_GET_I2C_DMA_BUF_ADDR      _IOR(CCU_MAGICNO,  20, int)
+#define CCU_IOCTL_SET_I2C_MODE              _IOW(CCU_MAGICNO,  21, int)
 #define CCU_IOCTL_GET_CURRENT_FPS           _IOR(CCU_MAGICNO,  23, int)
+#define CCU_IOCTL_GET_SENSOR_I2C_SLAVE_ADDR _IOR(CCU_MAGICNO,  24, int)
 #define CCU_IOCTL_GET_SENSOR_NAME           _IOR(CCU_MAGICNO,  25, int)
 #define CCU_IOCTL_GET_PLATFORM_INFO         _IOR(CCU_MAGICNO,  26, int)
-#define CCU_IOCTL_IMPORT_MEM                _IOW(CCU_MAGICNO,  27, int)
+#define CCU_IOCTL_IMPORT_MEM		        _IOW(CCU_MAGICNO,  27, int)
 #define CCU_IOCTL_UPDATE_QOS_REQUEST        _IOW(CCU_MAGICNO,  28, int)
-#define CCU_IOCTL_UPDATE_CAM_FREQ_REQUEST   _IOW(CCU_MAGICNO,  29, int)
-
-#define CCU_IOCTL_LOAD_CCU_BIN        _IOW(CCU_MAGICNO,  30, int)
-#define CCU_IOCTL_IPC_INIT                  _IOW(CCU_MAGICNO,  31, int)
-#define CCU_IOCTL_IPC_SEND_CMD              _IOW(CCU_MAGICNO,  32, int)
-#define CCU_IOCTL_ALLOC_MEM                 _IOW(CCU_MAGICNO,  33, int)
-#define CCU_IOCTL_DEALLOC_MEM               _IOW(CCU_MAGICNO,  34, int)
+#define CCU_IOCTL_UPDATE_CAM_FREQ_REQUEST	_IOW(CCU_MAGICNO,  29, int)
 
 #endif

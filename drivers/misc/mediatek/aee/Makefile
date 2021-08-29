@@ -16,8 +16,12 @@ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/videox/
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/mrdump
 
-ifdef CONFIG_DRM_MEDIATEK
+ifdef CONFIG_DRM_MEDIATEK_BOMB
 subdir-ccflags-y += -I$(srctree)/drivers/gpu/drm/mediatek/
+endif
+
+ifdef CONFIG_DRM_MEDIATEK_CANNON
+subdir-ccflags-y += -I$(srctree)/drivers/gpu/drm/mediatek_cannon/
 endif
 
 subdir-ccflags-y += -I$(srctree)/drivers/watchdog/mediatek/include/

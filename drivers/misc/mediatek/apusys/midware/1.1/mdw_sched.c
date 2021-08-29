@@ -263,13 +263,17 @@ int mdw_sched_dev_routine(void *arg)
 		mdw_flw_debug("\n");
 		ret = wait_for_completion_interruptible(&d->cmplt);
 		if (ret)
-			goto next;
+			goto direc_next;
 
 		sc = (struct mdw_apu_sc *)d->sc;
 		if (!sc) {
 			mdw_drv_warn("no sc to exec\n");
-			goto next;
+			goto direc_next;
 		}
+
+		mdw_trace_begin("dev(%s-%d) exec|sc(0x%llx-%d) boost(%d/%u)",
+			d->name, d->idx, sc->parent->kid, sc->idx,
+			h.boost_val, sc->boost);
 
 		/* get mem ctx */
 		if (cmd_parser->get_ctx(sc)) {
@@ -281,10 +285,6 @@ int mdw_sched_dev_routine(void *arg)
 		/* construct cmd hnd */
 		mdw_queue_boost(sc);
 		cmd_parser->set_hnd(sc, d->idx, &h);
-
-		mdw_trace_begin("dev(%s-%d) exec|sc(0x%llx-%d) boost(%d/%u)",
-			d->name, d->idx, sc->parent->kid, sc->idx,
-			h.boost_val, sc->boost);
 
 		/*
 		 * Execute reviser to switch VLM:
@@ -329,10 +329,10 @@ int mdw_sched_dev_routine(void *arg)
 		mdw_flw_debug("sc(0x%llx-#%d) ref(%d)\n", sc->parent->kid,
 			sc->idx, kref_read(&sc->multi_ref));
 		kref_put(&sc->multi_ref, mdw_sched_enque_done_sc);
-
+next:
 		mdw_trace_end("dev(%s-%d) exec|boost(%d)",
 			d->name, d->idx, h.boost_val);
-next:
+direc_next:
 		mdw_flw_debug("done\n");
 		continue;
 	}

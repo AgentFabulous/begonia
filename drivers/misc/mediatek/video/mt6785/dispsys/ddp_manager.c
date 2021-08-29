@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -33,6 +34,7 @@
 
 #include "ddp_log.h"
 #include "disp_drv_platform.h"
+//#include "primary_display.h"
 
 /* #define __GED_NOTIFICATION_SUPPORT__ */
 #ifdef __GED_NOTIFICATION_SUPPORT__
@@ -1572,7 +1574,7 @@ static int is_module_in_path(enum DISP_MODULE_ENUM module,
 
 	return 0;
 }
-
+extern int primary_display_set_panel_param(unsigned int param);
 int dpmgr_path_user_cmd(disp_path_handle dp_handle, unsigned int msg,
 			unsigned long arg, void *cmdqhandle)
 {
@@ -1649,6 +1651,11 @@ int dpmgr_path_user_cmd(disp_path_handle dp_handle, unsigned int msg,
 		ret = disp_color_ioctl(DISP_MODULE_COLOR0, msg, arg,
 				       cmdqhandle);
 		break;
+	case DISP_IOCTL_SET_PANEL_PARAM:
+		{
+			primary_display_set_panel_param(arg);
+			break;
+		}
 	default:
 		DISP_LOG_W("%s io not supported\n", __func__);
 		break;

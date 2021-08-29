@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,6 +22,13 @@
 #include "SCP_power_monitor.h"
 #include <linux/pm_wakeup.h>
 
+#define XIAOMI_FACTORY_CALIBRATION 1
+#define ALS_CALI_INFO_SET_SCALE 0
+#define AMBIENT_LCD_BACKLIGHT_HIGH 13
+#define AMBIENT_LCD_BACKLIGHT_LOW 14
+#define AMBIENT_FROM_PROXIMITY 15
+
+#define AMBIENT_LCD_BACKLIGHT_VALUE 100
 
 #define ALSPSHUB_DEV_NAME     "alsps_hub_pl"
 
@@ -37,7 +45,14 @@ struct alspshub_ipi_data {
 	u16		als;
 	u8		ps;
 	int		ps_cali;
+	int32_t		ps_thd_cali[4];
 	atomic_t	als_cali;
+	int32_t		backlight_high;
+	int32_t		backlight_low;
+	int32_t		high_bias;
+	int32_t		low_bias;
+	int32_t		ch0_ps;
+	int32_t		ch1_ps;
 	atomic_t	ps_thd_val_high;
 	atomic_t	ps_thd_val_low;
 	ulong		enable;
@@ -47,6 +62,10 @@ struct alspshub_ipi_data {
 	bool als_android_enable;
 	bool ps_android_enable;
 	struct wakeup_source ps_wake_lock;
+	struct completion ps_calibration_done;
+
+	struct work_struct cabc_notify_work;
+	int16_t cabc_backlight_value;
 };
 
 static struct alspshub_ipi_data *obj_ipi_data;
@@ -285,16 +304,94 @@ static void alspshub_init_done_work(struct work_struct *work)
 {
 	struct alspshub_ipi_data *obj = obj_ipi_data;
 	int err = 0;
+#if XIAOMI_FACTORY_CALIBRATION
+	int32_t cfg_data[4] = {0};
+#else
 #ifndef MTK_OLD_FACTORY_CALIBRATION
 	int32_t cfg_data[2] = {0};
 #endif
-
+#endif
 	if (atomic_read(&obj->scp_init_done) == 0) {
 		pr_err("wait for nvram to set calibration\n");
 		return;
 	}
 	if (atomic_xchg(&obj->first_ready_after_boot, 1) == 0)
 		return;
+#if XIAOMI_FACTORY_CALIBRATION
+	spin_lock(&calibration_lock);
+	cfg_data[0] = obj->ps_thd_cali[0];
+	cfg_data[1] = obj->ps_thd_cali[1];
+	cfg_data[2] = obj->ps_thd_cali[2];
+	cfg_data[3] = obj->ps_thd_cali[3];
+	spin_unlock(&calibration_lock);
+	pr_info("alspshub_init_done_work 1 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+	err = sensor_cfg_to_hub(ID_PROXIMITY,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub ps fail\n");
+
+	cfg_data[0] = AMBIENT_LCD_BACKLIGHT_HIGH;
+	cfg_data[1] = obj->backlight_high;
+	cfg_data[2] = obj->high_bias;
+	cfg_data[3] = 0;
+	err = sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	pr_info("alspshub_init_done_work 2 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+	msleep(20);
+
+	cfg_data[0] = AMBIENT_LCD_BACKLIGHT_LOW;
+	cfg_data[1] = obj->backlight_low;
+	cfg_data[2] = obj->low_bias;
+	cfg_data[3] = 0;
+	err = sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	pr_info("alspshub_init_done_work 3 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+	msleep(20);
+
+	spin_lock(&calibration_lock);
+	cfg_data[0] = ALS_CALI_INFO_SET_SCALE;
+	cfg_data[1] = atomic_read(&obj->als_cali);
+	spin_unlock(&calibration_lock);
+	err = sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	pr_info("alspshub_init_done_work 4 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+	msleep(20);
+
+	cfg_data[0] = AMBIENT_FROM_PROXIMITY;
+	cfg_data[1] = obj->ch0_ps;
+	cfg_data[2] = obj->ch1_ps;
+	cfg_data[3] = 0;
+	err = sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	pr_info("alspshub_init_done_work 4 [%d, %d, %d, %d]\n",
+		cfg_data[0], cfg_data[1],
+		cfg_data[2], cfg_data[3]);
+
+#else
 #ifdef MTK_OLD_FACTORY_CALIBRATION
 	err = sensor_set_cmd_to_hub(ID_PROXIMITY,
 		CUST_ACTION_SET_CALI, &obj->ps_cali);
@@ -303,8 +400,8 @@ static void alspshub_init_done_work(struct work_struct *work)
 			ID_PROXIMITY, CUST_ACTION_SET_CALI);
 #else
 	spin_lock(&calibration_lock);
-	cfg_data[0] = atomic_read(&obj->ps_thd_val_high);
-	cfg_data[1] = atomic_read(&obj->ps_thd_val_low);
+	cfg_data[0] = atomic_read(&obj->ps_thd_val_low);
+	cfg_data[1] = atomic_read(&obj->ps_thd_val_high);
 	spin_unlock(&calibration_lock);
 	err = sensor_cfg_to_hub(ID_PROXIMITY,
 		(uint8_t *)cfg_data, sizeof(cfg_data));
@@ -319,10 +416,12 @@ static void alspshub_init_done_work(struct work_struct *work)
 	if (err < 0)
 		pr_err("sensor_cfg_to_hub als fail\n");
 #endif
+#endif
 }
 static int ps_recv_data(struct data_unit_t *event, void *reserved)
 {
 	int err = 0;
+	int cali_data[4] = {0};
 	struct alspshub_ipi_data *obj = obj_ipi_data;
 
 	if (!obj)
@@ -338,10 +437,15 @@ static int ps_recv_data(struct data_unit_t *event, void *reserved)
 			(int64_t)event->time_stamp);
 	} else if (event->flush_action == CALI_ACTION) {
 		spin_lock(&calibration_lock);
-		atomic_set(&obj->ps_thd_val_high, event->data[0]);
-		atomic_set(&obj->ps_thd_val_low, event->data[1]);
+		obj->ps_thd_cali[2] = event->data[0];
+		obj->ps_thd_cali[3] = event->data[1];
+		cali_data[0] = obj->ps_thd_cali[0];
+		cali_data[1] = obj->ps_thd_cali[1];
+		cali_data[2] = obj->ps_thd_cali[2];
+		cali_data[3] = obj->ps_thd_cali[3];
 		spin_unlock(&calibration_lock);
-		err = ps_cali_report(event->data);
+		complete(&obj->ps_calibration_done);
+		err = ps_cali_report(cali_data);
 	}
 	return err;
 }
@@ -435,19 +539,41 @@ static int alshub_factory_clear_cali(void)
 {
 	return 0;
 }
-static int alshub_factory_set_cali(int32_t offset)
+static int alshub_factory_set_cali(PS_CALI_DATA cali)
 {
 	struct alspshub_ipi_data *obj = obj_ipi_data;
 	int err = 0;
-	int32_t cfg_data;
+	int32_t cfg_data[4] = {0};
 
-	cfg_data = offset;
+	pr_info("alshub_factory_set_cali [%d, %d, %d, %d]\n",
+		cali.threshold0, cali.threshold1,
+		cali.threshold2, cali.threshold3);
+	cfg_data[0] = cali.threshold0;
+	cfg_data[1] = cali.threshold1;
+	cfg_data[2] = cali.threshold2;
+	cfg_data[3] = cali.threshold3;
+
+	if (cfg_data[0] == AMBIENT_LCD_BACKLIGHT_HIGH) {
+		obj->backlight_high = cali.threshold1;
+		obj->high_bias = cali.threshold2;
+	} else if (cfg_data[0] == AMBIENT_LCD_BACKLIGHT_LOW) {
+		obj->backlight_low = cali.threshold1;
+		obj->low_bias = cali.threshold2;
+	} else if (cfg_data[0] == ALS_CALI_INFO_SET_SCALE) {
+		atomic_set(&obj->als_cali, cali.threshold1);
+	} else if (cfg_data[0] == AMBIENT_FROM_PROXIMITY) {
+		obj->ch0_ps = cali.threshold1;
+		obj->ch1_ps = cali.threshold2;
+	}
+
 	err = sensor_cfg_to_hub(ID_LIGHT,
-		(uint8_t *)&cfg_data, sizeof(cfg_data));
+		(uint8_t *)cfg_data, sizeof(cfg_data));
 	if (err < 0)
 		pr_err("sensor_cfg_to_hub fail\n");
-	atomic_set(&obj->als_cali, offset);
-	als_cali_report(&cfg_data);
+
+	if (cfg_data[0] == ALS_CALI_INFO_SET_SCALE) {
+		als_cali_report(&cfg_data[1]);
+	}
 
 	return err;
 
@@ -455,8 +581,8 @@ static int alshub_factory_set_cali(int32_t offset)
 static int alshub_factory_get_cali(int32_t *offset)
 {
 	struct alspshub_ipi_data *obj = obj_ipi_data;
-
 	*offset = atomic_read(&obj->als_cali);
+	pr_info("alshub_factory_get_cali *offset: %d!\n", *offset);
 	return 0;
 }
 static int pshub_factory_enable_sensor(bool enable_disable,
@@ -542,34 +668,55 @@ static int pshub_factory_get_cali(int32_t *offset)
 	*offset = obj->ps_cali;
 	return 0;
 }
-static int pshub_factory_set_threshold(int32_t threshold[2])
+static int pshub_factory_set_threshold(PS_CALI_DATA thd_cali)
 {
 	int err = 0;
 	struct alspshub_ipi_data *obj = obj_ipi_data;
-#ifndef MTK_OLD_FACTORY_CALIBRATION
-	int32_t cfg_data[2] = {0};
-#endif
-	if (threshold[0] < threshold[1] || threshold[0] <= 0 ||
-		threshold[1] <= 0) {
-		pr_err("PS set threshold fail! invalid value:[%d, %d]\n",
-			threshold[0], threshold[1]);
-		return -1;
-	}
+#if XIAOMI_FACTORY_CALIBRATION
+	int32_t cfg_data[4] = {0};
+
+	pr_err("pshub_factory_set_threshold [%d, %d, %d, %d]\n",
+		thd_cali.threshold0, thd_cali.threshold1,
+		thd_cali.threshold2, thd_cali.threshold3);
 
 	spin_lock(&calibration_lock);
-	atomic_set(&obj->ps_thd_val_high, (threshold[0] + obj->ps_cali));
-	atomic_set(&obj->ps_thd_val_low, (threshold[1] + obj->ps_cali));
+	obj->ps_thd_cali[0] = thd_cali.threshold0;
+	obj->ps_thd_cali[1] = thd_cali.threshold1;
+	obj->ps_thd_cali[2] = thd_cali.threshold2;
+	obj->ps_thd_cali[3] = thd_cali.threshold3;
+
+	cfg_data[0] = obj->ps_thd_cali[0];
+	cfg_data[1] = obj->ps_thd_cali[1];
+	cfg_data[2] = obj->ps_thd_cali[2];
+	cfg_data[3] = obj->ps_thd_cali[3];
+	spin_unlock(&calibration_lock);
+	err = sensor_cfg_to_hub(ID_PROXIMITY,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+	ps_cali_report(cfg_data);
+#else
+#ifndef MTK_OLD_FACTORY_CALIBRATION
+	int32_t cfg_data[4] = {0};
+#endif
+
+	spin_lock(&calibration_lock);
+	obj->ps_thd_cali[0] = thd_cali[0];
+	obj->ps_thd_cali[1] = thd_cali[1];
 	spin_unlock(&calibration_lock);
 #ifdef MTK_OLD_FACTORY_CALIBRATION
 	err = sensor_set_cmd_to_hub(ID_PROXIMITY,
-		CUST_ACTION_SET_PS_THRESHOLD, threshold);
+		CUST_ACTION_SET_PS_THRESHOLD, thd_cali);
 	if (err < 0)
 		pr_err("sensor_set_cmd_to_hub fail, (ID:%d),(action:%d)\n",
 			ID_PROXIMITY, CUST_ACTION_SET_PS_THRESHOLD);
 #else
 	spin_lock(&calibration_lock);
-	cfg_data[0] = atomic_read(&obj->ps_thd_val_high);
-	cfg_data[1] = atomic_read(&obj->ps_thd_val_low);
+	cfg_data[0] = obj->ps_thd_cali[0];
+	cfg_data[1] = obj->ps_thd_cali[1];
+	cfg_data[2] = obj->ps_thd_cali[2];
+	cfg_data[3] = obj->ps_thd_cali[3];
 	spin_unlock(&calibration_lock);
 	err = sensor_cfg_to_hub(ID_PROXIMITY,
 		(uint8_t *)cfg_data, sizeof(cfg_data));
@@ -578,18 +725,41 @@ static int pshub_factory_set_threshold(int32_t threshold[2])
 
 	ps_cali_report(cfg_data);
 #endif
+#endif
 	return err;
 }
 
-static int pshub_factory_get_threshold(int32_t threshold[2])
+static int pshub_factory_get_threshold(PS_CALI_DATA *thd_cali)
 {
+	int err = 0;
 	struct alspshub_ipi_data *obj = obj_ipi_data;
+#if XIAOMI_FACTORY_CALIBRATION
+	pr_err("pshub_factory_get_threshold [%d, %d, %d, %d]\n",
+		obj->ps_thd_cali[0], obj->ps_thd_cali[1],
+		obj->ps_thd_cali[2], obj->ps_thd_cali[3]);
 
 	spin_lock(&calibration_lock);
-	threshold[0] = atomic_read(&obj->ps_thd_val_high) - obj->ps_cali;
-	threshold[1] = atomic_read(&obj->ps_thd_val_low) - obj->ps_cali;
+	thd_cali->threshold0 = obj->ps_thd_cali[0];
+	thd_cali->threshold1 = obj->ps_thd_cali[1];
+	thd_cali->threshold2 = obj->ps_thd_cali[2];
+	thd_cali->threshold3 = obj->ps_thd_cali[3];
+	spin_unlock(&calibration_lock);
+	return err;
+#else
+	err = wait_for_completion_timeout(&obj->ps_calibration_done,
+					  msecs_to_jiffies(3000));
+	if (!err) {
+		pr_err("get proximity cali fail\n");
+		return -1;
+	}
+	spin_lock(&calibration_lock);
+	thd_cali[0] = obj->ps_thd_cali[0];
+	thd_cali[1] = obj->ps_thd_cali[1];
+	thd_cali[2] = obj->ps_thd_cali[2];
+	thd_cali[3] = obj->ps_thd_cali[3];
 	spin_unlock(&calibration_lock);
 	return 0;
+#endif
 }
 
 static struct alsps_factory_fops alspshub_factory_fops = {
@@ -689,11 +859,64 @@ static int als_set_cali(uint8_t *data, uint8_t count)
 {
 	int32_t *buf = (int32_t *)data;
 	struct alspshub_ipi_data *obj = obj_ipi_data;
+	int32_t cfg_data[4] = {0};
 
-	spin_lock(&calibration_lock);
-	atomic_set(&obj->als_cali, buf[0]);
-	spin_unlock(&calibration_lock);
-	return sensor_cfg_to_hub(ID_LIGHT, data, count);
+	pr_info("als_set_cali [%d, %d, %d, %d]\n",
+		buf[0], buf[1], buf[2], buf[3]);
+
+	cfg_data[0] = buf[0];
+	cfg_data[1] = buf[1];
+	cfg_data[2] = buf[2];
+	cfg_data[3] = buf[3];
+
+	if (cfg_data[0] == AMBIENT_LCD_BACKLIGHT_HIGH) {
+		obj->backlight_high = cfg_data[1];
+		obj->high_bias = cfg_data[2];
+	} else if (cfg_data[0] == AMBIENT_LCD_BACKLIGHT_LOW) {
+		obj->backlight_low = cfg_data[1];
+		obj->low_bias = cfg_data[2];
+	} else if (cfg_data[0] == ALS_CALI_INFO_SET_SCALE) {
+		spin_lock(&calibration_lock);
+		atomic_set(&obj->als_cali, buf[1]);
+		spin_unlock(&calibration_lock);
+		pr_info("als_set_cali buf: %d!\n", buf[1]);
+		pr_info("als_set_cali *offset: %d!\n", atomic_read(&obj->als_cali));
+	} else if (cfg_data[0] == AMBIENT_FROM_PROXIMITY) {
+		obj->ch0_ps = cfg_data[1];
+		obj->ch1_ps = cfg_data[2];
+	}
+
+	return sensor_cfg_to_hub(ID_LIGHT,
+		(uint8_t *)cfg_data, sizeof(cfg_data));
+}
+
+void cabc_backlight_value_notification(int backlight_value)
+{
+	struct alspshub_ipi_data *obj = obj_ipi_data;
+	if (obj != NULL
+		&& backlight_value != obj->cabc_backlight_value) {
+		obj->cabc_backlight_value = backlight_value;
+		schedule_work(&obj->cabc_notify_work);
+	}
+}
+EXPORT_SYMBOL_GPL(cabc_backlight_value_notification);
+
+static void cabc_backlight_value_notification_work(struct work_struct *work)
+{
+	struct alspshub_ipi_data *obj = obj_ipi_data;
+	int32_t cfg_data[4] = {0};
+	if (obj != NULL) {
+		cfg_data[0] = AMBIENT_LCD_BACKLIGHT_VALUE;
+		cfg_data[1] = obj->cabc_backlight_value;
+		cfg_data[2] = 0;
+		cfg_data[3] = 0;
+
+		pr_info("cabc_backlight_value_notification_work [%d, %d, %d, %d]\n",
+			cfg_data[0], cfg_data[1], cfg_data[2], cfg_data[3]);
+
+		sensor_cfg_to_hub(ID_LIGHT,
+			(uint8_t *)cfg_data, sizeof(cfg_data));
+	}
 }
 
 static int rgbw_enable(int en)
@@ -839,8 +1062,12 @@ static int ps_set_cali(uint8_t *data, uint8_t count)
 	struct alspshub_ipi_data *obj = obj_ipi_data;
 
 	spin_lock(&calibration_lock);
-	atomic_set(&obj->ps_thd_val_high, buf[0]);
-	atomic_set(&obj->ps_thd_val_low, buf[1]);
+	//atomic_set(&obj->ps_thd_val_low, buf[0]);
+	//atomic_set(&obj->ps_thd_val_high, buf[1]);
+	obj->ps_thd_cali[0] = buf[0];
+	obj->ps_thd_cali[1] = buf[1];
+	obj->ps_thd_cali[2] = buf[2];
+	obj->ps_thd_cali[3] = buf[3];
 	spin_unlock(&calibration_lock);
 	return sensor_cfg_to_hub(ID_PROXIMITY, data, count);
 }
@@ -889,6 +1116,8 @@ static int alspshub_probe(struct platform_device *pdev)
 	obj_ipi_data = obj;
 
 	INIT_WORK(&obj->init_done_work, alspshub_init_done_work);
+	INIT_WORK(&obj->cabc_notify_work, cabc_backlight_value_notification_work);
+	obj->cabc_backlight_value = -1;
 
 	platform_set_drvdata(pdev, obj);
 
@@ -909,6 +1138,7 @@ static int alspshub_probe(struct platform_device *pdev)
 
 	clear_bit(CMC_BIT_ALS, &obj->enable);
 	clear_bit(CMC_BIT_PS, &obj->enable);
+	init_completion(&obj->ps_calibration_done);
 	scp_power_monitor_register(&scp_ready_notifier);
 	err = scp_sensorHub_data_registration(ID_PROXIMITY, ps_recv_data);
 	if (err < 0) {

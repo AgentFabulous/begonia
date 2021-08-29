@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #ifndef CMDQ_EVENT_COMMON
@@ -549,6 +550,9 @@ enum cmdq_event {
 	CMDQ_SYNC_DISP_WDMA0_2NONSEC_END,		/* 661 */
 	CMDQ_SYNC_DISP_WDMA1_2NONSEC_END,		/* 662 */
 	CMDQ_SYNC_DISP_EXT_STREAM_EOF,			/* 663 */
+
+	/* DISP ARR VFP change Token*/
+	CMDQ_SYNC_TOKEN_VFP_CHANGED,			/*664*/
 
 	/* Event for CMDQ to block executing command when append command
 	 * Plz sync CMDQ_SYNC_TOKEN_APPEND_THR(id) in cmdq_core source file.

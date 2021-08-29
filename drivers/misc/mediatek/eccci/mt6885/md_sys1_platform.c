@@ -513,13 +513,7 @@ void md_cd_get_md_bootup_status(
 	struct ccci_modem *md, unsigned int *buff, int length)
 {
 	struct md_sys1_info *md_info = (struct md_sys1_info *)md->private_data;
-	struct md_pll_reg *md_reg = NULL;
-
-	md_reg = md_info->md_pll_base;
-	if (!md_reg) {
-		CCCI_ERROR_LOG(md->index, TAG, "%s:md_reg is null\n", __func__);
-		return;
-	}
+	struct md_pll_reg *md_reg = md_info->md_pll_base;
 
 	CCCI_NOTICE_LOG(md->index, TAG, "md_boot_stats len %d\n", length);
 
@@ -703,25 +697,10 @@ void __attribute__((weak)) kicker_pbm_by_md(enum pbm_kicker kicker,
 {
 }
 
-#ifdef FEATURE_CLK_BUF
-static void flight_mode_set_by_atf(struct ccci_modem *md,
-		unsigned int flightMode)
-{
-	struct arm_smccc_res res;
-
-	arm_smccc_smc(MTK_SIP_KERNEL_CCCI_CONTROL, MD_FLIGHT_MODE_SET,
-		flightMode, 0, 0, 0, 0, 0, &res);
-
-	CCCI_BOOTUP_LOG(md->index, TAG,
-		"[%s] flag_1=%lu, flag_2=%lu, flag_3=%lu, flag_4=%lu\n",
-		__func__, res.a0, res.a1, res.a2, res.a3);
-}
-#endif
-
 int md_cd_soft_power_off(struct ccci_modem *md, unsigned int mode)
 {
 #ifdef FEATURE_CLK_BUF
-	flight_mode_set_by_atf(md, true);
+	clk_buf_set_by_flightmode(true);
 #endif
 	return 0;
 }
@@ -729,7 +708,7 @@ int md_cd_soft_power_off(struct ccci_modem *md, unsigned int mode)
 int md_cd_soft_power_on(struct ccci_modem *md, unsigned int mode)
 {
 #ifdef FEATURE_CLK_BUF
-	flight_mode_set_by_atf(md, false);
+	clk_buf_set_by_flightmode(false);
 #endif
 	return 0;
 }
@@ -816,7 +795,7 @@ int md_cd_power_on(struct ccci_modem *md)
 	switch (md->index) {
 	case MD_SYS1:
 #ifdef FEATURE_CLK_BUF
-		flight_mode_set_by_atf(md, false);
+		clk_buf_set_by_flightmode(false);
 #endif
 		CCCI_BOOTUP_LOG(md->index, TAG, "enable md sys clk\n");
 		ret = clk_prepare_enable(clk_table[0].clk_ref);
@@ -885,7 +864,7 @@ int md_cd_power_off(struct ccci_modem *md, unsigned int timeout)
 			ccci_read32(infra_ao_base, INFRA_AO_MD_SRCCLKENA));
 		CCCI_BOOTUP_LOG(md->index, TAG, "Call md1_pmic_setting_off\n");
 #ifdef FEATURE_CLK_BUF
-		flight_mode_set_by_atf(md, true);
+		clk_buf_set_by_flightmode(true);
 #endif
 		/* 3. PMIC off */
 		md1_pmic_setting_off();

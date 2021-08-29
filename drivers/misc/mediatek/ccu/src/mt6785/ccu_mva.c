@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,7 +13,6 @@
  */
 
 #include "ccu_cmn.h"
-#include "ccu_platform_def.h"
 #include "ccu_mva.h"
 
 static struct ion_client *_ccu_ion_client;

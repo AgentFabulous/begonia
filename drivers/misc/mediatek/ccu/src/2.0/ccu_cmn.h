@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,6 +19,17 @@
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
 #include "ccu_drv.h"
+
+#ifdef MTK_CCU_EMULATOR
+/*#define CCUI_OF_M4U_PORT M4U_PORT_CAM_IMGI*/
+/*#define CCUI_OF_M4U_PORT M4U_PORT_CAM_CCUI*/
+/*#define CCUO_OF_M4U_PORT M4U_PORT_CAM_CCUO*/
+/*#define CCUG_OF_M4U_PORT M4U_PORT_CAM_CCUG*/
+#else
+#define CCUI_OF_M4U_PORT M4U_PORT_CCUI
+#define CCUO_OF_M4U_PORT M4U_PORT_CCUO
+#define CCUG_OF_M4U_PORT M4U_PORT_CCUG
+#endif
 
 /* Common Structure */
 enum ccu_req_type_e {

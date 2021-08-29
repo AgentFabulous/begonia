@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2020 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,7 +20,10 @@
 /* For Power Model */
 #include <mtk_me_swpm_plat.h>
 #include <mtk_swpm_interface.h>
+
+#if defined(CONFIG_DRM_MEDIATEK_BOMB) || defined(CONFIG_DRM_MEDIATEK_CANNON)
 #include <mtk_drm_crtc.h>
+#endif
 
 #ifdef SWPM_ME_ENABLE
 static bool swpm_enable = true;

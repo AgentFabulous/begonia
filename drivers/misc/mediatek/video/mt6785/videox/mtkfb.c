@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -193,6 +194,8 @@ unsigned int ext_lcd_fps = 6000;
 char ext_mtkfb_lcm_name[256] = { 0 };
 #endif
 
+extern unsigned char xy_writepoint[16];
+
 DEFINE_SEMAPHORE(sem_flipping);
 DEFINE_SEMAPHORE(sem_early_suspend);
 DEFINE_SEMAPHORE(sem_overlay_buffer);
@@ -211,6 +214,25 @@ static int _parse_tag_videolfb(void);
 
 static void mtkfb_late_resume(void);
 static void mtkfb_early_suspend(void);
+
+#define WAIT_RESUME_TIMEOUT 200
+#define WAIT_SUSPEND_TIMEOUT 1500
+static struct fb_info *prim_fbi;
+static struct delayed_work prim_panel_work;
+static atomic_t prim_panel_is_on;
+static void prim_panel_off_delayed_work(struct work_struct *work)
+{
+	if (!lock_fb_info(prim_fbi)) {
+		return;
+	}
+
+	if (atomic_read(&prim_panel_is_on)) {
+		fb_blank(prim_fbi, FB_BLANK_POWERDOWN);
+		atomic_set(&prim_panel_is_on, false);
+	}
+
+	unlock_fb_info(prim_fbi);
+}
 
 void mtkfb_log_enable(int enable)
 {
@@ -282,6 +304,14 @@ static int mtkfb1_blank(int blank_mode, struct fb_info *info)
 static int mtkfb_blank(int blank_mode, struct fb_info *info)
 {
 	enum mtkfb_power_mode prev_pm = primary_display_get_power_mode();
+
+	if ((info == prim_fbi) && (blank_mode == FB_BLANK_UNBLANK) &&
+		atomic_read(&prim_panel_is_on)) {
+		atomic_set(&prim_panel_is_on, false);
+		cancel_delayed_work(&prim_panel_work);
+		pr_debug("%s cancle delayed work, because the fpc is unlocked suceessfully fp\n", __func__);
+		return 0;
+	}
 
 	switch (blank_mode) {
 	case FB_BLANK_UNBLANK:
@@ -1912,6 +1942,100 @@ static struct fb_ops mtkfb1_ops = {
 	.fb_blank = mtkfb1_blank,
 };
 #endif
+
+extern ssize_t lcm_mipi_reg_write(char *buf, size_t count);
+extern ssize_t lcm_mipi_reg_read(char *buf);
+
+extern ssize_t led_i2c_reg_write(char *buf, size_t count);
+extern ssize_t led_i2c_reg_read(char *buf);
+
+static ssize_t mipi_reg_show(struct device *dev,
+			    struct device_attribute *attr,
+			   char *buf)
+{
+	return lcm_mipi_reg_read(buf);
+}
+
+static ssize_t mipi_reg_store(struct device *dev,
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	int rc = 0;
+
+	rc = lcm_mipi_reg_write((char *)buf, count);
+	return rc;
+}
+
+static ssize_t panel_info_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	/* struct fb_info *fbi = dev_get_drvdata(dev); */
+	int ret = 0;
+
+	ret = scnprintf(buf, PAGE_SIZE,
+		"panel_name=%s\n", mtkfb_lcm_name);
+
+	return ret;
+}
+
+static ssize_t disp_param_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int ret = 0;
+
+	ret = scnprintf(buf, 16, "%s", xy_writepoint);
+
+	return ret;
+}
+
+static ssize_t disp_param_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int param;
+	sscanf(buf, "0x%x", &param);
+
+	MTKFB_FUNC();
+	MTKFB_LOG("fb_set_dispparam:%d Start\n", param);
+	primary_display_set_panel_param(param);
+	MTKFB_LOG("fb_set_dispparam End\n");
+
+	return size;
+}
+
+static ssize_t led_i2c_reg_show(struct device *dev,
+			    struct device_attribute *attr,
+			   char *buf)
+{
+	return led_i2c_reg_read(buf);
+}
+
+static ssize_t led_i2c_reg_store(struct device *dev,
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	int rc = 0;
+
+	rc = led_i2c_reg_write((char *)buf, count);
+	return rc;
+}
+
+static DEVICE_ATTR_RO(panel_info);
+static DEVICE_ATTR_RW(disp_param);
+static DEVICE_ATTR_RW(mipi_reg);
+static DEVICE_ATTR_RW(led_i2c_reg);
+
+static struct attribute *fb_attrs[] = {
+	&dev_attr_panel_info.attr,
+	&dev_attr_disp_param.attr,
+	&dev_attr_mipi_reg.attr,
+	&dev_attr_led_i2c_reg.attr,
+	NULL,
+};
+
+static struct attribute_group fb_attr_group = {
+	.attrs = fb_attrs,
+};
+
 /*
  * ---------------------------------------------------------------
  * Sysfs interface
@@ -1920,14 +2044,20 @@ static struct fb_ops mtkfb1_ops = {
 
 static int mtkfb_register_sysfs(struct mtkfb_device *fbdev)
 {
-	NOT_REFERENCED(fbdev);
+	//NOT_REFERENCED(fbdev);
+        int rc;
 
-	return 0;
+	rc = sysfs_create_group(&fbdev->dev->kobj, &fb_attr_group);
+	if (rc)
+		pr_err("sysfs group creation failed, rc=%d\n", rc);
+
+	return rc;
 }
 
 static void mtkfb_unregister_sysfs(struct mtkfb_device *fbdev)
 {
-	NOT_REFERENCED(fbdev);
+	//NOT_REFERENCED(fbdev);
+	sysfs_remove_group(&fbdev->dev->kobj, &fb_attr_group);
 }
 
 /*
@@ -2538,6 +2668,14 @@ static int mtkfb_probe(struct platform_device *pdev)
 	fbdev->dev = &(pdev->dev);
 	dev_set_drvdata(&(pdev->dev), fbdev);
 
+	atomic_set(&fbdev->resume_pending, 0);
+	init_waitqueue_head(&fbdev->resume_wait_q);
+
+	fbdev->is_prim_panel = true;
+	prim_fbi = fbi;
+	atomic_set(&prim_panel_is_on, false);
+	INIT_DELAYED_WORK(&prim_panel_work, prim_panel_off_delayed_work);
+
 	DISPMSG("%s: fb_pa = %pa\n", __func__, &fb_base);
 
 #ifdef CONFIG_MTK_IOMMU_V2
@@ -2671,10 +2809,9 @@ static int mtkfb_probe(struct platform_device *pdev)
 	 * this function will get fb_heap base address to ion
 	 * for management frame buffer
 	 */
-//#ifdef MTK_FB_ION_SUPPORT
-	ion_drv_create_FB_heap(mtkfb_get_fb_base(), DISP_GetFBRamSize());
-	pr_info("%s DISP_GetFBRamSize size:%d\n",
-		__func__, DISP_GetFBRamSize());
+#ifdef MTK_FB_ION_SUPPORT
+	/*ion_drv_create_FB_heap(mtkfb_get_fb_base(), mtkfb_get_fb_size());*/
+#endif
 #endif
 	fbdev->state = MTKFB_ACTIVE;
 
@@ -2821,6 +2958,29 @@ static void mtkfb_late_resume(void)
 }
 
 #ifdef CONFIG_PM
+static int mtkfb_pm_prepare(struct device *dev)
+{
+	struct mtkfb_device *fbdev = dev_get_drvdata(dev);
+
+	if (!fbdev)
+		return -ENODEV;
+	if (fbdev->is_prim_panel)
+		atomic_inc(&fbdev->resume_pending);
+	return 0;
+}
+
+static void mtkfb_pm_complete(struct device *dev)
+{
+	struct mtkfb_device *fbdev = dev_get_drvdata(dev);
+
+	if (!fbdev)
+		return;
+	if (fbdev->is_prim_panel) {
+		atomic_set(&fbdev->resume_pending, 0);
+		wake_up_all(&fbdev->resume_wait_q);
+	}
+	return;
+}
 
 int mtkfb_pm_suspend(struct device *device)
 {
@@ -2891,6 +3051,8 @@ static const struct of_device_id mtkfb_of_ids[] = {
 };
 
 static const struct dev_pm_ops mtkfb_pm_ops = {
+	.prepare = mtkfb_pm_prepare,
+	.complete = mtkfb_pm_complete,
 	.suspend = mtkfb_pm_suspend,
 	.resume = mtkfb_pm_resume,
 	.freeze = mtkfb_pm_freeze,
@@ -2997,6 +3159,42 @@ static void __exit mtkfb_cleanup(void)
 	MSG_FUNC_LEAVE();
 }
 
+/*
+ * mtkfb_prim_panel_unblank() - Unblank primary panel FB
+ * @timeout : >0 blank primary panel FB after timeout (ms)
+ */
+int mtkfb_prim_panel_unblank(int timeout)
+{
+	int ret = 0;
+	struct mtkfb_device *fbdev = NULL;
+
+	if (prim_fbi) {
+		fbdev = (struct mtkfb_device *)prim_fbi->par;
+		wait_event_timeout(fbdev->resume_wait_q,
+				!atomic_read(&fbdev->resume_pending),
+				msecs_to_jiffies(WAIT_RESUME_TIMEOUT));
+		if (!lock_fb_info(prim_fbi)) {
+			return -ENODEV;
+		}
+		if (prim_fbi->blank == FB_BLANK_UNBLANK) {
+			unlock_fb_info(prim_fbi);
+			return 0;
+		}
+		ret = fb_blank(prim_fbi, FB_BLANK_UNBLANK);
+		if (!ret) {
+			atomic_set(&prim_panel_is_on, true);
+			if (timeout > 0)
+				schedule_delayed_work(&prim_panel_work, msecs_to_jiffies(timeout));
+			else
+				schedule_delayed_work(&prim_panel_work, msecs_to_jiffies(WAIT_SUSPEND_TIMEOUT));
+		}
+		unlock_fb_info(prim_fbi);
+		return ret;
+	}
+
+	pr_err("primary panel is not existed\n");
+	return -EINVAL;
+}
 
 module_init(mtkfb_init);
 module_exit(mtkfb_cleanup);

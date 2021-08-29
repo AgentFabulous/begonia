@@ -127,7 +127,6 @@ static void aee_kdump_cpu_stop(void *arg, void *regs, void *svc_sp)
 		creg = (void *)&crash_record->cpu_creg[cpu];
 
 		mrdump_save_control_register(creg);
-		mrdump_mini_per_cpu_regs(cpu, &regs, current);
 	}
 
 	local_fiq_disable();
@@ -172,7 +171,6 @@ static void mrdump_stop_noncore_cpu(void *unused)
 		creg = (void *)&crash_record->cpu_creg[cpu];
 
 		mrdump_save_control_register(creg);
-		mrdump_mini_per_cpu_regs(cpu, &regs, current);
 	}
 
 	local_fiq_disable();

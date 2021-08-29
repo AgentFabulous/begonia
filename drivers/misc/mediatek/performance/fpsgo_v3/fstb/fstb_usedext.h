@@ -29,16 +29,13 @@
 #define MAX_NR_FPS_LEVELS	1
 #define MAX_NR_RENDER_FPS_LEVELS	10
 #define DISPLAY_FPS_FILTER_NS 100000000ULL
-#define DISPLAY_FPS_FILTER_NUM 4
 #define ASFC_THRESHOLD_NS 20000000ULL
 #define ASFC_THRESHOLD_PERCENTAGE 30
 #define VPU_MAX_CAP 100
 #define MDLA_MAX_CAP 100
 #define RESET_TOLERENCE 3
 #define DEFAULT_JUMP_CHECK_NUM 21
-#define DEFAULT_JUMP_CHECK_Q_PCT 33
 #define JUMP_VOTE_MAX_I 60
-#define FSTB_IDLE_DBNC 10
 
 extern int (*fbt_notifier_cpu_frame_time_fps_stabilizer)(
 	int pid,
@@ -96,7 +93,6 @@ struct FSTB_FRAME_INFO {
 	unsigned long long gblock_b;
 	unsigned long long gblock_time;
 	int fps_raise_flag;
-	int render_idle_cnt;
 };
 
 struct FSTB_RENDER_TARGET_FPS {

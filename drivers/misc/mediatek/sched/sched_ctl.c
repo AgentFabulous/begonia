@@ -69,8 +69,6 @@ static struct kobj_attribute sched_boost_attr;
 static struct kobj_attribute sched_cpu_prefer_attr;
 #endif
 
-static int sched_ramup_factor; /*0 means disable (min:1%,max 100%)*/
-
 static int sched_hint_status(int util, int cap)
 {
 	enum sched_status_t status;
@@ -279,40 +277,6 @@ static struct kobj_attribute sched_walt_info_attr =
 __ATTR(walt_debug, 0600 /* S_IWUSR | S_IRUSR */,
 			show_walt_info, store_walt_info);
 
-
-static ssize_t store_sched_forked_ramup_factor(struct kobject *kobj,
-		struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int val = 0;
-
-	if (sscanf(buf, "%iu", &val) != 0) {
-		if (val >= 0 && val <= 100)
-			sched_ramup_factor = val;
-	}
-
-	return count;
-}
-
-static ssize_t show_sched_forked_ramup_factor(struct kobject *kobj,
-		struct kobj_attribute *attr, char *buf)
-{
-	unsigned int len = 0;
-	unsigned int max_len = 4096;
-
-	len += snprintf(buf, max_len, "%d\n", sched_ramup_factor);
-	return len;
-}
-
-int sched_forked_ramup_factor(void)
-{
-
-	return sched_ramup_factor;
-}
-
-static struct kobj_attribute sched_forked_ramup_factor_attr =
-__ATTR(sched_forked_ramup_factor, 0644, show_sched_forked_ramup_factor,
-		store_sched_forked_ramup_factor);
-
 static struct attribute *sched_attrs[] = {
 	&sched_info_attr.attr,
 	&sched_load_thresh_attr.attr,
@@ -325,7 +289,6 @@ static struct attribute *sched_attrs[] = {
 	&sched_iso_attr.attr,
 	&set_sched_iso_attr.attr,
 	&set_sched_deiso_attr.attr,
-	&sched_forked_ramup_factor_attr.attr,
 	NULL,
 };
 
@@ -645,15 +608,14 @@ int select_task_prefer_cpu(struct task_struct *p, int new_cpu)
 			break;
 #endif
 
-		if (cpumask_test_cpu(new_cpu, &domain->possible_cpus) && !cpu_isolated(new_cpu))
+		if (cpumask_test_cpu(new_cpu, &domain->possible_cpus))
 			goto out;
 
 		for_each_cpu(iter_cpu, &domain->possible_cpus) {
 
 			/* tsk with prefer idle to find bigger idle cpu */
 			if (!cpu_online(iter_cpu) ||
-				!cpumask_test_cpu(iter_cpu, tsk_cpus_allow) ||
-				cpu_isolated(iter_cpu))
+				!cpumask_test_cpu(iter_cpu, tsk_cpus_allow))
 				continue;
 
 			/* favoring tasks that prefer idle cpus
@@ -706,9 +668,7 @@ void sched_set_boost_fg(void)
 	 */
 
 	nr = arch_get_nr_clusters();
-	arch_get_cluster_cpus(&cpus, 0);
-	if (nr > 1)
-		cpumask_xor(&cpus, &cpus, cpu_possible_mask);
+	arch_get_cluster_cpus(&cpus, nr-1);
 
 	set_user_space_global_cpuset(&cpus, 3);
 	set_user_space_global_cpuset(&cpus, 2);

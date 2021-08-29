@@ -15,8 +15,6 @@ ccflags-y += -I$(srctree)
 
 ifeq ($(CONFIG_MACH_MT6833),y)
 	PDIR = mt6833
-else ifeq ($(CONFIG_MACH_MT6893),y)
-	PDIR = mt6893
 else
 	PDIR = $(MTK_PLATFORM)
 endif
@@ -33,13 +31,17 @@ ccflags-y  += -I$(srctree)/drivers/misc/mediatek/thermal/fakeHeader/
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/base/power/$(PDIR)
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/base/power/include/
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/base/power/include/gpufreq_v1/
+ccflags-y  += -I$(srctree)/drivers/misc/mediatek/flashlight/
+ccflags-y  += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
 
 obj-$(CONFIG_THERMAL) += mtk_thermal_monitor.o
 obj-$(CONFIG_THERMAL) += mtk_cooler_shutdown.o
 ifeq ($(CONFIG_MTK_LEDS), y)
     # setMaxbrightness() defined in mediatek/kernel/drivers/leds/leds_drv.c only built when CONFIG_MTK_LEDS is set
-    obj-$(CONFIG_THERMAL) += mtk_cooler_backlight.o
+    #obj-$(CONFIG_THERMAL) += mtk_cooler_backlight.o
+    obj-$(CONFIG_THERMAL) += mtk_cooler_backlight_cus.o
 endif
+obj-$(CONFIG_THERMAL) += mtk_cooler_flashlight_cus.o
 obj-$(CONFIG_THERMAL) += mtk_cooler_kshutdown.o
 #obj-$(CONFIG_THERMAL) += mtk_cooler_spkrvol.o
 #obj-$(CONFIG_THERMAL) += mtk_cooler_dropcall.o
@@ -54,8 +56,6 @@ ifeq ($(CONFIG_ARCH_MT7623), y)
 obj-y += mt2701/
 else ifeq ($(CONFIG_MACH_MT6833),y)
 obj-y += mt6833/
-else ifeq ($(CONFIG_MACH_MT6893),y)
-obj-y += mt6893/
 else
 obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
 endif

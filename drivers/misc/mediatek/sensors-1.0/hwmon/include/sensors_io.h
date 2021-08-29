@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,6 +38,13 @@ struct SENSOR_DATA {
 	int y;
 	int z;
 };
+
+typedef struct ps_cali_data{
+  int threshold0;
+  int threshold1;
+  int threshold2;
+  int threshold3;
+} PS_CALI_DATA;
 
 struct biometric_cali {
 	unsigned int pga6;
@@ -124,19 +132,19 @@ struct compat_biometric_threshold {
 
 /*-------------------MTK add-------------------------------------------*/
 #define ALSPS_GET_PS_TEST_RESULT _IOR(ALSPS, 0x09, int)
-#define ALSPS_GET_PS_THRESHOLD_HIGH _IOR(ALSPS, 0x0B, int)
+#define ALSPS_GET_PS_THRESHOLD_HIGH _IOR(ALSPS, 0x0B, PS_CALI_DATA)
 #define ALSPS_GET_PS_THRESHOLD_LOW _IOR(ALSPS, 0x0C, int)
 #define ALSPS_IOCTL_CLR_CALI _IOW(ALSPS, 0x0F, int)
 #define ALSPS_IOCTL_GET_CALI _IOR(ALSPS, 0x10, int)
 #define ALSPS_IOCTL_SET_CALI _IOW(ALSPS, 0x11, int)
-#define ALSPS_SET_PS_THRESHOLD _IOW(ALSPS, 0x12, int)
+#define ALSPS_SET_PS_THRESHOLD _IOW(ALSPS, 0x12, PS_CALI_DATA)
 #define AAL_SET_ALS_MODE _IOW(ALSPS, 0x14, int)
 #define AAL_GET_ALS_MODE _IOR(ALSPS, 0x15, int)
 #define AAL_GET_ALS_DATA _IOR(ALSPS, 0x16, int)
 #define ALSPS_ALS_ENABLE_CALI _IO(ALSPS, 0x17)
 #define ALSPS_PS_ENABLE_CALI _IO(ALSPS, 0x18)
 #define ALSPS_IOCTL_ALS_GET_CALI _IOW(ALSPS, 0x19, int)
-#define ALSPS_ALS_SET_CALI _IOW(ALSPS, 0x20, int)
+#define ALSPS_ALS_SET_CALI _IOW(ALSPS, 0x20, PS_CALI_DATA)
 
 #ifdef CONFIG_COMPAT
 #define COMPAT_ALSPS_SET_PS_MODE _IOW(ALSPS, 0x01, compat_int_t)

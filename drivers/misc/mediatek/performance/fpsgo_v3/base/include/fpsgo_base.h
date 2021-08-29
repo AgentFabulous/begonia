@@ -70,7 +70,6 @@ struct fbt_thread_blc {
 };
 
 struct fbt_boost_info {
-	int target_fps;
 	unsigned long long target_time;
 	unsigned int last_blc;
 
@@ -79,11 +78,9 @@ struct fbt_boost_info {
 	int weight_cnt;
 	int hit_cnt;
 	int deb_cnt;
-	int hit_cluster;
 
 	/* rescue*/
 	struct fbt_proc proc;
-	int cur_stage;
 
 	/* variance control */
 	struct fbt_frame_info frame_info[WINDOW];
@@ -91,15 +88,6 @@ struct fbt_boost_info {
 	int floor_count;
 	int reset_floor_bound;
 	int f_iter;
-};
-
-struct uboost {
-	unsigned long long vsync_u_runtime;
-	unsigned long long checkp_u_runtime;
-	unsigned long long timer_period;
-	int uboosting;
-	struct hrtimer timer;
-	struct work_struct work;
 };
 
 struct render_info {
@@ -140,9 +128,6 @@ struct render_info {
 	/*TODO: EARA mid list*/
 	unsigned long long mid;
 
-	/*uboost*/
-	struct uboost uboost_info;
-
 	struct mutex thr_mlock;
 };
 
@@ -161,7 +146,6 @@ struct fpsgo_loading {
 	int loading;
 	int prefer_type;
 	int policy;
-	long nice_bk;
 };
 
 struct gbe_runtime {
@@ -205,8 +189,6 @@ void fpsgo_main_trace(const char *fmt, ...);
 void fpsgo_clear_uclamp_boost(void);
 void fpsgo_clear_llf_cpu_policy(int orig_llf);
 void fpsgo_del_linger(struct render_info *thr);
-int fpsgo_uboost_traverse(unsigned long long ts);
-int fpsgo_base_is_finished(struct render_info *thr);
 
 int init_fpsgo_common(void);
 

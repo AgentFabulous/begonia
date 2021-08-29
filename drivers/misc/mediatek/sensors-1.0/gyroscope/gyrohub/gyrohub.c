@@ -1,6 +1,7 @@
 /* GYRO_HUB motion sensor driver
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,6 +21,8 @@
 #include <gyroscope.h>
 #include <SCP_sensorHub.h>
 #include "SCP_power_monitor.h"
+
+#define XIAOMI_FACTORY_CALIBRATION 1
 
 /* name must different with gsensor gyrohub */
 #define GYROHUB_DEV_NAME    "gyro_hub"
@@ -173,7 +176,6 @@ static int gyrohub_ReadGyroData(char *buf, int bufsize)
 	int gyro[GYROHUB_AXES_NUM];
 	int err = 0;
 	int status = 0;
-	int len = 0;
 
 	if (atomic_read(&obj->suspend))
 		return -3;
@@ -191,13 +193,13 @@ static int gyrohub_ReadGyroData(char *buf, int bufsize)
 	gyro[GYROHUB_AXIS_Y]	= data.gyroscope_t.y;
 	gyro[GYROHUB_AXIS_Z]	= data.gyroscope_t.z;
 	status					= data.gyroscope_t.status;
-	len = sprintf(buf, "%04x %04x %04x %04x",
+	sprintf(buf, "%04x %04x %04x %04x",
 		gyro[GYROHUB_AXIS_X],
 		gyro[GYROHUB_AXIS_Y],
 		gyro[GYROHUB_AXIS_Z],
 		status);
 
-	if ((atomic_read(&obj->trace) & GYRO_TRC_DATA) && (len > 0))
+	if (atomic_read(&obj->trace) & GYRO_TRC_DATA)
 		pr_debug("gsensor data: %s!\n", buf);
 
 	return 0;
@@ -213,9 +215,7 @@ static int gyrohub_ReadChipInfo(char *buf, int bufsize)
 	if ((buf == NULL) || (bufsize <= 30))
 		return -1;
 
-	if (sprintf(buf, "GYROHUB Chip") <= 0)
-		return -1;
-
+	sprintf(buf, "GYROHUB Chip");
 	return 0;
 }
 
@@ -587,7 +587,20 @@ static int gyrohub_factory_get_raw_data(int32_t data[3])
 }
 static int gyrohub_factory_enable_calibration(void)
 {
+#if XIAOMI_FACTORY_CALIBRATION
+	int err = 0;
+	struct gyro_data data;
+	struct gyrohub_ipi_data *obj = obj_ipi_data;
+	spin_lock(&calibration_lock);
+	data.x = obj->static_cali[0];
+	data.y = obj->static_cali[1];
+	data.z = obj->static_cali[2];
+	spin_unlock(&calibration_lock);
+	err = gyro_cali_report(&data);
+	return err;
+#else
 	return sensor_calibration_to_hub(ID_GYROSCOPE);
+#endif
 }
 static int gyrohub_factory_clear_cali(void)
 {
@@ -604,6 +617,23 @@ static int gyrohub_factory_clear_cali(void)
 }
 static int gyrohub_factory_set_cali(int32_t data[3])
 {
+#if XIAOMI_FACTORY_CALIBRATION
+	struct gyrohub_ipi_data *obj = obj_ipi_data;
+	int32_t cali_data[6] = {0};
+
+	pr_err("gyrohub_factory_set_cali data: (%d, %d, %d)!\n", data[0], data[1], data[2]);
+
+	spin_lock(&calibration_lock);
+	obj->static_cali[0] = data[0];
+	obj->static_cali[1] = data[1];
+	obj->static_cali[2] = data[2];
+
+	cali_data[3] = data[0];
+	cali_data[4] = data[1];
+	cali_data[5] = data[2];
+	spin_unlock(&calibration_lock);
+	return sensor_cfg_to_hub(ID_GYROSCOPE, (uint8_t *)cali_data, sizeof(int32_t) * 6);
+#else
 #ifdef MTK_OLD_FACTORY_CALIBRATION
 	int err = 0;
 
@@ -614,10 +644,19 @@ static int gyrohub_factory_set_cali(int32_t data[3])
 	}
 #endif
 	return 0;
+#endif
 }
 static int gyrohub_factory_get_cali(int32_t data[3])
 {
 	int err = 0;
+#if XIAOMI_FACTORY_CALIBRATION
+	struct gyrohub_ipi_data *obj = obj_ipi_data;
+	spin_lock(&calibration_lock);
+	data[GYROHUB_AXIS_X] = obj->static_cali[GYROHUB_AXIS_X];
+	data[GYROHUB_AXIS_Y] = obj->static_cali[GYROHUB_AXIS_Y];
+	data[GYROHUB_AXIS_Z] = obj->static_cali[GYROHUB_AXIS_Z];
+	spin_unlock(&calibration_lock);
+#else
 #ifndef MTK_OLD_FACTORY_CALIBRATION
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
 	uint8_t status = 0;
@@ -646,6 +685,7 @@ static int gyrohub_factory_get_cali(int32_t data[3])
 		pr_debug("gyrohub static cali detect shake!\n");
 		return -2;
 	}
+#endif
 #endif
 	return err;
 }
@@ -753,6 +793,9 @@ static int gyrohub_set_cali(uint8_t *data, uint8_t count)
 {
 	int32_t *buf = (int32_t *)data;
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
+
+	pr_err("gyrohub_set_cali data: (%d, %d, %d)!\n", buf[0], buf[1], buf[2]);
+	pr_err("gyrohub_set_cali data: (%d, %d, %d)!\n", buf[3], buf[4], buf[5]);
 
 	spin_lock(&calibration_lock);
 	obj->dynamic_cali[0] = buf[0];

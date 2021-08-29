@@ -1,6 +1,7 @@
 /* sarhub motion sensor driver
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,18 +19,28 @@
 #include "sarhub.h"
 #include <situation.h>
 #include <SCP_sensorHub.h>
+#include "SCP_power_monitor.h"
 #include <linux/notifier.h>
-#include "scp_helper.h"
 #include "scp_helper.h"
 #include "sar_factory.h"
 
+#define SARHUB_BUFSIZE 64
+#define SARHUB_DEV_NAME	"sar_hub_pl"
+
+
+
 static struct situation_init_info sarhub_init_info;
+
 static DEFINE_SPINLOCK(calibration_lock);
 struct sarhub_ipi_data {
+	atomic_t trace;
 	bool factory_enable;
 
 	int32_t cali_data[3];
 	int8_t cali_status;
+	struct work_struct init_done_work;
+	atomic_t scp_init_done;
+	atomic_t first_ready_after_boot;
 	struct completion calibration_done;
 };
 static struct sarhub_ipi_data *obj_ipi_data;
@@ -80,7 +91,25 @@ static int sar_factory_get_data(int32_t sensor_data[3])
 
 static int sar_factory_enable_calibration(void)
 {
-	return sensor_calibration_to_hub(ID_SAR);
+	int err = 0;
+	struct sarhub_ipi_data *obj = obj_ipi_data;
+
+	pr_err("sar_factory_enable_calibration start\n");
+
+	err = sensor_calibration_to_hub(ID_SAR);
+	if (err) {
+		pr_err("sensor_calibration_to_hub fail!\n");
+		return -1;
+	}
+
+	err = wait_for_completion_timeout(&obj->calibration_done,
+					  msecs_to_jiffies(10000));
+	if (!err) {
+		pr_err("sar factory get cali fail!\n");
+		return -1;
+	}
+
+	return err;
 }
 
 static int sar_factory_get_cali(int32_t data[3])
@@ -89,12 +118,6 @@ static int sar_factory_get_cali(int32_t data[3])
 	struct sarhub_ipi_data *obj = obj_ipi_data;
 	int8_t status = 0;
 
-	err = wait_for_completion_timeout(&obj->calibration_done,
-					  msecs_to_jiffies(3000));
-	if (!err) {
-		pr_err("sar factory get cali fail!\n");
-		return -1;
-	}
 	spin_lock(&calibration_lock);
 	data[0] = obj->cali_data[0];
 	data[1] = obj->cali_data[1];
@@ -105,7 +128,7 @@ static int sar_factory_get_cali(int32_t data[3])
 		pr_debug("sar cali fail!\n");
 		return -2;
 	}
-	return 0;
+	return err;
 }
 
 
@@ -121,6 +144,19 @@ static struct sar_factory_public sarhub_factory_device = {
 	.sensitivity = 1,
 	.fops = &sarhub_factory_fops,
 };
+
+static int sar_set_cali(uint8_t *data, uint8_t count)
+{
+	int32_t *buf = (int32_t *)data;
+	struct sarhub_ipi_data *obj = obj_ipi_data;
+	spin_lock(&calibration_lock);
+	obj->cali_data[0] = buf[0];
+	obj->cali_data[1] = buf[1];
+	obj->cali_data[2] = buf[2];
+	spin_unlock(&calibration_lock);
+	return sensor_cfg_to_hub(ID_SAR, data, count);
+
+}
 
 static int sar_get_data(int *probability, int *status)
 {
@@ -168,6 +204,7 @@ static int sar_recv_data(struct data_unit_t *event, void *reserved)
 	struct sarhub_ipi_data *obj = obj_ipi_data;
 	int32_t value[3] = {0};
 	int err = 0;
+	pr_err("sar_recv_data action: %d\n", event->flush_action);
 
 	if (event->flush_action == FLUSH_ACTION)
 		err = situation_flush_report(ID_SAR);
@@ -178,20 +215,65 @@ static int sar_recv_data(struct data_unit_t *event, void *reserved)
 		err = sar_data_report_t(value, (int64_t)event->time_stamp);
 	} else if (event->flush_action == CALI_ACTION) {
 		spin_lock(&calibration_lock);
-		obj->cali_data[0] =
-			event->sar_event.x_bias;
-		obj->cali_data[1] =
-			event->sar_event.y_bias;
-		obj->cali_data[2] =
-			event->sar_event.z_bias;
-		obj->cali_status =
-			(int8_t)event->sar_event.status;
+		value[0] = event->sar_event.x_bias;
+		value[1] = event->sar_event.y_bias;
+		value[2] = event->sar_event.z_bias;
+
+		obj->cali_data[0] = value[0];
+		obj->cali_data[1] = value[1];
+		obj->cali_data[2] = value[2];
 		spin_unlock(&calibration_lock);
+		if (event->sar_event.status == 0)
+			err = sar_cali_report(value);
 		complete(&obj->calibration_done);
 	}
 	return err;
 }
 
+static void scp_init_work_done(struct work_struct *work)
+{
+	int err = 0;
+	struct sarhub_ipi_data *obj = obj_ipi_data;
+#ifndef MTK_OLD_FACTORY_CALIBRATION
+	int32_t cfg_data[2] = {0};
+#endif
+	if (atomic_read(&obj->scp_init_done) == 0) {
+		pr_debug("scp is not ready to send cmd\n");
+		return;
+	}
+	if (atomic_xchg(&obj->first_ready_after_boot, 1) == 0)
+		return;
+	spin_lock(&calibration_lock);
+	cfg_data[0] = obj->cali_data[0];
+	cfg_data[1] = obj->cali_data[1];
+	spin_unlock(&calibration_lock);
+	err = sensor_cfg_to_hub(ID_SAR, (uint8_t *)cfg_data,
+				sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+
+}
+
+static int scp_ready_event(uint8_t event, void *ptr)
+{
+	struct sarhub_ipi_data *obj = obj_ipi_data;
+
+	switch (event) {
+	case SENSOR_POWER_UP:
+		atomic_set(&obj->scp_init_done, 1);
+		schedule_work(&obj->init_done_work);
+		break;
+	case SENSOR_POWER_DOWN:
+		atomic_set(&obj->scp_init_done, 0);
+		break;
+	}
+	return 0;
+}
+
+static struct scp_power_monitor scp_ready_notifier = {
+	.name = "sar",
+	.notifier_call = scp_ready_event,
+};
 
 static int sarhub_local_init(void)
 {
@@ -209,46 +291,60 @@ static int sarhub_local_init(void)
 	}
 
 	memset(obj, 0, sizeof(*obj));
+	INIT_WORK(&obj->init_done_work, scp_init_work_done);
 	obj_ipi_data = obj;
+
 	WRITE_ONCE(obj->factory_enable, false);
 	init_completion(&obj->calibration_done);
+	atomic_set(&obj->scp_init_done, 0);
+	atomic_set(&obj->first_ready_after_boot, 0);
+	scp_power_monitor_register(&scp_ready_notifier);
 
 	ctl.open_report_data = sar_open_report_data;
 	ctl.batch = sar_batch;
 	ctl.flush = sar_flush;
+	ctl.set_cali = sar_set_cali;
 	ctl.is_support_wake_lock = true;
 	ctl.is_support_batch = false;
 	err = situation_register_control_path(&ctl, ID_SAR);
 	if (err) {
 		pr_err("register sar control path err\n");
-		goto exit;
+		goto exit_kfree;
 	}
 
 	data.get_data = sar_get_data;
 	err = situation_register_data_path(&data, ID_SAR);
 	if (err) {
 		pr_err("register sar data path err\n");
-		goto exit;
+		goto exit_kfree;
 	}
 
 	err = sar_factory_device_register(&sarhub_factory_device);
 	if (err) {
 		pr_err("sar_factory_device register failed\n");
-		goto exit;
+		goto exit_kfree;
 	}
 
 	err = scp_sensorHub_data_registration(ID_SAR,
 		sar_recv_data);
 	if (err) {
 		pr_err("SCP_sensorHub_data_registration fail!!\n");
-		goto exit;
+		goto exit_kfree;
 	}
+	pr_debug("%s: OK\n", __func__);
 	return 0;
+
+exit_kfree:
+	kfree(obj);
+	obj_ipi_data = NULL;
 exit:
-	return -1;
+	pr_err("%s: err = %d\n", __func__, err);
+	return err;
 }
+
 static int sarhub_local_uninit(void)
 {
+	sar_factory_device_deregister(&sarhub_factory_device);
 	return 0;
 }
 

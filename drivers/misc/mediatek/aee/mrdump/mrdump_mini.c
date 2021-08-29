@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -70,7 +71,7 @@ static struct mrdump_mini_elf_header *mrdump_mini_ehdr;
 static char modules_info_buf[MODULES_INFO_BUF_SIZE];
 #endif
 
-static bool dump_all_cpus = 1;
+static bool dump_all_cpus;
 
 __weak void get_gz_log_buffer(unsigned long *addr, unsigned long *paddr,
 			unsigned long *size, unsigned long *start)
@@ -346,11 +347,6 @@ void mrdump_mini_add_misc(unsigned long addr, unsigned long size,
 
 int kernel_addr_valid(unsigned long addr)
 {
-#ifdef CONFIG_KASAN_SW_TAGS
-	/* KASAN_SW_TAGS only support arm64 */
-	addr = addr | 0xff00000000000000;
-#endif
-
 	if (addr < MIN_MARGIN)
 		return 0;
 
@@ -671,10 +667,13 @@ int mrdump_modules_info(unsigned char *buffer, size_t sz_buf)
 #endif
 }
 
+static void mrdump_mini_clear_loads(void);
 void mrdump_mini_add_hang_raw(unsigned long vaddr, unsigned long size)
 {
 	LOGE("mrdump: hang data 0x%lx size:0x%lx\n", vaddr, size);
 	mrdump_mini_add_misc(vaddr, size, 0, "_HANG_DETECT_");
+	/* hang only remove mini rdump loads info to save storage space */
+	mrdump_mini_clear_loads();
 }
 
 #define EXTRA_MISC(func, name, max_size) \
@@ -888,6 +887,20 @@ static void mrdump_mini_add_loads(void)
 			mrdump_mini_add_entry((unsigned long)ti,
 					MRDUMP_MINI_SECTION_SIZE);
 		}
+	}
+}
+
+static void mrdump_mini_clear_loads(void)
+{
+	struct elf_phdr *phdr;
+	int i;
+
+	for (i = 0; i < MRDUMP_MINI_NR_SECTION; i++) {
+		phdr = &mrdump_mini_ehdr->phdrs[i];
+		if (phdr->p_type == PT_NULL)
+			continue;
+		if (phdr->p_type == PT_LOAD)
+			phdr->p_type = PT_NULL;
 	}
 }
 

@@ -645,6 +645,29 @@ static int mt6360_select_vinovp(struct mt6360_pmu_chg_info *mpci, u32 uV)
 					  i << MT6360_SHFT_CHG_VIN_OVP_VTHSEL);
 }
 
+static const u32 mt6360_vrechg_list[] = {
+	100, 150, 200, 250,
+};
+
+static int mt6360_set_vrech(struct mt6360_pmu_chg_info *mpci, u32 mV)
+{
+	int i;
+
+	dev_dbg(mpci->dev, "%s: vrech = %d\n", __func__, mV);
+
+	if (mV < mt6360_vrechg_list[0])
+		return -EINVAL;
+	for (i = 1; i < ARRAY_SIZE(mt6360_vrechg_list); i++) {
+		if (mV < mt6360_vrechg_list[i])
+			break;
+	}
+	i--;
+	return mt6360_pmu_reg_update_bits(mpci->mpi,
+					  MT6360_PMU_CHG_CTRL11,
+					  MT6360_MASK_VRECH,
+					  i << MT6360_SHFT_VRECH);
+}
+
 static inline int mt6360_read_zcv(struct mt6360_pmu_chg_info *mpci)
 {
 	int ret = 0;
@@ -790,6 +813,9 @@ out:
 	ret = mt6360_pmu_reg_update_bits(mpci->mpi,
 					 MT6360_PMU_CHG_CTRL2,
 					 MT6360_MASK_CHG_EN, en ? 0xff : 0);
+	ret = mt6360_pmu_reg_update_bits(mpci->mpi,
+					MT6360_PMU_CHG_CTRL2,
+					MT6360_MASK_BYPASS_MODE, 0x0);
 	if (ret < 0)
 		dev_notice(mpci->dev, "%s: fail, en = %d\n", __func__, en);
 vsys_wkard_fail:
@@ -808,7 +834,7 @@ static int mt6360_set_cv(struct charger_device *chg_dev, u32 uV)
 	struct mt6360_pmu_chg_info *mpci = charger_get_data(chg_dev);
 	u8 data = 0;
 
-	dev_dbg(mpci->dev, "%s: cv = %d\n", __func__, uV);
+	dev_err(mpci->dev, "%s: cv = %d\n", __func__, uV);
 	data = mt6360_trans_cv_sel(uV);
 	return mt6360_pmu_reg_update_bits(mpci->mpi,
 					  MT6360_PMU_CHG_CTRL4,
@@ -868,6 +894,7 @@ static int mt6360_set_aicr(struct charger_device *chg_dev, u32 uA)
 	int ret = 0;
 	u8 data = 0;
 
+	pr_err("uA: %d\n", uA);
 	dev_dbg(mpci->dev, "%s\n", __func__);
 	/* Toggle aicc for auto aicc mode */
 	if (!pdata->aicc_once) {
@@ -1334,7 +1361,7 @@ static int mt6360_enable_power_path(struct charger_device *chg_dev,
 {
 	struct mt6360_pmu_chg_info *mpci = charger_get_data(chg_dev);
 
-	dev_dbg(mpci->dev, "%s: en = %d\n", __func__, en);
+	dev_info(mpci->dev, "%s: en = %d\n", __func__, en);
 	return mt6360_pmu_reg_update_bits(mpci->mpi, MT6360_PMU_CHG_CTRL1,
 					MT6360_MASK_FORCE_SLEEP, en ? 0 : 0xff);
 }
@@ -1770,6 +1797,14 @@ static int mt6360_plug_in(struct charger_device *chg_dev)
 	int ret = 0;
 
 	dev_dbg(mpci->dev, "%s\n", __func__);
+
+	/* Get chg type det power supply */
+	mpci->psy = power_supply_get_by_name("charger");
+	if (!mpci->psy) {
+		dev_notice(mpci->dev,
+			"%s: get power supply failed\n", __func__);
+		return -EINVAL;
+	}
 
 	ret = mt6360_enable_wdt(mpci, true);
 	if (ret < 0) {
@@ -2639,6 +2674,13 @@ static int mt6360_chg_init_setting(struct mt6360_pmu_chg_info *mpci)
 	ret = mt6360_select_vinovp(mpci, 14500000);
 	if (ret < 0) {
 		dev_err(mpci->dev, "%s: unlimit vin for pump express\n",
+			__func__);
+		return ret;
+	}
+	/* adjust recharge voltage to 150mV */
+	ret = mt6360_set_vrech(mpci, 150);
+	if (ret < 0) {
+		dev_err(mpci->dev, "%s: set re-charge voltage fail\n",
 			__func__);
 		return ret;
 	}

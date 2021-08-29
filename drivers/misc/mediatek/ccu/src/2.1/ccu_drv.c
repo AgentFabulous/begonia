@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -94,8 +95,10 @@ static wait_queue_head_t wait_queue_enque;
 static struct ion_handle
 	*import_buffer_handle[CCU_IMPORT_BUF_NUM];
 
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_PM_WAKELOCKS
 struct wakeup_source ccu_wake_lock;
+#else
+struct wake_lock ccu_wake_lock;
 #endif
 /*static int g_bWaitLock;*/
 
@@ -811,6 +814,22 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd,
 
 		break;
 	}
+	case CCU_IOCTL_SEND_CMD:
+	{	/*--todo: not used for now, remove it*/
+		struct ccu_cmd_s cmd;
+
+		ret = copy_from_user(
+			&cmd, (void *)arg, sizeof(struct ccu_cmd_s));
+
+		if (ret != 0) {
+			LOG_ERR(
+			"[CCU_IOCTL_SEND_CMD] copy_from_user failed, ret=%d\n",
+			ret);
+			return -EFAULT;
+		}
+		ccu_send_command(&cmd);
+		break;
+	}
 
 	case CCU_IOCTL_FLUSH_LOG:
 	{
@@ -839,8 +858,7 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd,
 		LOG_DBG_MUST("request freq level: %d\n", freq_level);
 		if (freq_level == CCU_REQ_CAM_FREQ_NONE)
 			pm_qos_update_request(&_ccu_qos_request, 0);
-		else if ((freq_level < _step_size) &&
-				 (freq_level < MAX_FREQ_STEP))
+		else
 			pm_qos_update_request(&_ccu_qos_request,
 				_g_freq_steps[freq_level]);
 
@@ -1065,7 +1083,7 @@ static int ccu_release(struct inode *inode, struct file *flip)
 static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 {
 	unsigned long length = 0;
-	unsigned long pfn = 0x0;
+	unsigned int pfn = 0x0;
 
 	length = (vma->vm_end - vma->vm_start);
 	/*  */
@@ -1073,7 +1091,7 @@ static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 	pfn = vma->vm_pgoff << PAGE_SHIFT;
 
 	LOG_DBG
-	("CCU_mmap: vm_pgoff(0x%lx),pfn(0x%lx),phy(0x%lx)\n",
+	("CCU_mmap: vm_pgoff(0x%lx),pfn(0x%x),phy(0x%lx)\n",
 	vma->vm_pgoff, pfn, vma->vm_pgoff << PAGE_SHIFT);
 	LOG_DBG
 	("vm_start(0x%lx),vm_end(0x%lx),length(0x%lx)\n",
@@ -1085,7 +1103,7 @@ static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 		if (length > PAGE_SIZE) {
 			LOG_ERR("mmap range error :");
 			LOG_ERR
-		    ("module(0x%lx),length(0x%lx),CCU_HW_BASE(0x%x)!\n",
+		    ("module(0x%x),length(0x%lx),CCU_HW_BASE(0x%x)!\n",
 		     pfn, length, 0x4000);
 			return -EAGAIN;
 		}
@@ -1093,7 +1111,7 @@ static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 		if (length > CCU_CAMSYS_SIZE) {
 			LOG_ERR("mmap range error :");
 			LOG_ERR
-		    ("module(0x%lx),length(0x%lx),CCU_CAMSYS_BASE_HW(0x%x)!\n",
+		    ("module(0x%x),length(0x%lx),CCU_CAMSYS_BASE_HW(0x%x)!\n",
 		     pfn, length, 0x4000);
 			return -EAGAIN;
 		}
@@ -1101,7 +1119,7 @@ static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 		if (length > CCU_PMEM_SIZE) {
 			LOG_ERR("mmap range error :");
 			LOG_ERR
-		    ("module(0x%lx),length(0x%lx),CCU_PMEM_BASE_HW(0x%x)!\n",
+		    ("module(0x%x),length(0x%lx),CCU_PMEM_BASE_HW(0x%x)!\n",
 		     pfn, length, 0x4000);
 			return -EAGAIN;
 		}
@@ -1109,7 +1127,7 @@ static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 		if (length > CCU_DMEM_SIZE) {
 			LOG_ERR("mmap range error :");
 			LOG_ERR
-		    ("module(0x%lx),length(0x%lx),CCU_PMEM_BASE_HW(0x%x)!\n",
+		    ("module(0x%x),length(0x%lx),CCU_PMEM_BASE_HW(0x%x)!\n",
 		     pfn, length, 0x4000);
 			return -EAGAIN;
 		}
@@ -1365,8 +1383,11 @@ if ((strcmp("ccu", g_ccu_device->dev->of_node->name) == 0)) {
 			CCU_DEV_NAME, ret);
 			goto EXIT;
 		}
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_PM_WAKELOCKS
 	wakeup_source_init(&ccu_wake_lock, "ccu_lock_wakelock");
+#else
+			wake_lock_init(&ccu_wake_lock, WAKE_LOCK_SUSPEND,
+				       "ccu_lock_wakelock");
 #endif
 
 		/* enqueue/dequeue control in ihalpipe wrapper */

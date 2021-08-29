@@ -57,7 +57,6 @@ enum GBE_BOOST_DEVICE {
 	GBE_BOOST_IO,
 	GBE_BOOST_HE,
 	GBE_BOOST_GPU,
-	GBE_BOOST_LLF,
 	GBE_BOOST_NUM,
 };
 
@@ -146,7 +145,6 @@ void gbe_boost(enum GBE_KICKER kicker, int boost)
 	char u_io_string[11];
 	char u_boost_string[12];
 	char u_gpu_string[12];
-	char u_llf_string[12];
 
 	if (!pld)
 		return;
@@ -179,7 +177,6 @@ void gbe_boost(enum GBE_KICKER kicker, int boost)
 		strncpy(u_io_string, "IO_BOOST=1", 11);
 		strncpy(u_gpu_string, "GPU_BOOST=1", 12);
 		strncpy(u_boost_string, "GBE_BOOST=1", 12);
-		strncpy(u_llf_string, "LLF_BOOST=1", 12);
 	} else {
 		for (i = 0; i < cluster_num; i++) {
 			pld[i].max = -1;
@@ -190,7 +187,6 @@ void gbe_boost(enum GBE_KICKER kicker, int boost)
 		strncpy(u_io_string, "IO_BOOST=0", 11);
 		strncpy(u_gpu_string, "GPU_BOOST=0", 12);
 		strncpy(u_boost_string, "GBE_BOOST=0", 12);
-		strncpy(u_llf_string, "LLF_BOOST=0", 12);
 	}
 
 	if (test_bit(GBE_BOOST_CPU, &policy_mask))
@@ -200,10 +196,8 @@ void gbe_boost(enum GBE_KICKER kicker, int boost)
 		update_eas_uclamp_min(EAS_UCLAMP_KIR_GBE,
 			CGROUP_TA, uclamp_pct);
 
-	if (test_bit(GBE_BOOST_VCORE, &policy_mask)) {
-		if (pm_qos_request_active(&dram_req))
-			pm_qos_update_request(&dram_req, pm_req);
-	}
+	if (test_bit(GBE_BOOST_VCORE, &policy_mask))
+		pm_qos_update_request(&dram_req, pm_req);
 
 	if (test_bit(GBE_BOOST_IO, &policy_mask))
 		sentuevent(u_io_string);
@@ -213,9 +207,6 @@ void gbe_boost(enum GBE_KICKER kicker, int boost)
 
 	if (test_bit(GBE_BOOST_GPU, &policy_mask))
 		sentuevent(u_gpu_string);
-
-	if (test_bit(GBE_BOOST_LLF, &policy_mask))
-		sentuevent(u_llf_string);
 
 out:
 	mutex_unlock(&gbe_lock);
@@ -246,7 +237,7 @@ static ssize_t gbe_policy_mask_store(struct kobject *kobj,
 		}
 	}
 
-	if (val > 1 << GBE_BOOST_NUM || val < 0)
+	if (val > 64 || val < 0)
 		return count;
 
 	if (!pld)
@@ -256,13 +247,11 @@ static ssize_t gbe_policy_mask_store(struct kobject *kobj,
 		int i;
 		char u_io_string[11];
 		char u_gpu_string[12];
-		char u_llf_string[12];
 		char u_boost_string[12];
 
 		strncpy(u_io_string, "IO_BOOST=0", 11);
 		strncpy(u_gpu_string, "GPU_BOOST=0", 12);
 		strncpy(u_boost_string, "GBE_BOOST=0", 12);
-		strncpy(u_llf_string, "GPU_BOOST=0", 12);
 		for (i = 0; i < cluster_num; i++) {
 			pld[i].max = -1;
 			pld[i].min = -1;
@@ -273,11 +262,9 @@ static ssize_t gbe_policy_mask_store(struct kobject *kobj,
 
 		update_userlimit_cpu_freq(CPU_KIR_GBE, cluster_num, pld);
 		update_eas_uclamp_min(EAS_UCLAMP_KIR_GBE, CGROUP_TA, 0);
-		if (pm_qos_request_active(&dram_req))
-			pm_qos_update_request(&dram_req, PM_QOS_DDR_OPP_DEFAULT_VALUE);
+		pm_qos_update_request(&dram_req, PM_QOS_DDR_OPP_DEFAULT_VALUE);
 		sentuevent(u_io_string);
 		sentuevent(u_gpu_string);
-		sentuevent(u_llf_string);
 		sentuevent(u_boost_string);
 
 		mutex_unlock(&gbe_lock);

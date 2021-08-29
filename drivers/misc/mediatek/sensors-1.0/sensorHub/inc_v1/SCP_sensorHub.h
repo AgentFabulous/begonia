@@ -1,6 +1,7 @@
 /* SCP sensor hub driver
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -210,6 +211,20 @@ struct sar_event_t {
 	uint32_t status;
 };
 
+struct elevator_event_t{
+    int32_t status;
+};
+
+struct als_factory_strm_event_t{
+	struct {
+		int32_t data[3];
+		int32_t x_bias;
+		int32_t y_bias;
+		int32_t z_bias;
+	};
+	uint32_t status;
+};
+
 enum activity_type_t {
 	STILL,
 	STANDING,
@@ -266,6 +281,8 @@ struct data_unit_t {
 		struct in_pocket_event_t inpocket_event;
 		struct geofence_event_t geofence_data_t;
 		struct sar_event_t sar_event;
+		struct elevator_event_t elevator_data_t;
+		struct als_factory_strm_event_t als_factory_strm_event;
 		int32_t data[8];
 	};
 } __packed;

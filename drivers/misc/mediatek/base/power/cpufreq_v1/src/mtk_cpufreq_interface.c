@@ -596,11 +596,11 @@ static int cpufreq_cci_mode_proc_show(struct seq_file *m, void *v)
 #ifdef CONFIG_HYBRID_CPU_DVFS
 	mode = cpuhvfs_get_cci_mode();
 	if (mode == 0)
-		seq_puts(m, "cci_mode as Normal mode 0\n");
+		seq_puts(m, "cci_mode as Normal mode\n");
 	else if (mode == 1)
-		seq_puts(m, "cci_mode as Perf mode 1\n");
+		seq_puts(m, "cci_mode as Perf mode\n");
 	else
-		seq_puts(m, "cci_mode as Unknown mode 2\n");
+		seq_puts(m, "cci_mode as Unknown mode\n");
 #endif
 	return 0;
 }

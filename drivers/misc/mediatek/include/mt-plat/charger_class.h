@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -140,6 +141,16 @@ struct charger_ops {
 
 	/* charger type detection */
 	int (*enable_chg_type_det)(struct charger_device *dev, bool en);
+	int (*rerun_apsd)(struct charger_device *dev, bool en);
+
+	/* hvdcp detection control */
+	int (*enable_hvdcp_det)(struct charger_device *dev, bool en);
+
+	/* HVDCP type detection */
+	int (*get_hvdcp_type)(struct charger_device *dev, u32 *type);
+	int (*get_hvdcp_dpdm_status)(struct charger_device *dev, bool *status);
+	int (*set_hvdcp_dpdm)(struct charger_device *dev);
+	int (*check_hv_charging)(struct charger_device *dev);
 
 	/* run AICL */
 	int (*run_aicl)(struct charger_device *dev, u32 *uA);
@@ -258,6 +269,18 @@ extern int charger_dev_enable_safety_timer(
 	struct charger_device *charger_dev, bool en);
 extern int charger_dev_enable_chg_type_det(
 	struct charger_device *charger_dev, bool en);
+extern int charger_dev_rerun_apsd(
+	struct charger_device *charger_dev, bool en);
+extern int charger_dev_enable_hvdcp_det(
+	struct charger_device *charger_dev, bool en);
+extern int charger_dev_get_hvdcp_type(
+	struct charger_device *chg_dev, u32 *type);
+extern int charger_dev_get_hvdcp_dpdm_status(
+	struct charger_device *chg_dev, bool *status);
+extern int charger_dev_set_hvdcp_dpdm(
+	struct charger_device *chg_dev);
+extern int charger_dev_check_hv_charging(
+	struct charger_device *chg_dev);
 extern int charger_dev_enable_otg(
 	struct charger_device *charger_dev, bool en);
 extern int charger_dev_enable_discharge(

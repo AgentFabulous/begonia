@@ -116,48 +116,6 @@ enum{
 	/* _MLSCI_R1_EN_  = (1L<<4), */
 } ENUM_DMA2_EN;
 
-
-/* debug_data port sequence */
-enum{
-	BPCI_R1_DEBUG   = 0,
-	LSCI_R1_DEBUG,
-	RAWI_R2_DEBUG,
-	IMGO_R1_DEBUG,
-	RRZO_R1_DEBUG,
-	AAO_R1_DEBUG,
-	AFO_R1_DEBUG,
-	LCESO_R1_DEBUG,
-	UFEO_R1_DEBUG,
-	PDO_R1_DEBUG,
-	rsv_0_DEBUG,
-	TSFSO_R1_DEBUG,
-	PDI_R1_DEBUG,
-	LMVO_R1_DEBUG,
-	FLKO_R1_DEBUG,
-	RSSO_R1_DEBUG,
-	UFGO_R1_DEBUG,
-	RAWI_R3_DEBUG,
-	CQI_R1_DEBUG,
-	CQI_R2_DEBUG,
-	BPCI_R2_DEBUG,
-	BPCI_R3_DEBUG,
-	rsv_1_DEBUG,
-	UFDI_R2_DEBUG,
-	rsv_2_DEBUG,
-	rsv_3_DEBUG,
-	LTMSO_R1_DEBUG,
-	LCESHO_R1_DEBUG,
-	rsv_4_DEBUG,
-	RSSO_R2_DEBUG,
-	CRZO_R1_DEBUG,
-	CRZBO_R1_DEBUG,
-	CRZO_R2_DEBUG,
-	rsv_5_DEBUG,
-	YUVO_R1_DEBUG,
-	YUVBO_R1_DEBUG,
-	YUVCO_R1_DEBUG,
-} DEBUG_DATA;
-
 /**
  *    CAMSV_DMA_SOFT_RSTSTAT
  */
@@ -491,8 +449,6 @@ enum{
 #define CAM_REG_CQ_THR24_BASEADDR(module)       (isp_devs[module].regs + 0x0334)
 
 #define CAM_REG_TG_SEN_MODE(module)             (isp_devs[module].regs + 0x1F00)
-#define CAM_REG_TG_PATH_CFG(module)             (isp_devs[module].regs + 0x1F10)
-#define CAM_REG_TG_DCIF_CTL(module)             (isp_devs[module].regs + 0x1F68)
 #define CAM_REG_TG_VF_CON(module)               (isp_devs[module].regs + 0x1F04)
 #define CAM_REG_TG_INTER_ST(module)             (isp_devs[module].regs + 0x1F3C)
 #define CAM_REG_TG_SUB_PERIOD(module)           (isp_devs[module].regs + 0x1F74)
@@ -500,7 +456,6 @@ enum{
 #define CAM_REG_RRZ_IN_IMG(module)              (isp_devs[module].regs + 0x1104)
 #define CAM_REG_RRZ_OUT_IMG(module)             (isp_devs[module].regs + 0x1108)
 
-#define CAM_REG_DMA_CQ_COUNTER(module)          (isp_devs[module].regs + 0x40AC)
 #define CAM_REG_DMA_FRAME_HEADER_EN1(module)    (isp_devs[module].regs + 0x40BC)
 #define CAM_REG_IMGO_BASE_ADDR(module)          (isp_devs[module].regs + 0x4820)
 #define CAM_REG_IMGO_XSIZE(module)              (isp_devs[module].regs + 0x482C)
@@ -761,6 +716,8 @@ enum{
 #define CAM_REG_DMA_SOFT_RESET1(module)         (isp_devs[module].regs + 0x4010)
 #define CAM_REG_DMA_ERR_CTRL1(module)           (isp_devs[module].regs + 0x401C)
 
+
+
 /* MRAW */
 /* MRAW WDMA */
 #define CAM_REG_IMGO_M1_DRS(module)             LOG_NOTICE("MRAW TBD\n")
@@ -801,13 +758,11 @@ enum{
 #define CAMSV_REG_INT_EN(module)                (isp_devs[module].regs + 0x0018)
 #define CAMSV_REG_INT_STATUS(module)            (isp_devs[module].regs + 0x001C)
 #define CAMSV_REG_SW_CTL(module)                (isp_devs[module].regs + 0x0020)
-#define CAMSV_REG_DCIF_SET(module)              (isp_devs[module].regs + 0x0058)
 #define CAMSV_REG_FBC_IMGO_CTL1(module)         (isp_devs[module].regs + 0x0A00)
 #define CAMSV_REG_FBC_IMGO_CTL2(module)         (isp_devs[module].regs + 0x0A04)
 #define CAMSV_REG_IMGO_BASE_ADDR(module)        (isp_devs[module].regs + 0x0420)
 #define CAMSV_REG_TG_SEN_MODE(module)           (isp_devs[module].regs + 0x0130)
 #define CAMSV_REG_TG_VF_CON(module)             (isp_devs[module].regs + 0x0134)
-#define CAMSV_REG_TG_PATH_CFG(module)           (isp_devs[module].regs + 0x0140)
 #define CAMSV_REG_TG_INTER_ST(module)           (isp_devs[module].regs + 0x016C)
 #define CAMSV_REG_TG_TIME_STAMP(module)         (isp_devs[module].regs + 0x01A0)
 #define CAMSV_REG_DMA_SOF_RSTSTAT(module)       (isp_devs[module].regs + 0x0400)

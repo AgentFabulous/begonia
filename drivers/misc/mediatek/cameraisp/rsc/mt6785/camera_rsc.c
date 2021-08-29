@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -311,17 +312,17 @@ struct RSC_REQUEST_STRUCT {
 
 	unsigned int
 		enqueReqNum;   /* to judge it belongs to which frame package */
-	unsigned int FrameWRIdx; /* Frame write Index */
-	unsigned int RrameRDIdx; /* Frame read Index */
+	signed int FrameWRIdx; /* Frame write Index */
+	signed int RrameRDIdx; /* Frame read Index */
 	enum RSC_FRAME_STATUS_ENUM
 		RscFrameStatus[_SUPPORT_MAX_RSC_FRAME_REQUEST_];
 	struct RSC_Config RscFrameConfig[_SUPPORT_MAX_RSC_FRAME_REQUEST_];
 };
 
 struct RSC_REQUEST_RING_STRUCT {
-	unsigned int WriteIdx;     /* enque how many request  */
-	unsigned int ReadIdx;      /* read which request index */
-	unsigned int HWProcessIdx; /* HWWriteIdx */
+	signed int WriteIdx;     /* enque how many request  */
+	signed int ReadIdx;      /* read which request index */
+	signed int HWProcessIdx; /* HWWriteIdx */
 	struct RSC_REQUEST_STRUCT
 		RSCReq_Struct[_SUPPORT_MAX_RSC_REQUEST_RING_SIZE_];
 };
@@ -369,8 +370,8 @@ struct RSC_INFO_STRUCT {
 	unsigned int DebugMask; /* Debug Mask */
 	signed int IrqNum;
 	struct RSC_IRQ_INFO_STRUCT IrqInfo;
-	unsigned int WriteReqIdx;
-	unsigned int ReadReqIdx;
+	signed int WriteReqIdx;
+	signed int ReadReqIdx;
 	pid_t ProcessID[_SUPPORT_MAX_RSC_FRAME_REQUEST_];
 };
 
@@ -415,7 +416,6 @@ static struct SV_LOG_STR gSvLog[RSC_IRQ_TYPE_AMOUNT];
 	char *ptr; \
 	char *pDes;\
 	int avaLen;\
-	int ret;\
 	unsigned int *ptr2 = &gSvLog[irq]._cnt[ppb][logT];\
 	unsigned int str_leng;\
 	unsigned int logi;\
@@ -433,10 +433,8 @@ static struct SV_LOG_STR gSvLog[RSC_IRQ_TYPE_AMOUNT];
 		&(gSvLog[irq]._str[ppb][logT][gSvLog[irq]._cnt[ppb][logT]]);   \
 	avaLen = str_leng - 1 - gSvLog[irq]._cnt[ppb][logT];\
 	if (avaLen > 1) {\
-		ret = snprintf((char *)(pDes), avaLen, fmt,\
+		snprintf((char *)(pDes), avaLen, fmt,\
 			##__VA_ARGS__);   \
-		if (ret < 0)\
-			LOG_ERR("snprintf error");\
 		if ('\0' != gSvLog[irq]._str[ppb][logT][str_leng - 1]) {\
 			LOG_ERR("log str over flow(%d)", irq);\
 		} \
@@ -501,10 +499,7 @@ static struct SV_LOG_STR gSvLog[RSC_IRQ_TYPE_AMOUNT];
 			ptr = pDes = (char *)\
 			&(pSrc->_str[ppb][logT][pSrc->_cnt[ppb][logT]]);\
 			ptr2 = &(pSrc->_cnt[ppb][logT]);\
-			ret = snprintf((char *)(pDes), avaLen, fmt,\
-							##__VA_ARGS__);  \
-			if (ret < 0)\
-				LOG_ERR("snprintf error");\
+			snprintf((char *)(pDes), avaLen, fmt, ##__VA_ARGS__);  \
 			while (*ptr++ != '\0') {\
 				(*ptr2)++;\
 			} \
@@ -522,8 +517,8 @@ static struct SV_LOG_STR gSvLog[RSC_IRQ_TYPE_AMOUNT];
 	struct SV_LOG_STR *pSrc = &gSvLog[irq];\
 	char *ptr;\
 	unsigned int i;\
-	unsigned int ppb = 0;\
-	unsigned int logT = 0;\
+	signed int ppb = 0;\
+	signed int logT = 0;\
 	if (ppb_in > 1) {\
 		ppb = 1;\
 	} else{\
@@ -2649,13 +2644,13 @@ EXIT:
 /*******************************************************************************
  *
  ******************************************************************************/
-/*
 static signed int RSC_mmap(struct file *pFile, struct vm_area_struct *pVma)
 {
 	unsigned long length = 0;
 	unsigned int pfn = 0x0;
 
 	length = pVma->vm_end - pVma->vm_start;
+	/*  */
 	pVma->vm_page_prot = pgprot_noncached(pVma->vm_page_prot);
 	pfn = pVma->vm_pgoff << PAGE_SHIFT;
 
@@ -2682,10 +2677,10 @@ static signed int RSC_mmap(struct file *pFile, struct vm_area_struct *pVma)
 							pVma->vm_page_prot)) {
 		return -EAGAIN;
 	}
-
+	/*  */
 	return 0;
 }
-*/
+
 /*******************************************************************************
  *
  ******************************************************************************/
@@ -2699,7 +2694,7 @@ static const struct file_operations RSCFileOper = {
 	.open = RSC_open,
 	.release = RSC_release,
 	/* .flush   = mt_RSC_flush, */
-	/* .mmap = RSC_mmap, */
+	.mmap = RSC_mmap,
 	.unlocked_ioctl = RSC_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = RSC_ioctl_compat,
@@ -3160,7 +3155,7 @@ static struct platform_driver RSCDriver = {
 		}
 };
 
-#ifdef RSC_PROCFS
+
 static int rsc_dump_read(struct seq_file *m, void *v)
 {
 	int i, j;
@@ -3402,7 +3397,7 @@ static const struct file_operations rsc_reg_proc_fops = {
 	.read = seq_read,
 	.write = rsc_reg_write,
 };
-#endif
+
 
 /*******************************************************************************
  *
@@ -3450,10 +3445,9 @@ static signed int __init RSC_Init(void)
 	void *tmp;
 	/* FIX-ME: linux-3.10 procfs API changed */
 	/* use proc_create */
-#ifdef RSC_PROCFS
 	struct proc_dir_entry *proc_entry;
 	struct proc_dir_entry *isp_rsc_dir;
-#endif
+
 
 	int i;
 	/*  */
@@ -3481,7 +3475,6 @@ static signed int __init RSC_Init(void)
 	LOG_DBG("ISP_RSC_BASE: %lx\n", ISP_RSC_BASE);
 #endif
 
-#ifdef RSC_PROCFS
 	isp_rsc_dir = proc_mkdir("rsc", NULL);
 	if (!isp_rsc_dir) {
 		LOG_ERR("[%s]: fail to mkdir /proc/rsc\n", __func__);
@@ -3494,7 +3487,7 @@ static signed int __init RSC_Init(void)
 
 	proc_entry = proc_create("rsc_reg", 0644, isp_rsc_dir,
 							&rsc_reg_proc_fops);
-#endif
+
 
 	/* isr log */
 	if (PAGE_SIZE <

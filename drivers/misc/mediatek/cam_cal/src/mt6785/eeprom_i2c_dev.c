@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,14 +17,13 @@ static enum EEPROM_I2C_DEV_IDX gi2c_dev_sel[IMGSENSOR_SENSOR_IDX_MAX_NUM] = {
 	I2C_DEV_IDX_1, /* main */
 	I2C_DEV_IDX_2, /* sub */
 	I2C_DEV_IDX_3, /* main2 */
-	I2C_DEV_IDX_1, /* sub2 */
+	I2C_DEV_IDX_2, /* sub2 */
 	I2C_DEV_IDX_3, /* main3 */
 };
 
 enum EEPROM_I2C_DEV_IDX get_i2c_dev_sel(enum IMGSENSOR_SENSOR_IDX idx)
 {
-	if (idx >= IMGSENSOR_SENSOR_IDX_MIN_NUM &&
-		idx < IMGSENSOR_SENSOR_IDX_MAX_NUM)
+	if (idx < IMGSENSOR_SENSOR_IDX_MAX_NUM)
 		return gi2c_dev_sel[idx];
 	return I2C_DEV_IDX_1;
 }

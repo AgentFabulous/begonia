@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Author: Argus Lin <argus.lin@mediatek.com>
  */
 
@@ -73,6 +74,11 @@
 #define EINT_PIN_PLUG_IN        (1)
 #define EINT_PIN_PLUG_OUT       (0)
 #define EINT_PIN_MOISTURE_DETECTED (2)
+
+/*Audio Start*/
+#define MEDIA_PREVIOUS_SCAN_CODE 257
+#define MEDIA_NEXT_SCAN_CODE 258
+/*Audio End*/
 
 #ifdef CONFIG_ACCDET_EINT_IRQ
 enum pmic_eint_ID {
@@ -206,6 +212,22 @@ static int moisture_ext_r = 470000;
 static bool debug_thread_en;
 static bool dump_reg;
 static struct task_struct *thread;
+
+/* add fsa4480 */
+#ifdef CONFIG_USB_SWITCH_FSA4480
+
+enum fsa_function {
+	FSA_MIC_GND_SWAP,
+	FSA_USBC_ORIENTATION_CC1,
+	FSA_USBC_ORIENTATION_CC2,
+	FSA_USBC_DISPLAYPORT_DISCONNECTED,
+	FSA_EVENT_MAX,
+};
+static struct device_node *fsa_handle = NULL;
+extern int fsa4480_switch_event(struct device_node *node, enum fsa_function event);
+
+#endif
+/* end */
 
 /*******************local function declaration******************/
 #ifdef CONFIG_ACCDET_EINT_IRQ
@@ -1036,19 +1058,19 @@ static void send_key_event(u32 keycode, u32 flag)
 {
 	switch (keycode) {
 	case DW_KEY:
-		input_report_key(accdet_input_dev, KEY_VOLUMEDOWN, flag);
+		input_report_key(accdet_input_dev, MEDIA_NEXT_SCAN_CODE, flag);
 		input_sync(accdet_input_dev);
-		pr_debug("accdet KEY_VOLUMEDOWN %d\n", flag);
+		pr_debug("accdet MEDIA_NEXT_SCAN_CODE %d\n", flag);
 		break;
 	case UP_KEY:
-		input_report_key(accdet_input_dev, KEY_VOLUMEUP, flag);
+		input_report_key(accdet_input_dev, MEDIA_PREVIOUS_SCAN_CODE, flag);
 		input_sync(accdet_input_dev);
-		pr_debug("accdet KEY_VOLUMEUP %d\n", flag);
+		pr_debug("accdet MEDIA_PREVIOUS_SCAN_CODE %d\n", flag);
 		break;
 	case MD_KEY:
-		input_report_key(accdet_input_dev, KEY_PLAYPAUSE, flag);
+		input_report_key(accdet_input_dev, KEY_MEDIA, flag);
 		input_sync(accdet_input_dev);
-		pr_debug("accdet KEY_PLAYPAUSE %d\n", flag);
+		pr_debug("accdet KEY_MEDIA %d\n", flag);
 		break;
 	case AS_KEY:
 		input_report_key(accdet_input_dev, KEY_VOICECOMMAND, flag);
@@ -1141,11 +1163,14 @@ static void multi_key_detection(u32 cur_AB)
 	if (cur_eint_state == EINT_PIN_PLUG_IN)
 #endif
 		send_key_event(cur_key, !cur_AB);
-	else {
+#if (defined CONFIG_ACCDET_EINT_IRQ) || (defined CONFIG_ACCDET_EINT)
+	else
+	{
 		pr_info("accdet plugout sideeffect key,do not report key=%d\n",
 			cur_key);
 		cur_key = NO_KEY;
 	}
+#endif
 
 	if (cur_AB)
 		cur_key = NO_KEY;
@@ -1259,11 +1284,14 @@ static u32 get_moisture_sw_auxadc_check(void)
 
 static u32 adjust_eint_analog_setting(u32 eintID)
 {
+#ifdef CONFIG_SND_SOC_CS35L41_J10
 	if ((accdet_dts.eint_detect_mode == 0x3) ||
 		(accdet_dts.eint_detect_mode == 0x4)) {
 		/* ESD switches off */
 		pmic_write_clr(PMIC_RG_ACCDETSPARE_ADDR, 8);
 	}
+#else
+#endif
 	if (accdet_dts.eint_detect_mode == 0x4) {
 #ifdef CONFIG_ACCDET_SUPPORT_EINT0
 		/* enable RG_EINT0CONFIGACCDET */
@@ -1564,11 +1592,14 @@ static u32 adjust_eint_setting(u32 moistureID, u32 eintID)
 
 static void recover_eint_analog_setting(void)
 {
+#ifdef CONFIG_SND_SOC_CS35L41_J10
 	if ((accdet_dts.eint_detect_mode == 0x3) ||
 		(accdet_dts.eint_detect_mode == 0x4)) {
 		/* ESD switches on */
 		pmic_write_set(PMIC_RG_ACCDETSPARE_ADDR, 8);
 	}
+#else
+#endif
 	if (accdet_dts.eint_detect_mode == 0x4) {
 #ifdef CONFIG_ACCDET_SUPPORT_EINT0
 		/* disable RG_EINT0CONFIGACCDET */
@@ -2761,6 +2792,13 @@ static int accdet_get_dts_data(void)
 		accdet_dts.eint_use_ext_res,
 		accdet_dts.moisture_use_ext_res);
 
+#ifdef CONFIG_USB_SWITCH_FSA4480
+	fsa_handle = of_parse_phandle(node, "fsa4480-i2c-handle", 0);
+	if (NULL == fsa_handle) {
+		pr_err("%s: get fsa_handle error. \n", __func__);
+	}
+#endif
+
 	return 0;
 }
 
@@ -3301,9 +3339,9 @@ int mt_accdet_probe(struct platform_device *dev)
 	}
 
 	__set_bit(EV_KEY, accdet_input_dev->evbit);
-	__set_bit(KEY_PLAYPAUSE, accdet_input_dev->keybit);
-	__set_bit(KEY_VOLUMEDOWN, accdet_input_dev->keybit);
-	__set_bit(KEY_VOLUMEUP, accdet_input_dev->keybit);
+	__set_bit(KEY_MEDIA, accdet_input_dev->keybit);
+	__set_bit(MEDIA_NEXT_SCAN_CODE, accdet_input_dev->keybit);
+	__set_bit(MEDIA_PREVIOUS_SCAN_CODE, accdet_input_dev->keybit);
 	__set_bit(KEY_VOICECOMMAND, accdet_input_dev->keybit);
 
 	__set_bit(EV_SW, accdet_input_dev->evbit);
@@ -3390,7 +3428,11 @@ int mt_accdet_probe(struct platform_device *dev)
 	}
 
 #ifdef CONFIG_ACCDET_EINT
+
+#ifndef CONFIG_USB_SWITCH_FSA4480
 	ret = ext_eint_setup(dev);
+#endif
+
 	if (ret) {
 		pr_notice("%s ap eint setup fail.ret:%d\n", __func__, ret);
 		goto err_eint_setup;
@@ -3479,3 +3521,23 @@ long mt_accdet_unlocked_ioctl(struct file *file, unsigned int cmd,
 	}
 	return 0;
 }
+
+#ifdef CONFIG_USB_SWITCH_FSA4480
+void accdet_eint_callback_wrapper(unsigned int plug_status)
+{
+	int ret = 0;
+
+	pr_info("%s: call ex eint handler\n", __func__);
+
+	cur_eint_state = plug_status;
+
+	disable_irq_nosync(accdet_irq);
+
+	pr_info("accdet %s(), cur_eint_state=%d\n", __func__, cur_eint_state);
+
+	ret = queue_work(eint_workqueue, &eint_work);
+
+	pr_info("%s: exit queue work\n", __func__);
+}
+EXPORT_SYMBOL(accdet_eint_callback_wrapper);
+#endif

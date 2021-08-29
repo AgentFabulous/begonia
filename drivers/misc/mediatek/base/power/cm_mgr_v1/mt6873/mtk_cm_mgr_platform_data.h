@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -59,7 +60,7 @@ static int cm_mgr_dram_level;
 static int cm_mgr_loop;
 static int total_bw_value;
 #ifdef USE_BCPU_WEIGHT
-int cpu_power_bcpu_weight_max = 100;
+int cpu_power_bcpu_weight_max = 300;
 int cpu_power_bcpu_weight_min = 100;
 #endif /* USE_BCPU_WEIGHT */
 unsigned int cpu_power_ratio_up[CM_MGR_EMI_OPP] = {140, 100, 140, 100, 140};

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -52,11 +53,13 @@ void apu_power_dump_opp_table(struct seq_file *s)
 int apu_power_dump_curr_status(struct seq_file *s, int oneline_str)
 {
 	struct apu_power_info info = {0};
-	u64 time;
+	uint64_t time;
 	ulong  rem_nsec;
 
 	time = sched_clock();
 	rem_nsec = do_div(time, 1000000000);
+
+
 	info.id = 0;
 	info.type = 1;
 

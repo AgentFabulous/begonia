@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -33,6 +34,8 @@ static const char *this_state_name[DTS_GPIO_STATE_MAX] = {
 	"mode_te_gpio",
 	"mode_te_te",
 	"mode_te1_te",
+	"lcd_bl_bias_en1",
+	"lcd_bl_bias_en0",
 };
 
 /* pinctrl implementation */

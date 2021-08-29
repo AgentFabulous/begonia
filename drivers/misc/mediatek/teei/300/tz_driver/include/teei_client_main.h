@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2019, MICROTRUST Incorporated
+ * Copyright (C) 2021 XiaoMi, Inc.
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -83,5 +84,7 @@ void teei_cpus_read_lock(void);
 void teei_cpus_read_unlock(void);
 void teei_cpus_write_lock(void);
 void teei_cpus_write_unlock(void);
+
+int teei_set_switch_pri(unsigned long policy);
 
 #endif /* __TEEI_CLIENT_MAIN_H__ */

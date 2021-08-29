@@ -35,6 +35,7 @@
 #include <mali_kbase_mem_pool_group.h>
 #include <mmu/mali_kbase_mmu.h>
 #include <tl/mali_kbase_timeline.h>
+#include <tl/mali_kbase_tracepoints.h>
 
 #ifdef CONFIG_DEBUG_FS
 #include <mali_kbase_debug_mem_view.h>
@@ -46,12 +47,14 @@ void kbase_context_debugfs_init(struct kbase_context *const kctx)
 	kbase_mem_pool_debugfs_init(kctx->kctx_dentry, kctx);
 	kbase_jit_debugfs_init(kctx);
 	kbasep_jd_debugfs_ctx_init(kctx);
+	kbase_debug_job_fault_context_init(kctx);
 }
 KBASE_EXPORT_SYMBOL(kbase_context_debugfs_init);
 
 void kbase_context_debugfs_term(struct kbase_context *const kctx)
 {
 	debugfs_remove_recursive(kctx->kctx_dentry);
+	kbase_debug_job_fault_context_term(kctx);
 }
 KBASE_EXPORT_SYMBOL(kbase_context_debugfs_term);
 #else
@@ -111,55 +114,34 @@ static int kbase_context_submit_check(struct kbase_context *kctx)
 	return 0;
 }
 
-static void kbase_context_flush_jobs(struct kbase_context *kctx)
-{
-	kbase_jd_zap_context(kctx);
-	flush_workqueue(kctx->jctx.job_done_wq);
-}
-
-static void kbase_context_free(struct kbase_context *kctx)
-{
-	kbase_timeline_post_kbase_context_destroy(kctx);
-
-	vfree(kctx);
-}
-
 static const struct kbase_context_init context_init[] = {
-	{NULL, kbase_context_free, NULL},
-	{ kbase_context_common_init, kbase_context_common_term, NULL },
-	{ kbase_dma_fence_init, kbase_dma_fence_term,
-	  "DMA fence initialization failed" },
-	{ kbase_context_mem_pool_group_init, kbase_context_mem_pool_group_term,
-	  "Memory pool goup initialization failed" },
-	{ kbase_mem_evictable_init, kbase_mem_evictable_deinit,
-	  "Memory evictable initialization failed" },
-	{ kbase_context_mmu_init, kbase_context_mmu_term,
-	  "MMU initialization failed" },
-	{ kbase_context_mem_alloc_page, kbase_context_mem_pool_free,
-	  "Memory alloc page failed" },
-	{ kbase_region_tracker_init, kbase_region_tracker_term,
-	  "Region tracker initialization failed" },
-	{ kbase_sticky_resource_init, kbase_context_sticky_resource_term,
-	  "Sticky resource initialization failed" },
-	{ kbase_jit_init, kbase_jit_term, "JIT initialization failed" },
-	{ kbase_context_kbase_kinstr_jm_init,
-	  kbase_context_kbase_kinstr_jm_term,
-	  "JM instrumentation initialization failed" },
-	{ kbase_context_kbase_timer_setup, NULL, NULL },
-	{ kbase_event_init, kbase_event_cleanup,
-	  "Event initialization failed" },
-	{ kbasep_js_kctx_init, kbasep_js_kctx_term,
-	  "JS kctx initialization failed" },
-	{ kbase_jd_init, kbase_jd_exit, "JD initialization failed" },
-	{ kbase_context_submit_check, NULL, NULL },
-#ifdef CONFIG_DEBUG_FS
-	{kbase_debug_job_fault_context_init,
-		kbase_debug_job_fault_context_term,
-		"Job fault context initialization failed"},
-#endif
-	{NULL, kbase_context_flush_jobs, NULL},
-	{kbase_context_add_to_dev_list, kbase_context_remove_from_dev_list,
-		"Adding kctx to device failed"},
+	{kbase_context_common_init, kbase_context_common_term, NULL},
+	{kbase_context_mem_pool_group_init, kbase_context_mem_pool_group_term,
+			"Memory pool goup initialization failed"},
+	{kbase_mem_evictable_init, kbase_mem_evictable_deinit,
+			"Memory evictable initialization failed"},
+	{kbasep_js_kctx_init, kbasep_js_kctx_term,
+			"JS kctx initialization failed"},
+	{kbase_jd_init, kbase_jd_exit,
+			"JD initialization failed"},
+	{kbase_event_init, kbase_event_cleanup,
+			"Event initialization failed"},
+	{kbase_dma_fence_init, kbase_dma_fence_term,
+			"DMA fence initialization failed"},
+	{kbase_context_mmu_init, kbase_context_mmu_term,
+			"MMU initialization failed"},
+	{kbase_context_mem_alloc_page, kbase_context_mem_pool_free,
+			"Memory alloc page failed"},
+	{kbase_region_tracker_init, kbase_region_tracker_term,
+			"Region tracker initialization failed"},
+	{kbase_sticky_resource_init, kbase_context_sticky_resource_term,
+			"Sticky resource initialization failed"},
+	{kbase_jit_init, kbase_jit_term,
+			"JIT initialization failed"},
+	{kbase_context_kbase_kinstr_jm_init, kbase_context_kbase_kinstr_jm_term,
+			"JM instrumentation initialization failed"},
+	{kbase_context_kbase_timer_setup, NULL, NULL},
+	{kbase_context_submit_check, NULL, NULL},
 };
 
 static void kbase_context_term_partial(
@@ -203,23 +185,14 @@ struct kbase_context *kbase_create_context(struct kbase_device *kbdev,
 #if defined(CONFIG_64BIT)
 	else
 		kbase_ctx_flag_set(kctx, KCTX_FORCE_SAME_VA);
-#endif /* defined(CONFIG_64BIT) */
+#endif /* !defined(CONFIG_64BIT) */
 
 	for (i = 0; i < ARRAY_SIZE(context_init); i++) {
-		int err = 0;
-
-		if (context_init[i].init)
-			err = context_init[i].init(kctx);
+		int err = context_init[i].init(kctx);
 
 		if (err) {
 			dev_err(kbdev->dev, "%s error = %d\n",
 						context_init[i].err_mes, err);
-
-			/* kctx should be freed by kbase_context_free().
-			 * Otherwise it will result in memory leak.
-			 */
-			WARN_ON(i == 0);
-
 			kbase_context_term_partial(kctx, i);
 			return NULL;
 		}
@@ -240,20 +213,16 @@ void kbase_destroy_context(struct kbase_context *kctx)
 	if (WARN_ON(!kbdev))
 		return;
 
-	/* Context termination could happen whilst the system suspend of
-	 * the GPU device is ongoing or has completed. It has been seen on
-	 * Customer side that a hang could occur if context termination is
-	 * not blocked until the resume of GPU device.
+	/* Ensure the core is powered up for the destroy process
+	 * A suspend won't happen here, because we're in a syscall
+	 * from a userspace thread.
 	 */
-	while (kbase_pm_context_active_handle_suspend(
-		kbdev, KBASE_PM_SUSPEND_HANDLER_DONT_INCREASE)) {
-		dev_info(kbdev->dev,
-			 "Suspend in progress when destroying context");
-		wait_event(kbdev->pm.resume_wait,
-			   !kbase_pm_is_suspending(kbdev));
-	}
+	kbase_pm_context_active(kbdev);
 
 	kbase_mem_pool_group_mark_dying(&kctx->mem_pools);
+
+	kbase_jd_zap_context(kctx);
+	flush_workqueue(kctx->jctx.job_done_wq);
 
 	kbase_context_term_partial(kctx, ARRAY_SIZE(context_init));
 

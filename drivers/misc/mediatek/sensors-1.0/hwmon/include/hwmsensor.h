@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -82,8 +83,13 @@
 #define SENSOR_TYPE_RGBW                               70
 #define SENSOR_TYPE_GYRO_TEMPERATURE                   71
 #define SENSOR_TYPE_SAR                                72
+#define SENSOR_TYPE_PS_FACTORY_STRM (73)
+#define SENSOR_TYPE_ALS_FACTORY_STRM (74)
+#define SENSOR_TYPE_SAR_ALGO (75)
+#define SENSOR_TYPE_ELEVATOR_DETECT  (76)
+
 /* end sensor type */
-#define SENSOR_TYPE_MAX_NUM                            SENSOR_TYPE_SAR
+#define SENSOR_TYPE_MAX_NUM                            SENSOR_TYPE_ELEVATOR_DETECT
 #define SENSOR_TYPE_MAX_NUM_PLUS_ONE                   (SENSOR_TYPE_MAX_NUM + 1)
 
 /*---------------------------------------------------------------------------*/
@@ -155,8 +161,14 @@
 #define ID_RGBW                 (ID_BASE + SENSOR_TYPE_RGBW - 1)
 #define ID_GYRO_TEMPERATURE     (ID_BASE + SENSOR_TYPE_GYRO_TEMPERATURE - 1)
 #define ID_SAR                  (ID_BASE + SENSOR_TYPE_SAR - 1)
+
+#define ID_PS_FACTORY_STRM (ID_BASE + SENSOR_TYPE_PS_FACTORY_STRM - 1)
+#define ID_ALS_FACTORY_STRM (ID_BASE + SENSOR_TYPE_ALS_FACTORY_STRM - 1)
+#define ID_SAR_ALGO (ID_BASE + SENSOR_TYPE_SAR_ALGO - 1)
+#define ID_ELEVATOR_DETECT (ID_BASE + SENSOR_TYPE_ELEVATOR_DETECT - 1)
+
 /* end sensor ID */
-#define ID_SENSOR_MAX_HANDLE    (ID_SAR)
+#define ID_SENSOR_MAX_HANDLE    (ID_ELEVATOR_DETECT)
 #define ID_SENSOR_MAX_HANDLE_PLUS_ONE    (ID_SENSOR_MAX_HANDLE + 1)
 
 #if (ID_SENSOR_MAX_HANDLE_PLUS_ONE != SENSOR_TYPE_MAX_NUM)

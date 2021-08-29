@@ -38,12 +38,6 @@
 #include <linux/stringhash.h>
 #include "tee_routing_config.h"
 
-#if IS_ENABLED(CONFIG_MTK_ENG_BUILD)
-#define trusty_dbg(dev, fmt, ...) dev_dbg(dev, fmt, ##__VA_ARGS__)
-#else
-#define trusty_dbg(dev, fmt, ...)
-#endif
-
 #define MAX_DEVICES			4
 
 #define REPLY_TIMEOUT			5000
@@ -325,7 +319,7 @@ static int is_valid_vds(struct tipc_virtio_dev *vds)
 	int i = 0;
 	int ret = 0;
 
-	trusty_dbg(&vds->vdev->dev, "%s: vds 0x%p\n", __func__, vds);
+	pr_debug("%s: vds 0x%p\n", __func__, vds);
 	if (unlikely(!virt_addr_valid(vds)))
 		return -EFAULT;
 
@@ -1639,7 +1633,7 @@ static void _handle_conn_rsp(struct tipc_virtio_dev *vds,
 		return;
 	}
 
-	trusty_dbg(&vds->vdev->dev,
+	dev_dbg(&vds->vdev->dev,
 		"%s: connection response: for addr 0x%x: status %d remote addr 0x%x\n",
 		__func__, rsp->target, rsp->status, rsp->remote);
 
@@ -1678,7 +1672,7 @@ static void _handle_disc_req(struct tipc_virtio_dev *vds,
 		return;
 	}
 
-	trusty_dbg(&vds->vdev->dev, "%s: disconnect request: for addr 0x%x\n",
+	dev_dbg(&vds->vdev->dev, "%s: disconnect request: for addr 0x%x\n",
 		__func__, req->target);
 
 	chan = vds_lookup_channel(vds, req->target);
@@ -1707,7 +1701,7 @@ static void _handle_ctrl_msg(struct tipc_virtio_dev *vds,
 		return;
 	}
 
-	trusty_dbg(&vds->vdev->dev,
+	dev_dbg(&vds->vdev->dev,
 		"%s: Incoming ctrl message: src 0x%x type %d len %d\n",
 		__func__, src, msg->type, msg->body_len);
 
@@ -1768,7 +1762,7 @@ static int _handle_rxbuf(struct tipc_virtio_dev *vds,
 		goto drop_it;
 	}
 
-	trusty_dbg(dev, "From: %d, To: %d, Len: %d, Flags: 0x%x, Reserved: %d\n",
+	dev_dbg(dev, "From: %d, To: %d, Len: %d, Flags: 0x%x, Reserved: %d\n",
 		msg->src, msg->dst, msg->len, msg->flags, msg->reserved);
 
 	/* message directed to control endpoint is a special case */
@@ -1938,7 +1932,7 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 
 	vdev->priv = vds;
 	vds->state = VDS_OFFLINE;
-	trusty_dbg(&vdev->dev, "%s: done\n", __func__);
+	dev_dbg(&vdev->dev, "%s: done\n", __func__);
 	return 0;
 
 err_free_rx_buffers:

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -397,8 +398,8 @@ void disp_helper_option_init(void)
 
 	disp_helper_set_option(DISP_OPT_USE_PQ, 1);
 	disp_helper_set_option(DISP_OPT_MUTEX_EOF_EN_FOR_CMD_MODE, 1);
-	disp_helper_set_option(DISP_OPT_ESD_CHECK_RECOVERY, 1);
-	disp_helper_set_option(DISP_OPT_ESD_CHECK_SWITCH, 1);
+	disp_helper_set_option(DISP_OPT_ESD_CHECK_RECOVERY, 0);
+	disp_helper_set_option(DISP_OPT_ESD_CHECK_SWITCH, 0);
 
 	disp_helper_set_option(DISP_OPT_BYPASS_OVL, 0);
 	disp_helper_set_option(DISP_OPT_FPS_CALC_WND, 10);
@@ -428,7 +429,7 @@ void disp_helper_option_init(void)
 	disp_helper_set_option(DISP_OPT_AOD, 1);
 
 	/* ARR phase 1 option */
-	disp_helper_set_option(DISP_OPT_ARR_PHASE_1, 0);
+	disp_helper_set_option(DISP_OPT_ARR_PHASE_1, 1);
 
 	disp_helper_set_option(DISP_OPT_RSZ, 0);
 	disp_helper_set_option(DISP_OPT_RPO, 1);

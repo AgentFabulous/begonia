@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,6 +23,8 @@ int last_als_report_data = -1;
 /* AAL default delay timer(nano seconds)*/
 #define AAL_DELAY 200000000
 
+#define FACTORY_BUILD 0
+
 static struct alsps_init_info *alsps_init_list[MAX_CHOOSE_ALSPS_NUM] = {0};
 
 int als_data_report_t(int value, int status, int64_t time_stamp)
@@ -29,6 +32,8 @@ int als_data_report_t(int value, int status, int64_t time_stamp)
 	int err = 0;
 	struct alsps_context *cxt = NULL;
 	struct sensor_event event;
+
+	pr_notice("[ALS]%s! %d, %d\n", __func__, value, status);
 
 	memset(&event, 0, sizeof(struct sensor_event));
 
@@ -43,6 +48,14 @@ int als_data_report_t(int value, int status, int64_t time_stamp)
 		err = sensor_input_event(cxt->als_mdev.minor, &event);
 		cxt->is_get_valid_als_data_after_enable = true;
 	}
+#if FACTORY_BUILD
+	event.handle = ID_LIGHT;
+	event.flush_action = DATA_ACTION;
+	event.word[0] = value;
+	event.status = status;
+	err = sensor_input_event(cxt->als_mdev.minor, &event);
+	last_als_report_data = value;
+#else
 	if (value != last_als_report_data) {
 		event.handle = ID_LIGHT;
 		event.flush_action = DATA_ACTION;
@@ -52,6 +65,7 @@ int als_data_report_t(int value, int status, int64_t time_stamp)
 		if (err >= 0)
 			last_als_report_data = value;
 	}
+#endif
 	return err;
 }
 int als_data_report(int value, int status)
@@ -150,6 +164,8 @@ int ps_cali_report(int *value)
 	event.flush_action = CALI_ACTION;
 	event.word[0] = value[0];
 	event.word[1] = value[1];
+	event.word[2] = value[2];
+	event.word[3] = value[3];
 	err = sensor_input_event(alsps_context_obj->ps_mdev.minor, &event);
 	return err;
 }

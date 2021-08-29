@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -13,10 +14,10 @@
 
 #ifndef _CCU_IMGSENSOR_H_
 #define _CCU_IMGSENSOR_H_
-#include "ccu_i2c.h"
+
 void ccu_get_current_fps(int32_t *current_fps_list);
 
-void ccu_get_sensor_i2c_info(struct ccu_i2c_info *sensor_info);
+void ccu_get_sensor_i2c_slave_addr(int32_t *sensorI2cSlaveAddr);
 
 void ccu_get_sensor_name(char **sensor_name);
 

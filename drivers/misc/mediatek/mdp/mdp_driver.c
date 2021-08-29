@@ -155,7 +155,7 @@ static int cmdq_release(struct inode *pInode, struct file *pFile)
 	struct cmdqFileNodeStruct *pNode;
 	unsigned long flags;
 
-	CMDQ_LOG("CMDQ driver release fd=%p begin\n", pFile);
+	CMDQ_VERBOSE("CMDQ driver release fd=%p begin\n", pFile);
 
 	pNode = (struct cmdqFileNodeStruct *)pFile->private_data;
 
@@ -173,9 +173,6 @@ static int cmdq_release(struct inode *pInode, struct file *pFile)
 
 	spin_unlock_irqrestore(&pNode->nodeLock, flags);
 
-	/* release by mapping job */
-	mdp_ioctl_free_job_by_node(pNode);
-
 	/* scan through tasks that created by
 	 * this file node and release them
 	 */
@@ -187,7 +184,7 @@ static int cmdq_release(struct inode *pInode, struct file *pFile)
 	mdp_ioctl_free_readback_slots_by_node(pFile);
 	cmdqCoreFreeWriteAddressByNode(pFile, CMDQ_CLT_MDP);
 
-	CMDQ_LOG("CMDQ driver release end\n");
+	CMDQ_VERBOSE("CMDQ driver release end\n");
 
 	return 0;
 }

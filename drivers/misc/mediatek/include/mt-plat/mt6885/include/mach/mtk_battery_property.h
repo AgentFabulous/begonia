@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,11 +16,11 @@
 #define _MTK_BATTERY_PROPERTY_H
 
 /* customize */
-#define DIFFERENCE_FULLOCV_ITH	200	/* mA */
+#define DIFFERENCE_FULLOCV_ITH	250	/* mA */
 #define MTK_CHR_EXIST 1
 #define KEEP_100_PERCENT 1
 #define R_FG_VALUE	5				/* mOhm */
-#define EMBEDDED_SEL 0
+#define EMBEDDED_SEL 1
 #define PMIC_SHUTDOWN_CURRENT 20	/* 0.01 mA */
 #define FG_METER_RESISTANCE	100
 #define CAR_TUNE_VALUE	100 /*1.00 */
@@ -76,7 +77,7 @@
 #define DIFFERENCE_FULL_CV 1000 /*0.01%*/
 #define PSEUDO1_EN 1
 #define PSEUDO100_EN 1
-#define PSEUDO100_EN_DIS 1
+#define PSEUDO100_EN_DIS 0
 
 #define DIFF_SOC_SETTING 50	/* 0.01% */
 #define DIFF_BAT_TEMP_SETTING 1
@@ -91,9 +92,9 @@
 #define FG_PRE_TRACKING_EN 1
 #define VBAT2_DET_TIME 5
 #define VBAT2_DET_COUNTER 6
-#define VBAT2_DET_VOLTAGE1	34500
-#define VBAT2_DET_VOLTAGE2	32000
-#define VBAT2_DET_VOLTAGE3	35000
+#define VBAT2_DET_VOLTAGE1	34000
+#define VBAT2_DET_VOLTAGE2	33500
+#define VBAT2_DET_VOLTAGE3	34500
 
 /* PCB setting */
 #define CALIBRATE_CAR_TUNE_VALUE_BY_META_TOOL
@@ -102,7 +103,7 @@
 /* Aging Compensation 1*/
 #define AGING_FACTOR_MIN 90
 #define AGING_FACTOR_DIFF 10
-#define DIFFERENCE_VOLTAGE_UPDATE 30
+#define DIFFERENCE_VOLTAGE_UPDATE 50
 #define AGING_ONE_EN 1
 #define AGING1_UPDATE_SOC 30
 #define AGING1_LOAD_SOC 70
@@ -120,14 +121,14 @@
 #define AGING_5_EN 1
 #define AGING_6_EN 1
 
-#define AGING4_UPDATE_SOC 10
+#define AGING4_UPDATE_SOC 40
 #define AGING4_LOAD_SOC 70
 
 #define AGING5_UPDATE_SOC 30
-#define AGING5_LOAD_SOC 35
+#define AGING5_LOAD_SOC 70
 
 #define AGING6_UPDATE_SOC 30
-#define AGING6_LOAD_SOC 35
+#define AGING6_LOAD_SOC 70
 
 /* threshold */
 #define HWOCV_SWOCV_DIFF	300
@@ -172,7 +173,7 @@
 #define DIFF_IAVG_TH 3000
 
 /* ZCV INTR */
-#define ZCV_SUSPEND_TIME 7
+#define ZCV_SUSPEND_TIME 3
 #define SLEEP_CURRENT_AVG 200 /*0.1mA*/
 #define ZCV_CAR_GAP_PERCENTAGE 1
 
@@ -241,24 +242,10 @@
 
 #define UI_FULL_LIMIT_TIME 99999
 
-#define UI_FULL_LIMIT_FC_SOC0 9900
-#define UI_FULL_LIMIT_FC_ITH0 3000
-
-#define UI_FULL_LIMIT_FC_SOC1 9900
-#define UI_FULL_LIMIT_FC_ITH1 3100
-
-#define UI_FULL_LIMIT_FC_SOC2 9900
-#define UI_FULL_LIMIT_FC_ITH2 3200
-
-#define UI_FULL_LIMIT_FC_SOC3 9900
-#define UI_FULL_LIMIT_FC_ITH3 3300
-
-#define UI_FULL_LIMIT_FC_SOC4 9900
-#define UI_FULL_LIMIT_FC_ITH4 3400
 
 /* using voltage to limit uisoc in 1% case */
 /* UI_LOW_LIMIT_VTH0=36000 means 3.6v */
-#define UI_LOW_LIMIT_EN 0
+#define UI_LOW_LIMIT_EN 1
 
 #define UI_LOW_LIMIT_SOC0 200
 #define UI_LOW_LIMIT_VTH0 34500

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -221,8 +222,20 @@ ssize_t scp_A_log_read(char __user *data, size_t len)
 
 	mutex_lock(&scp_A_log_mutex);
 
-	r_pos = SCP_A_buf_info->r_pos;
 	w_pos = SCP_A_buf_info->w_pos;
+
+
+#ifdef SCP_LOGGER_OVERWRITE
+	pr_err("scp_A_log_read: len= %d\n", len);
+
+	if (get_scp_semaphore(HW_SEM_LOGGER) < 0) {
+		pr_err("[SCP]: HW_semaphore Get fail.\n");
+		mutex_unlock(&scp_A_log_mutex);
+		return 0;
+	}
+#endif
+
+	r_pos = SCP_A_buf_info->r_pos;
 
 	if (r_pos == w_pos)
 		goto error;
@@ -259,6 +272,14 @@ ssize_t scp_A_log_read(char __user *data, size_t len)
 	SCP_A_buf_info->r_pos = r_pos;
 
 error:
+#ifdef SCP_LOGGER_OVERWRITE
+	if (release_scp_semaphore(HW_SEM_LOGGER) < 0) {
+		pr_err("[SCP]: HW_semaphore Release fail.\n");
+		mutex_unlock(&scp_A_log_mutex);
+		return 0;
+	}
+#endif
+
 	mutex_unlock(&scp_A_log_mutex);
 
 	return datalen;
@@ -498,9 +519,17 @@ static ssize_t scp_A_mobile_log_UT_show(struct device *kobj,
 
 	mutex_lock(&scp_A_log_mutex);
 
-	r_pos = SCP_A_buf_info->r_pos;
 	w_pos = SCP_A_buf_info->w_pos;
 
+#ifdef SCP_LOGGER_OVERWRITE
+	if (get_scp_semaphore(HW_SEM_LOGGER) < 0) {
+		pr_err("[SCP]: HW_semaphore Get fail.\n");
+		mutex_unlock(&scp_A_log_mutex);
+		return 0;
+	}
+#endif
+
+	r_pos = SCP_A_buf_info->r_pos;
 	if (r_pos == w_pos)
 		goto error;
 
@@ -526,6 +555,14 @@ static ssize_t scp_A_mobile_log_UT_show(struct device *kobj,
 	SCP_A_buf_info->r_pos = r_pos;
 
 error:
+#ifdef SCP_LOGGER_OVERWRITE
+	if (release_scp_semaphore(HW_SEM_LOGGER) < 0) {
+		pr_err("[SCP]: HW_semaphore Release fail.\n");
+		mutex_unlock(&scp_A_log_mutex);
+		return 0;
+	}
+#endif
+
 	mutex_unlock(&scp_A_log_mutex);
 
 	return len;
@@ -762,9 +799,6 @@ void scp_crash_log_move_to_buf(enum scp_core_id scp_id)
 	unsigned int log_start_idx;  /* SCP log start pointer */
 	unsigned int log_end_idx;    /* SCP log end pointer */
 	unsigned int w_pos;          /* buf write pointer */
-	char *dram_logger_limit = /* SCP log reserve limitation */
-		(char *)(scp_get_reserve_mem_virt(SCP_A_LOGGER_MEM_ID)
-		+ scp_get_reserve_mem_size(SCP_A_LOGGER_MEM_ID));
 	char *pre_scp_logger_buf = NULL;
 	char *dram_logger_buf;       /* dram buffer */
 	int scp_awake_flag;
@@ -882,12 +916,6 @@ void scp_crash_log_move_to_buf(enum scp_core_id scp_id)
 		/* copy to dram buffer */
 		dram_logger_buf = ((char *) SCP_A_log_ctl) +
 		    SCP_A_log_ctl->buff_ofs + w_pos;
-		/* check write address don't over logger reserve memory */
-		if (dram_logger_buf > dram_logger_limit) {
-			pr_debug("[SCP] %s: dram_logger_buf %x oversize reserve mem %x\n",
-			__func__, dram_logger_buf, dram_logger_limit);
-		goto exit;
-		}
 
 		/* memory copy from log buf */
 		pos = 0;

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -41,7 +42,7 @@ static enum IMGSENSOR_RETURN regulator_init(
 	struct IMGSENSOR_HW_DEVICE_COMMON *pcommon)
 {
 	struct REGULATOR *preg = (struct REGULATOR *)pinstance;
-	int type, idx;
+	int type, idx, ret = 0;
 	char str_regulator_name[LENGTH_FOR_SNPRINTF];
 
 	for (idx = IMGSENSOR_SENSOR_IDX_MIN_NUM;
@@ -52,17 +53,21 @@ static enum IMGSENSOR_RETURN regulator_init(
 			type++) {
 			memset(str_regulator_name, 0,
 				sizeof(str_regulator_name));
-			snprintf(str_regulator_name,
+			ret = snprintf(str_regulator_name,
 				sizeof(str_regulator_name),
 				"cam%d_%s",
 				idx,
 				regulator_control[type].pregulator_type);
-			preg->pregulator[idx][type] = regulator_get(
+			if (ret < 0)
+				return ret;
+			preg->pregulator[idx][type] = regulator_get_optional(
 					&pcommon->pplatform_device->dev,
 					str_regulator_name);
-			if (preg->pregulator[idx][type] == NULL)
+			if (IS_ERR(preg->pregulator[idx][type])) {
+				preg->pregulator[idx][type] = NULL;
 				PK_INFO("ERROR: regulator[%d][%d]  %s fail!\n",
 						idx, type, str_regulator_name);
+			}
 			atomic_set(&preg->enable_cnt[idx][type], 0);
 		}
 	}
@@ -101,6 +106,7 @@ static enum IMGSENSOR_RETURN regulator_set(
 	enum IMGSENSOR_HW_PIN_STATE pin_state)
 {
 	struct regulator     *pregulator;
+	struct regulator     *pregulator_main2 = NULL;
 	struct REGULATOR     *preg = (struct REGULATOR *)pinstance;
 	int reg_type_offset;
 	atomic_t             *enable_cnt;
@@ -116,6 +122,11 @@ static enum IMGSENSOR_RETURN regulator_set(
 
 	pregulator = preg->pregulator[(unsigned int)sensor_idx][
 		reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD];
+	if (sensor_idx != IMGSENSOR_SENSOR_IDX_MAIN2) {
+		pregulator_main2 =
+			preg->pregulator[IMGSENSOR_SENSOR_IDX_MAIN2][
+				reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD];
+	}
 
 	enable_cnt = &preg->enable_cnt[(unsigned int)sensor_idx][
 		reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD];
@@ -142,6 +153,30 @@ static enum IMGSENSOR_RETURN regulator_set(
 				  pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0]);
 				return IMGSENSOR_RETURN_ERROR;
 			}
+
+			if (IMGSENSOR_HW_PIN_AVDD == pin && pregulator_main2) {
+				if (regulator_set_voltage(pregulator_main2,
+					regulator_voltage[
+					pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0],
+					regulator_voltage[
+					pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0])) {
+
+					PK_PR_ERR(
+					  "[regulator_main2]fail to regulator_set_voltage, powertype:%d powerId:%d\n",
+					  pin,
+					  regulator_voltage[
+					  pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0]);
+				}
+				if (regulator_enable(pregulator_main2)) {
+					PK_PR_ERR(
+					"[regulator_main2]fail to regulator_enable, powertype:%d powerId:%d\n",
+					pin,
+					regulator_voltage[
+					  pin_state - IMGSENSOR_HW_PIN_STATE_LEVEL_0]);
+					//return IMGSENSOR_RETURN_ERROR;
+				}
+			}
+
 			atomic_inc(enable_cnt);
 		} else {
 			if (regulator_is_enabled(pregulator))
@@ -153,6 +188,19 @@ static enum IMGSENSOR_RETURN regulator_set(
 					pin);
 				return IMGSENSOR_RETURN_ERROR;
 			}
+			if (IMGSENSOR_HW_PIN_AVDD == pin && pregulator_main2) {
+				mdelay(1);
+				if (regulator_is_enabled(pregulator_main2))
+					PK_DBG("[regulator_main2]%d is enabled\n", pin);
+
+				if (regulator_disable(pregulator_main2)) {
+					PK_PR_ERR(
+						"[regulator_main2]fail to regulator_disable, powertype: %d\n",
+						pin);
+					//return IMGSENSOR_RETURN_ERROR;
+				}
+			}
+
 			atomic_dec(enable_cnt);
 		}
 	} else {

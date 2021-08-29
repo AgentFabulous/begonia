@@ -6,7 +6,6 @@ config ANDROID_DEFAULT_SETTING
 	select ANDROID_BINDERFS
 	select ANDROID_BINDER_IPC
 	select ARM64_SW_TTBR0_PAN
-	select ARM64_PAN
 	select ARMV8_DEPRECATED if COMPAT
 	select ASHMEM
 	select AUDIT
@@ -212,7 +211,6 @@ config ANDROID_DEFAULT_SETTING
 	select PPPOL2TP
 	select PPTP
 	select PREEMPT
-	select PROCESS_RECLAIM
 	select PROC_FS
 	select PROFILING
 	select PSI

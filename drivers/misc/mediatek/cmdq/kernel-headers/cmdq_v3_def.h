@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -295,6 +296,11 @@ struct cmdqSecDataStruct {
 
 	/* ISP metadata for secure camera */
 	struct cmdqSecIspMeta ispMeta;
+	uint64_t extension;
+	#ifdef MTK_IN_HOUSE_TEE
+	uint32_t secMode;
+	#endif
+	bool mtee;
 };
 
 struct cmdq_v3_replace_struct {

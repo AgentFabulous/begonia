@@ -1427,6 +1427,9 @@ static void kbase_pm_hw_issues_detect(struct kbase_device *kbdev)
 
 	kbdev->hw_quirks_sc = 0;
 
+	/* GPU2017-1360: Disable CRC on AFBC compression data */
+	kbdev->hw_quirks_sc |= SC_DISABLE_CRC_AFBC_COMPRESSED;
+
 	/* Needed due to MIDBASE-1494: LS_PAUSEBUFFER_DISABLE. See PRLAM-8443.
 	 * and needed due to MIDGLES-3539. See PRLAM-11035 */
 	if (kbase_hw_has_issue(kbdev, BASE_HW_ISSUE_8443) ||

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -48,6 +49,8 @@
 #define AFDRV_DW9800WAF "DW9800WAF"
 #define AFDRV_DW9719TAF "DW9719TAF"
 #define AFDRV_DW9763AF "DW9763AF"
+#define AFDRV_DW9800VAF "DW9800VAF"
+#define AFDRV_FP5516AF "FP5516AF"
 #define AFDRV_DW9814AF "DW9814AF"
 #define AFDRV_DW9839AF "DW9839AF"
 #define AFDRV_FP5510E2AF "FP5510E2AF"
@@ -68,9 +71,11 @@
 #define AFDRV_LC898217AFC "LC898217AFC"
 #define AFDRV_LC898229AF "LC898229AF"
 #define AFDRV_MT9P017AF "MT9P017AF"
+#define AFDRV_OV5645AF "OV5645AF"
 #define AFDRV_OV8825AF "OV8825AF"
 #define AFDRV_WV511AAF "WV511AAF"
 #define AFDRV_DW9718TAF "DW9718TAF"
+#define AFDRV_DW9800AF "DW9800AF"
 
 #define CONVERT_CCU_TIMESTAMP 0x1000
 

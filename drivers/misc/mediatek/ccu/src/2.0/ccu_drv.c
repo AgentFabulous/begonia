@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -71,13 +72,11 @@
 #include "kd_camera_feature.h"/*for IMGSENSOR_SENSOR_IDX*/
 #include "ccu_mva.h"
 #include "ccu_qos.h"
-/****************************************************************************
- *
- ***************************************************************************/
+/*****************************************************************************/
 
 #define CCU_DEV_NAME            "ccu"
 
-#define CCU_CLK_NUM 3 /* [0]: Camsys, [1]: Mmsys */
+#define CCU_CLK_NUM 2 /* [0]: Camsys, [1]: Mmsys */
 struct clk *ccu_clk_ctrl[CCU_CLK_NUM];
 
 struct ccu_device_s *g_ccu_device;
@@ -89,8 +88,10 @@ static wait_queue_head_t wait_queue_enque;
 
 static struct ion_handle *import_buffer_handle[CCU_IMPORT_BUF_NUM];
 
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_PM_WAKELOCKS
 struct wakeup_source ccu_wake_lock;
+#else
+struct wake_lock ccu_wake_lock;
 #endif
 /*static int g_bWaitLock;*/
 
@@ -113,7 +114,7 @@ const struct ccu_isr_callback_t ccu_isr_callbacks[CCU_IRQ_NUM_TYPES] = {
 
 static irqreturn_t ccu_isr_callback_xxx(int irq, void *device_id)
 {
-	LOG_DBG("%s:0x%x\n", __func__, irq);
+	LOG_DBG("%s:0x%x\n",  __func__. irq);
 	return IRQ_HANDLED;
 }
 
@@ -216,8 +217,8 @@ static int ccu_mmap(struct file *flip, struct vm_area_struct *vma);
 static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg);
 
 #ifdef CONFIG_COMPAT
-static long ccu_compat_ioctl(struct file *flip,
-	unsigned int cmd, unsigned long arg);
+static long ccu_compat_ioctl(struct file *flip, unsigned int cmd,
+	unsigned long arg);
 #endif
 
 static const struct file_operations ccu_fops = {
@@ -235,8 +236,8 @@ static const struct file_operations ccu_fops = {
 /*---------------------------------------------------------------------------*/
 /* M4U: fault callback                                                       */
 /*---------------------------------------------------------------------------*/
-enum m4u_callback_ret_t ccu_m4u_fault_callback(int port,
-	unsigned int mva, void *data)
+enum m4u_callback_ret_t ccu_m4u_fault_callback(int port, unsigned int mva,
+	void *data)
 {
 	LOG_DBG("[m4u] fault callback: port=%d, mva=0x%x", port, mva);
 	return 0/*M4U_CALLBACK_HANDLED*/;
@@ -443,16 +444,17 @@ static int ccu_open(struct inode *inode, struct file *flip)
 	flip->private_data = user;
 	ccu_ion_init();
 
-	for (i = 0; i < CCU_IMPORT_BUF_NUM; i++)
+	for (i = 0; i < CCU_IMPORT_BUF_NUM; i++) {
 		import_buffer_handle[i] =
 		(struct ion_handle *)CCU_IMPORT_BUF_UNDEF;
-
+	}
 	return ret;
 }
 
+/*****************************************************************************/
 #ifdef CONFIG_COMPAT
-static long ccu_compat_ioctl(struct file *flip,
-	unsigned int cmd, unsigned long arg)
+static long ccu_compat_ioctl(struct file *flip, unsigned int cmd,
+	unsigned long arg)
 {
 	/*<<<<<<<<<< debug 32/64 compat check*/
 	struct compat_ccu_power_s __user *ptr_power32;
@@ -507,13 +509,16 @@ static long ccu_compat_ioctl(struct file *flip,
 		for (i = 0; i < MAX_LOG_BUF_NUM; i++) {
 			err |= get_user(uptr_Addr32,
 				(&ptr_power32->workBuf.va_log[i]));
-			err |= put_user(compat_ptr(uptr_Addr32),
-				(&ptr_power64->workBuf.va_log[i]));
+			err |=
+			    put_user(compat_ptr(uptr_Addr32),
+				     (&ptr_power64->workBuf.va_log[i]));
 			err |= get_user(uint_Data32,
 				(&ptr_power32->workBuf.mva_log[i]));
 
-			err |= copy_to_user(&(ptr_power64->workBuf.mva_log[i]),
-				&uint_Data32, sizeof(uint_Data32));
+			err |=
+			    copy_to_user(&(ptr_power64->workBuf.mva_log[i]),
+					&uint_Data32,
+					sizeof(uint_Data32));
 		}
 
 		LOG_DBG("[IOCTL_DBG] err: %d\n", err);
@@ -558,7 +563,7 @@ static int ccu_alloc_command(struct ccu_cmd_s **rcmd)
 
 	cmd = kzalloc(sizeof(vlist_type(struct ccu_cmd_s)), GFP_KERNEL);
 	if (cmd == NULL) {
-		LOG_ERR("%s(), node=0x%p\n", __func__, cmd);
+		LOG_ERR("%s, node=0x%p\n", __func__, cmd);
 		return -ENOMEM;
 	}
 
@@ -578,28 +583,21 @@ int ccu_clock_enable(void)
 {
 	int ret;
 
-	LOG_DBG_MUST("%s+\n", __func__);
+	LOG_DBG_MUST("%s.\n", __func__);
 	ccu_qos_init();
 
-	ret = clk_prepare_enable(ccu_clk_ctrl[0]);
+	ret = (clk_prepare_enable(ccu_clk_ctrl[0]) |
+		clk_prepare_enable(ccu_clk_ctrl[1]));
 	if (ret)
-		LOG_ERR("CCU_CLK_MMSYS_CCU enable fail.\n");
-	ret = clk_prepare_enable(ccu_clk_ctrl[1]);
-	if (ret)
-		LOG_ERR("CAM_PWR enable fail.\n");
-	ret = clk_prepare_enable(ccu_clk_ctrl[2]);
-	if (ret)
-		LOG_ERR("CCU_CLK_CAM_CCU enable fail.\n");
-
+		LOG_ERR("clock enable fail.\n");
 	return ret;
 }
 
 void ccu_clock_disable(void)
 {
 	LOG_DBG_MUST("%s.\n", __func__);
-	clk_disable_unprepare(ccu_clk_ctrl[2]);
-	clk_disable_unprepare(ccu_clk_ctrl[1]);
 	clk_disable_unprepare(ccu_clk_ctrl[0]);
+	clk_disable_unprepare(ccu_clk_ctrl[1]);
 
 	ccu_qos_uninit();
 }
@@ -634,7 +632,8 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			LOG_ERR(
 			"[SET_POWER] copy_from_user failed, ret=%d\n", ret);
 			return -EFAULT;
-		}			ret = ccu_set_power(&power);
+		}
+		ret = ccu_set_power(&power);
 		LOG_DBG("ccuk: ioctl set powerk-\n");
 		break;
 	}
@@ -652,8 +651,7 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			sizeof(struct ccu_cmd_s));
 		if (ret != 0) {
 			LOG_ERR(
-			"[ENQUE_COMMAND] copy_from_user failed, ret=%d\n",
-			ret);
+			"[ENQUE_COMMAND] copy_from_user failed, ret=%d\n", ret);
 			return -EFAULT;
 		}
 		ret = ccu_push_command_to_queue(user, cmd);
@@ -669,8 +667,7 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			"[DEQUE_COMMAND] pop command failed, ret=%d\n", ret);
 			return -EFAULT;
 		}
-		ret = copy_to_user((void *)arg, cmd,
-			sizeof(struct ccu_cmd_s));
+		ret = copy_to_user((void *)arg, cmd, sizeof(struct ccu_cmd_s));
 		if (ret != 0) {
 			LOG_ERR(
 			"[DEQUE_COMMAND] copy_to_user failed, ret=%d\n", ret);
@@ -765,6 +762,22 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	}
+	case CCU_IOCTL_SEND_CMD:	/*--todo: not used for now, remove it*/
+	{
+		struct ccu_cmd_s cmd;
+
+		ret = copy_from_user(&cmd,
+			(void *)arg, sizeof(struct ccu_cmd_s));
+
+		if (ret != 0) {
+			LOG_ERR(
+			"[CCU_IOCTL_SEND_CMD] copy_from_user failed, ret=%d\n",
+			ret);
+			return -EFAULT;
+		}
+		ccu_send_command(&cmd);
+		break;
+	}
 	case CCU_IOCTL_FLUSH_LOG:
 	{
 		ccu_flushLog(0, NULL);
@@ -795,9 +808,8 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 	}
 	case CCU_IOCTL_SET_I2C_MODE:
 	{
-		LOG_DBG_MUST("CCU_IOCTL_SET_I2C_MODE\n");
+		ret = ccu_i2c_controller_init((enum CCU_I2C_CHANNEL)arg);
 
-		ret = ccu_i2c_controller_init((uint32_t)arg);
 		if (ret == -1) {
 			LOG_DBG("ccu_i2c_controller_init fail\n");
 			ret = -EINVAL;
@@ -815,37 +827,70 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 	}
 	case CCU_IOCTL_GET_SENSOR_I2C_SLAVE_ADDR:
 	{
-		struct ccu_i2c_info sensor_info[IMGSENSOR_SENSOR_IDX_MAX_NUM];
+		int32_t sensorI2cSlaveAddr[5];
 
-		LOG_DBG_MUST("CCU_IOCTL_GET_SENSOR_I2C_SLAVE_ADDR\n");
-		ccu_get_sensor_i2c_info(&sensor_info[0]);
-		ret = copy_to_user((void *)arg, &sensor_info,
-			sizeof(struct ccu_i2c_info) *
-			IMGSENSOR_SENSOR_IDX_MAX_NUM);
+		ccu_get_sensor_i2c_slave_addr(&sensorI2cSlaveAddr[0]);
+
+		ret = copy_to_user((void *)arg, &sensorI2cSlaveAddr,
+			sizeof(int32_t) * 5);
+
 		break;
 	}
 	case CCU_IOCTL_GET_SENSOR_NAME:
 	{
-	#define SENSOR_NAME_MAX_LEN 32
-	char *sensor_names[IMGSENSOR_SENSOR_IDX_MAX_NUM];
+		#define SENSOR_NAME_MAX_LEN 32
 
-	LOG_DBG_MUST("CCU_IOCTL_GET_SENSOR_NAME\n");
-	ccu_get_sensor_name(sensor_names);
-	for (i = IMGSENSOR_SENSOR_IDX_MIN_NUM;
-		i < IMGSENSOR_SENSOR_IDX_MAX_NUM ; i++){
-		if (sensor_names[i] != NULL) {
-			ret = copy_to_user(((char *)arg+
-				SENSOR_NAME_MAX_LEN*i),
-			sensor_names[i], strlen(sensor_names[i])+1);
+		char *sensor_names[5];
+
+		ccu_get_sensor_name(sensor_names);
+
+		if (sensor_names[0] != NULL) {
+			ret = copy_to_user((char *)arg, sensor_names[0],
+				strlen(sensor_names[0])+1);
 			if (ret != 0) {
-				LOG_ERR(
-				"copy_to_user failed: %d\n", ret);
+				LOG_ERR("copy_to_user 1 failed: %d\n", ret);
 				break;
 			}
 		}
-	}
-	#undef SENSOR_NAME_MAX_LEN
-	break;
+
+		if (sensor_names[1] != NULL) {
+			ret = copy_to_user(((char *)arg+SENSOR_NAME_MAX_LEN),
+				sensor_names[1], strlen(sensor_names[1])+1);
+			if (ret != 0) {
+				LOG_ERR("copy_to_user 2 failed: %d\n", ret);
+				break;
+			}
+		}
+
+		if (sensor_names[2] != NULL) {
+			ret = copy_to_user(((char *)arg+SENSOR_NAME_MAX_LEN*2),
+				sensor_names[2], strlen(sensor_names[2])+1);
+			if (ret != 0) {
+				LOG_ERR("copy_to_user 3 failed: %d\n", ret);
+				break;
+			}
+		}
+
+		if (sensor_names[3] != NULL) {
+			ret = copy_to_user(((char *)arg+SENSOR_NAME_MAX_LEN*3),
+				sensor_names[3], strlen(sensor_names[3])+1);
+			if (ret != 0) {
+				LOG_ERR("copy_to_user 4 failed: %d\n", ret);
+				break;
+			}
+		}
+
+		if (sensor_names[4] != NULL) {
+			ret = copy_to_user(((char *)arg+SENSOR_NAME_MAX_LEN*4),
+				sensor_names[4], strlen(sensor_names[4])+1);
+			if (ret != 0) {
+				LOG_ERR("copy_to_user 4 failed: %d\n", ret);
+				break;
+			}
+		}
+
+		#undef SENSOR_NAME_MAX_LEN
+		break;
 	}
 
 	case CCU_READ_REGISTER:
@@ -861,8 +906,9 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		ret = copy_from_user(&import_mem, (void *)arg,
 			sizeof(struct import_mem_s));
 		if (ret != 0) {
-			LOG_ERR("%s copy_to_user failed: %d\n",
-				"CCU_IOCTL_IMPORT_MEM", ret);
+			LOG_ERR(
+			"CCU_IOCTL_IMPORT_MEM copy_to_user failed: %d\n",
+			ret);
 			break;
 		}
 		for (i = 0; i < CCU_IMPORT_BUF_NUM; i++) {
@@ -874,8 +920,9 @@ static long ccu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			ccu_ion_import_handle(import_mem.memID[i]);
 			if (!import_buffer_handle[i]) {
 				ret = -EFAULT;
-				LOG_ERR("%s failed: %d\n",
-				"CCU ccu_ion_import_handle", ret);
+				LOG_ERR(
+				"CCU ccu_ion_import_handle failed: %d\n",
+				ret);
 				break;
 			}
 		}
@@ -932,7 +979,7 @@ static int ccu_release(struct inode *inode, struct file *flip)
 static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 {
 	unsigned long length = 0;
-	unsigned long pfn = 0x0;
+	unsigned int pfn = 0x0;
 
 	length = (vma->vm_end - vma->vm_start);
 	/*  */
@@ -940,7 +987,7 @@ static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 	pfn = vma->vm_pgoff << PAGE_SHIFT;
 
 	LOG_DBG
-	("CCU_mmap: vm_pgoff(0x%lx),pfn(0x%lx),phy(0x%lx)\n"
+	("CCU_mmap: vm_pgoff(0x%lx),pfn(0x%x),phy(0x%lx)\n"
 	vma->vm_pgoff, pfn, vma->vm_pgoff << PAGE_SHIFT);
 	LOG_DBG
 	("vm_start(0x%lx),vm_end(0x%lx),length(0x%lx)\n",
@@ -951,28 +998,28 @@ static int ccu_mmap(struct file *flip, struct vm_area_struct *vma)
 	if (pfn == (ccu_hw_base - CCU_HW_OFFSET)) {
 		if (length > PAGE_SIZE) {
 			LOG_ERR
-			("mmap error :module(0x%lx),len(0x%lx),CCU_HW(0x%x)!\n",
+			("mmap error :module(0x%x),len(0x%lx),CCU_HW(0x%x)!\n",
 			pfn, length, 0x4000);
 			return -EAGAIN;
 		}
 	} else if (pfn == CCU_CAMSYS_BASE) {
 		if (length > CCU_CAMSYS_SIZE) {
 			LOG_ERR
-		    ("mmap error :module(0x%lx),len(0x%lx),CCU_CAMSYS(0x%x)!\n",
+		    ("mmap error :module(0x%x),len(0x%lx),CCU_CAMSYS(0x%x)!\n",
 		     pfn, length, 0x4000);
 			return -EAGAIN;
 		}
 	} else if (pfn == CCU_PMEM_BASE) {
 		if (length > CCU_PMEM_SIZE) {
 			LOG_ERR
-		    ("mmap error :module(0x%lx),len(0x%lx),CCU_PMEM(0x%x)!\n",
+		    ("mmap error :module(0x%x),len(0x%lx),CCU_PMEM(0x%x)!\n",
 		     pfn, length, 0x4000);
 			return -EAGAIN;
 		}
 	} else if (pfn == CCU_DMEM_BASE) {
 		if (length > CCU_DMEM_SIZE) {
 			LOG_ERR
-		    ("mmap error :module(0x%lx),len(0x%lx),CCU_DMEM(0x%x)!\n",
+		    ("mmap error :module(0x%x),len(0x%lx),CCU_DMEM(0x%x)!\n",
 		     pfn, length, 0x4000);
 			return -EAGAIN;
 		}
@@ -1122,8 +1169,9 @@ static int ccu_probe(struct platform_device *pdev)
 		g_ccu_device->ccu_base =
 		(unsigned long)ioremap(phy_addr, phy_size);
 		LOG_INF("ccu_base pa: 0x%x, size: 0x%x\n",
-			phy_addr, phy_size);
-		LOG_INF("ccu_base va: 0x%lx\n", g_ccu_device->ccu_base);
+		 phy_addr, phy_size);
+		LOG_INF("ccu_base va: 0x%lx\n",
+		 g_ccu_device->ccu_base);
 
 		/*remap dmem_base*/
 		phy_addr = CCU_DMEM_BASE;
@@ -1131,8 +1179,9 @@ static int ccu_probe(struct platform_device *pdev)
 		g_ccu_device->dmem_base =
 		(unsigned long)ioremap(phy_addr, phy_size);
 		LOG_INF("dmem_base pa: 0x%x, size: 0x%x\n",
-			phy_addr, phy_size);
-		LOG_INF("dmem_base va: 0x%lx\n", g_ccu_device->dmem_base);
+		 phy_addr, phy_size);
+		LOG_INF("dmem_base va: 0x%lx\n",
+		 g_ccu_device->dmem_base);
 
 		/*remap camsys_base*/
 		phy_addr = CCU_CAMSYS_BASE;
@@ -1140,8 +1189,9 @@ static int ccu_probe(struct platform_device *pdev)
 		g_ccu_device->camsys_base =
 		(unsigned long)ioremap(phy_addr, phy_size);
 		LOG_INF("camsys_base pa: 0x%x, size: 0x%x\n",
-			phy_addr, phy_size);
-		LOG_INF("camsys_base va: 0x%lx\n", g_ccu_device->camsys_base);
+		 phy_addr, phy_size);
+		LOG_INF("camsys_base va: 0x%lx\n",
+		 g_ccu_device->camsys_base);
 
 		/*remap n3d_a_base*/
 		phy_addr = CCU_N3D_A_BASE;
@@ -1149,25 +1199,21 @@ static int ccu_probe(struct platform_device *pdev)
 		g_ccu_device->n3d_a_base =
 		(unsigned long)ioremap(phy_addr, phy_size);
 		LOG_INF("n3d_a_base pa: 0x%x, size: 0x%x\n",
-			phy_addr, phy_size);
-		LOG_INF("n3d_a_base va: 0x%lx\n", g_ccu_device->n3d_a_base);
+		 phy_addr, phy_size);
+		LOG_INF("n3d_a_base va: 0x%lx\n",
+		 g_ccu_device->n3d_a_base);
+
 	}
 /* get Clock control from device tree.  */
 	{
 		ccu_clk_ctrl[0] =
-		devm_clk_get(g_ccu_device->dev, "CCU_CLK_MMSYS_CCU");
-		if (ccu_clk_ctrl[0] == NULL)
-			LOG_ERR("Get CCU_CLK_MMSYS_CCU fail.\n");
-
-		ccu_clk_ctrl[1] =
-		devm_clk_get(g_ccu_device->dev, "CAM_PWR");
-		if (ccu_clk_ctrl[1] == NULL)
-			LOG_ERR("Get CAM_PWR fail.\n");
-
-		ccu_clk_ctrl[2] =
 		devm_clk_get(g_ccu_device->dev, "CCU_CLK_CAM_CCU");
-		if (ccu_clk_ctrl[2] == NULL)
-			LOG_ERR("Get CCU_CLK_CAM_CCU fail.\n");
+		if (ccu_clk_ctrl[0] == NULL)
+			LOG_ERR("Get ccu clock ctrl camsys fail.\n");
+		ccu_clk_ctrl[1] =
+		devm_clk_get(g_ccu_device->dev, "CCU_CLK_MMSYS_CCU");
+		if (ccu_clk_ctrl[1] == NULL)
+			LOG_ERR("Get ccu clock ctrl mmsys fail.\n");
 	}
 	/**/
 	g_ccu_device->irq_num = irq_of_parse_and_map(node, 0);
@@ -1188,9 +1234,8 @@ static int ccu_probe(struct platform_device *pdev)
 		}
 	} else {
 		LOG_DBG("No IRQ!!: ccu_num_devs=%d, devnode(%s), irq=%d\n",
-			ccu_num_devs,
-			g_ccu_device->dev->of_node->name,
-			g_ccu_device->irq_num);
+		ccu_num_devs, g_ccu_device->dev->of_node->name,
+		g_ccu_device->irq_num);
 	}
 
 	/* Only register char driver in the 1st time */
@@ -1199,8 +1244,7 @@ static int ccu_probe(struct platform_device *pdev)
 		/* Register char driver */
 		ret = ccu_reg_chardev();
 		if (ret) {
-			LOG_DERR(g_ccu_device->dev,
-				"register char failed");
+			LOG_DERR(g_ccu_device->dev, "register char failed");
 			return ret;
 		}
 
@@ -1217,12 +1261,15 @@ static int ccu_probe(struct platform_device *pdev)
 		if (IS_ERR(dev)) {
 			ret = PTR_ERR(dev);
 			LOG_DERR(g_ccu_device->dev,
-				"Failed to create device: /dev/%s, err = %d",
-				CCU_DEV_NAME, ret);
+			"Failed to create device: /dev/%s, err = %d",
+			CCU_DEV_NAME, ret);
 			goto EXIT;
 		}
-#ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_PM_WAKELOCKS
 		wakeup_source_init(&ccu_wake_lock, "ccu_lock_wakelock");
+#else
+		wake_lock_init(&ccu_wake_lock, WAKE_LOCK_SUSPEND,
+				"ccu_lock_wakelock");
 #endif
 
 		/* enqueue/dequeue control in ihalpipe wrapper */

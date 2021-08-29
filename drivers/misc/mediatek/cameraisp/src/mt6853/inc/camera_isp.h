@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -710,7 +711,8 @@ enum ISP_CMD_ENUM {
 	ISP_CMD_ION_MAP_PA, /* AOSP ION: map physical address from fd */
 	ISP_CMD_ION_UNMAP_PA, /* AOSP ION: unmap physical address from fd */
 	ISP_CMD_ION_UNMAP_PA_BY_MODULE,
-	ISP_CMD_ION_GET_PA
+	ISP_CMD_ION_GET_PA,
+	ISP_CMD_SET_VIR_CQCNT
 };
 
 enum ISP_HALT_DMA_ENUM {
@@ -798,6 +800,8 @@ enum ISP_HALT_DMA_ENUM {
 #define ISP_NOTE_CQTHR0_BASE                      \
 	_IOWR(ISP_MAGIC, ISP_CMD_NOTE_CQTHR0_BASE, unsigned int*)
 
+#define ISP_SET_VIR_CQCNT \
+	_IOWR(ISP_MAGIC, ISP_CMD_SET_VIR_CQCNT, unsigned int*)
 #define ISP_SET_PM_QOS                           \
 	_IOWR(ISP_MAGIC, ISP_CMD_SET_PM_QOS, unsigned int)
 

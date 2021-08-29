@@ -2,6 +2,7 @@
  * mtk_pwm.c PWM Drvier
  *
  * Copyright (c) 2016, Media Teck.inc
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public Licence,
@@ -74,7 +75,7 @@ static struct pwm_device pwm_dat = {
 
 static struct pwm_device *pwm_dev = &pwm_dat;
 
-static void mt_pwm_power_on(u32 pwm_no, bool pmic_pad)
+void mt_pwm_power_on(u32 pwm_no, bool pmic_pad)
 {
 	mutex_lock(&pwm_power_lock);
 
@@ -82,6 +83,7 @@ static void mt_pwm_power_on(u32 pwm_no, bool pmic_pad)
 
 	mutex_unlock(&pwm_power_lock);
 }
+EXPORT_SYMBOL(mt_pwm_power_on);
 
 static void mt_pwm_power_off(u32 pwm_no, bool pmic_pad)
 {

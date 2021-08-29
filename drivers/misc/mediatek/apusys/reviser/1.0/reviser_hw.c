@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1111,8 +1112,7 @@ int reviser_dram_remap_init(void *drvinfo)
 	reviser_device = (struct reviser_dev_info *)drvinfo;
 
 	//g_mem_sys.size = REMAP_DRAM_SIZE;
-	//Reserve memory for IP device + Preemption device
-	g_mem_sys.size = VLM_SIZE * VLM_CTXT_CTX_ID_COUNT * 2;
+	g_mem_sys.size = VLM_SIZE * VLM_CTXT_CTX_ID_COUNT;
 	if (reviser_mem_alloc(reviser_device->dev, &g_mem_sys)) {
 		LOG_ERR("alloc fail\n");
 		return -ENOMEM;

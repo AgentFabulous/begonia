@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -2324,10 +2325,11 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module,
 			DISP_SLOT_OVL0_FBDC_BW, (unsigned int)ovl_fbdc_bw);
 
 		/*read last frame BW from ovl*/
+		/*
 		DISP_REG_BACKUP(handle, DISPSYS_SLOT_BASE,
 			DISP_SLOT_OVL0_LASTF_BW,
 			baddr + DISP_REG_OVL_GDRDY_PRD_NUM);
-
+		*/
 	} else if (module == DISP_MODULE_OVL0_2L) {
 		DISP_SLOT_SET(handle, DISPSYS_SLOT_BASE,
 			DISP_SLOT_OVL0_2L_BW, (unsigned int)ovl_bw);
@@ -2335,9 +2337,11 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module,
 			DISP_SLOT_OVL0_2L_FBDC_BW, (unsigned int)ovl_fbdc_bw);
 
 		/*read last frame BW from ovl*/
+		/*
 		DISP_REG_BACKUP(handle, DISPSYS_SLOT_BASE,
 			DISP_SLOT_OVL0_2L_LASTF_BW,
 			baddr + DISP_REG_OVL_GDRDY_PRD_NUM);
+		*/
 	}
 
 	return 0;

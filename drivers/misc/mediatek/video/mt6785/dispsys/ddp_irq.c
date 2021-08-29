@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -230,6 +231,13 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 				   0xffff);
 
 		reg_temp_val = reg_val;
+
+		/*vdo mode done interrupt*/
+		if (!(reg_val & (1 << 3))) {
+			mmprofile_log_ex(
+				ddp_mmp_get_events()->DSI_IRQ[index],
+				MMPROFILE_FLAG_PULSE, reg_val, 0);
+		}
 		/*
 		 * rd_rdy don't clear and wait for ESD &
 		 * Read LCM will clear the bit.

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,6 +19,7 @@
 
 #define AUX_IN0_NTC (0)
 #define AUX_IN1_NTC (1)
+#define AUX_IN2_NTC (2)
 
 #define BTS_RAP_PULL_UP_R		390000 /* 390K, pull up resister */
 
@@ -42,6 +44,16 @@
 #define BTSMDPA_RAP_NTC_TABLE		7 /* default is NCP15WF104F03RC(100K) */
 
 #define BTSMDPA_RAP_ADC_CHANNEL		AUX_IN1_NTC /* default is 1 */
+
+#define BACKLIGHT_RAP_PULL_UP_R		390000
+
+#define BACKLIGHT_TAP_OVER_CRITICAL_LOW	4397119
+
+#define BACKLIGHT_RAP_PULL_UP_VOLTAGE	1800
+
+#define BACKLIGHT_RAP_NTC_TABLE		7
+
+#define BACKLIGHT_RAP_ADC_CHANNEL		AUX_IN2_NTC
 
 extern int IMM_GetOneChannelValue(int dwChannel, int data[4], int *rawdata);
 extern int IMM_IsAdcInitReady(void);
