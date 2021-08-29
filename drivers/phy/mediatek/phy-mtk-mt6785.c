@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -384,6 +385,9 @@ static void usb_phy_tuning(struct mtk_phy_instance *instance)
 				(u32 *) &instance->phy_tuning.u2_term_ref);
 			of_property_read_u32(of_node, "u2_enhance",
 				(u32 *) &instance->phy_tuning.u2_enhance);
+			phy_printk(K_INFO, "%s u2_vrt_ref:%d, u2_term_ref:%d, u2_enhance:%d\n",
+					__func__, instance->phy_tuning.u2_vrt_ref,
+					instance->phy_tuning.u2_term_ref, instance->phy_tuning.u2_enhance);
 		}
 		instance->phy_tuning.inited = true;
 	}
@@ -479,7 +483,7 @@ static void phy_recover(struct mtk_phy_instance *instance)
 	phy_efuse_settings(instance);
 
 	u3phywrite32(U3D_USBPHYACR6, RG_USB20_DISCTH_OFST,
-		RG_USB20_DISCTH, 0x7);
+		RG_USB20_DISCTH, 0xF);
 
 	usb_phy_tuning(instance);
 	phy_advance_settings(instance);

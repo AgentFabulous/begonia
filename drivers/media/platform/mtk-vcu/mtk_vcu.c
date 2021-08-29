@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Author: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -443,7 +444,6 @@ int vcu_ipi_send(struct platform_device *pdev,
 		if (!vcu_ptr->abort) {
 			task_lock(vcud_task);
 			send_sig(SIGTERM, vcud_task, 0);
-			send_sig(SIGKILL, vcud_task, 0);
 			task_unlock(vcud_task);
 		}
 		if (vcu_ptr->open_cnt > 0) {
@@ -765,25 +765,13 @@ static void vcu_gce_flush_callback(struct cmdq_cb_data data)
 	atomic_dec(&vcu->gce_info[j].flush_pending);
 
 	mutex_lock(&vcu->vcu_gce_mutex[i]);
-	if (i == VCU_VENC) {
-		venc_encode_pmqos_gce_end(vcu->gce_info[j].v4l2_ctx, core_id,
+	venc_encode_pmqos_gce_end(vcu->gce_info[j].v4l2_ctx, core_id,
 				vcu->gce_job_cnt[i][core_id].counter);
-	}
 	if (atomic_dec_and_test(&vcu->gce_job_cnt[i][core_id]) &&
 		vcu->gce_info[j].v4l2_ctx != NULL){
-		if (i == VCU_VENC) {
+		if (i == VCU_VENC)
 			venc_encode_unprepare(vcu->gce_info[j].v4l2_ctx,
 				buff->cmdq_buff.core_id, &vcu->flags[i]);
-#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
-#if !(IS_ENABLED(CONFIG_MACH_MT6768) || IS_ENABLED(CONFIG_MACH_MT6779) ||\
-IS_ENABLED(CONFIG_MACH_MT6785))
-			if (buff->cmdq_buff.secure != 0)
-				cmdq_sec_mbox_switch_normal(vcu->clt_venc_sec[0]);
-#endif
-#endif
-			venc_unlock(vcu->gce_info[j].v4l2_ctx,
-				buff->cmdq_buff.core_id);
-		}
 	}
 	mutex_unlock(&vcu->vcu_gce_mutex[i]);
 
@@ -915,21 +903,6 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 
 	time_check_start();
 	mutex_lock(&vcu->vcu_gce_mutex[i]);
-
-	if (buff.cmdq_buff.codec_type == VCU_VENC) {
-		int lock = -1;
-
-		while (lock != 0) {
-			lock = venc_lock(vcu->gce_info[j].v4l2_ctx, core_id,
-				(bool)buff.cmdq_buff.secure);
-			if (lock != 0) {
-				mutex_unlock(&vcu->vcu_gce_mutex[i]);
-				usleep_range(1000, 2000);
-				mutex_lock(&vcu->vcu_gce_mutex[i]);
-			}
-		}
-	}
-
 	if (atomic_read(&vcu->gce_job_cnt[i][core_id]) == 0 &&
 		vcu->gce_info[j].v4l2_ctx != NULL){
 		if (i == VCU_VENC) {
@@ -1009,17 +982,15 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 		(buff.cmdq_buff.secure == 0)?vcu_gce_timeout_callback:NULL;
 	pkt_ptr->err_cb.data = (void *)&vcu_ptr->gce_info[j].buff[i];
 
-	pr_info("[VCU][%d] %s: buff %p type %d cnt %d order %d pkt %p hndl %llx %d %d\n",
+	pr_info("[VCU][%d] %s: buff %p type %d cnt %d order %d hndl %llx %d %d\n",
 		core_id, __func__, &vcu_ptr->gce_info[j].buff[i],
 		buff.cmdq_buff.codec_type,
-		cmds->cmd_cnt, buff.cmdq_buff.flush_order, pkt_ptr,
+		cmds->cmd_cnt, buff.cmdq_buff.flush_order,
 		buff.cmdq_buff.gce_handle, ret, j);
 
 	/* flush cmd async */
-	ret = cmdq_pkt_flush_threaded(pkt_ptr,
+	cmdq_pkt_flush_threaded(pkt_ptr,
 		vcu_gce_flush_callback, (void *)&vcu_ptr->gce_info[j].buff[i]);
-	if (ret < 0)
-		pr_info("[VCU] cmdq flush fail pkt %p\n", pkt_ptr);
 
 	atomic_inc(&vcu_ptr->gce_info[j].flush_pending);
 	time_check_end(100, strlen(vcodec_param_string));
@@ -2150,6 +2121,10 @@ static void probe_death_signal(void *ignore, int sig, struct siginfo *info,
 		spin_lock_irqsave(&vcu_ptr->vpud_sig_lock, flags);
 		vcu_ptr->vpud_is_going_down = 1;
 		spin_unlock_irqrestore(&vcu_ptr->vpud_sig_lock, flags);
+
+		// VPUD is going to be killed. stop next map/unmap fd
+		vcud_task = NULL;
+		files = NULL;
 	}
 }
 

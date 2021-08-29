@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 - 2017 Novatek, Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Revision: 18364
  * $Date: 2017-11-16 17:42:51 +0800 (週四, 16 十一月 2017) $
@@ -856,6 +857,13 @@ static ssize_t nvt_flash_read(struct file *file, char __user *buff,
 	}
 
 	i2c_wr = str[0] >> 7;
+
+	if(str[1] > (sizeof(str)/sizeof(uint8_t) -2))
+        {
+                 NVT_ERR("Out of range, the max lenght is %d\n",
+                                 (sizeof(str)/sizeof(uint8_t) -2));
+                 return -EFAULT;
+        }
 
 	if (i2c_wr == 0) {	//I2C write
 		while (retries < 20) {

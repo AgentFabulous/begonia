@@ -297,7 +297,7 @@ static int vdec_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
 	/*ack timeout means vpud has crashed*/
 	if (ret == -EIO) {
 		mtk_vcodec_err(inst, "- IPI msg ack timeout  -");
-		*src_chg = VDEC_HW_NOT_SUPPORT;
+		*src_chg = *src_chg | VDEC_HW_NOT_SUPPORT;
 	}
 
 	if (bs->dmabuf != NULL)
@@ -631,7 +631,6 @@ static int vdec_set_param(unsigned long h_vdec,
 	case SET_PARAM_WAIT_KEY_FRAME:
 	case SET_PARAM_OPERATING_RATE:
 	case SET_PARAM_TOTAL_FRAME_BUFQ_COUNT:
-	case SET_PARAM_FORCE_RES_CHANGE:
 		vcu_dec_set_param(&inst->vcu, (unsigned int)type, in, 1U);
 		break;
 	case SET_PARAM_UFO_MODE:

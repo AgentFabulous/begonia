@@ -82,7 +82,7 @@ irqreturn_t mtk_vcodec_dec_irq_handler(int irq, void *priv)
 		return IRQ_HANDLED;
 
 	/* check if HW active or not */
-	cg_status = readl(dev->dec_reg_base[VDEC_SYS]);
+	cg_status = readl(dev->dec_reg_base[0]);
 	if ((cg_status & MTK_VDEC_HW_ACTIVE) != 0) {
 		mtk_v4l2_err("DEC ISR, VDEC active is not 0x0 (0x%08x)",
 					 cg_status);
@@ -126,7 +126,7 @@ irqreturn_t mtk_vcodec_lat_dec_irq_handler(int irq, void *priv)
 		return IRQ_HANDLED;
 
 	/* check if HW active or not */
-	cg_status = readl(dev->dec_reg_base[VDEC_BASE]);
+	cg_status = readl(dev->dec_reg_base[0]);
 	if ((cg_status & MTK_VDEC_HW_ACTIVE) != 0) {
 		mtk_v4l2_err("DEC LAT ISR, VDEC active is not 0x0 (0x%08x)",
 					 cg_status);
@@ -291,10 +291,10 @@ void mtk_vcodec_enc_timeout_dump(void *ctx)
 	struct mtk_vcodec_ctx *curr_ctx = ctx;
 	struct mtk_vcodec_dev *dev = curr_ctx->dev;
 
-	#define REG1_COUNT 15
+	#define REG1_COUNT 14
 	#define REG2_COUNT 20
 	unsigned int Reg_1[REG1_COUNT] = {
-		0x0, 0x14, 0xEC, 0x1C0, 0x1168, 0x11C0,
+		0x14, 0xEC, 0x1C0, 0x1168, 0x11C0,
 		0x11C4, 0xF4, 0x5C, 0x60, 0x130,
 		0x24, 0x114C, 0x1164, 0x0140};
 	unsigned int Reg_2[REG2_COUNT] = {

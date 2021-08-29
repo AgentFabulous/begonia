@@ -2,6 +2,7 @@
  * mtu3_qmu.c - Queue Management Unit driver for device controller
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Author: Chunfeng Yun <chunfeng.yun@mediatek.com>
  *
@@ -433,6 +434,12 @@ static void qmu_done_tx(struct mtu3 *mtu, u8 epnum)
 	struct usb_request *request = NULL;
 	struct mtu3_request *mreq;
 
+	if (!(mep->flags & MTU3_EP_ENABLED)) {
+		dev_info(mtu->dev, "%s EP%d is already disabled\n",
+			__func__, epnum);
+		return;
+	}
+
 	/*transfer phy address got from QMU register to virtual address */
 	gpd_current = gpd_dma_to_virt(ring, gpd_dma);
 
@@ -454,6 +461,11 @@ static void qmu_done_tx(struct mtu3 *mtu, u8 epnum)
 		mtu3_req_complete(mep, request, 0);
 
 		gpd = advance_deq_gpd(ring);
+
+		if (!gpd) {
+			pr_err("[TX][ERROR] EP%d, Next GPD is null!!\n", epnum);
+			return;
+		}
 	}
 
 	dev_dbg(mtu->dev, "%s EP%d, deq=%p, enq=%p, complete\n",
@@ -471,6 +483,12 @@ static void qmu_done_rx(struct mtu3 *mtu, u8 epnum)
 	dma_addr_t gpd_dma = mtu3_readl(mbase, USB_QMU_RQCPR(epnum));
 	struct usb_request *req = NULL;
 	struct mtu3_request *mreq;
+
+	if (!(mep->flags & MTU3_EP_ENABLED)) {
+		dev_info(mtu->dev, "%s EP%d is already disabled\n",
+			__func__, epnum);
+		return;
+	}
 
 	gpd_current = gpd_dma_to_virt(ring, gpd_dma);
 
@@ -492,6 +510,11 @@ static void qmu_done_rx(struct mtu3 *mtu, u8 epnum)
 		mtu3_req_complete(mep, req, 0);
 
 		gpd = advance_deq_gpd(ring);
+
+		if (!gpd) {
+			pr_err("[RX][ERROR] EP%d, Next GPD is null!!\n", epnum);
+			return;
+		}
 	}
 
 	dev_dbg(mtu->dev, "%s EP%d, deq=%p, enq=%p, complete\n",

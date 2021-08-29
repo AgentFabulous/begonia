@@ -3,6 +3,7 @@
  *
  * This code is based on drivers/scsi/ufs/ufshcd.h
  * Copyright (C) 2011-2013 Samsung India Software Operations
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  *
  * Authors:
@@ -566,14 +567,6 @@ struct ufs_stats {
 	struct ufs_err_reg_hist perf_warn;
 };
 
-/* UFSHCD states */
-enum {
-	UFSHCD_STATE_RESET,
-	UFSHCD_STATE_ERROR,
-	UFSHCD_STATE_OPERATIONAL,
-	UFSHCD_STATE_EH_SCHEDULED,
-};
-
 /* MTK PATCH UFS Host Controller debug print bitmask */
 #define UFSHCD_DBG_PRINT_CLK_FREQ_EN		UFS_BIT(0)
 #define UFSHCD_DBG_PRINT_UIC_ERR_HIST_EN	UFS_BIT(1)
@@ -760,12 +753,6 @@ struct ufs_hba {
 	#define UFSHCD_QUIRK_BROKEN_UFS_HCI_VERSION		UFS_BIT(5)
 
 	/*
-	 * This quirk needs to be enabled if we apply performance heuristic
-	 * to UFS host.
-	 */
-	#define UFSHCD_QUIRK_UFS_HCI_PERF_HEURISTIC		UFS_BIT(6)
-
-	/*
 	 * This quirk needs to be enabled if the host contoller regards
 	 * resolution of the values of PRDTO and PRDTL in UTRD as byte.
 	 */
@@ -792,7 +779,7 @@ struct ufs_hba {
 	 */
 	#define UFSHCD_QUIRK_UFS_HCI_DISABLE_AH8_BEFORE_RDB	UFS_BIT(10)
 
-	/*
+    /*
 	 * This quirk needs to be enabled if the host controller advertises
 	 * inline encryption support but it doesn't work correctly.
 	 */
@@ -825,11 +812,9 @@ struct ufs_hba {
 	bool is_powered;
 	bool is_init_prefetch;
 	struct ufs_init_prefetch init_prefetch_data;
-	struct semaphore eh_sem;
 
 	/* Work Queues */
 	struct work_struct eh_work;
-	struct work_struct inv_resp_work;
 	struct work_struct eeh_work;
 	struct work_struct rls_work;
 
@@ -959,9 +944,6 @@ struct ufs_hba {
 	struct keyslot_manager *ksm;
 	void *crypto_DO_NOT_USE[8];
 #endif /* CONFIG_SCSI_UFS_CRYPTO */
-
-	u32 ufs_mtk_qcmd_r_cmd_cnt;
-	u32 ufs_mtk_qcmd_w_cmd_cnt;
 };
 
 /* MTK PATCH */

@@ -801,7 +801,7 @@ static void binder_print_bwdog(struct binder_transaction *t,
 	sub_t = timespec_sub(cur, *startime);
 
 	rtc_time_to_tm(t->tv.tv_sec, &tm);
-	pr_info_ratelimited("%d %s %d:%d to %d:%d %s %u.%03ld s (%s) dex %u start %lu.%03ld android %d-%02d-%02d %02d:%02d:%02d.%03lu\n",
+	pr_info("%d %s %d:%d to %d:%d %s %u.%03ld s (%s) dex %u start %lu.%03ld android %d-%02d-%02d %02d:%02d:%02d.%03lu\n",
 			t->debug_id, binder_wait_on_str[r],
 			t->fproc, t->fthrd, t->tproc, t->tthrd,
 			(cur_in && e) ? "over" : "total",
@@ -4274,6 +4274,11 @@ err_alloc_tcomplete_failed:
 	binder_cancel_bwdog(t);
 #endif
 #ifdef BINDER_USER_TRACKING
+	if (t->code) {
+		binder_debug(BINDER_DEBUG_FAILED_TRANSACTION,
+			     "%d:%d transaction %d failed code: %x",
+			      proc->pid, thread->pid, t->debug_id, t->code);
+	}
 	binder_print_delay(t);
 #endif
 	kfree(t);

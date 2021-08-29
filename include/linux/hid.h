@@ -959,6 +959,7 @@ static inline void hid_map_usage(struct hid_input *hidinput,
 		*bit = NULL;
 		return;
 	}
+
 	usage->type = type;
 	usage->code = c;
 	*max = limit;

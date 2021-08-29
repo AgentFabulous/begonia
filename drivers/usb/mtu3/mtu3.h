@@ -2,6 +2,7 @@
  * mtu3.h - MediaTek USB3 DRD header
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Author: Chunfeng Yun <chunfeng.yun@mediatek.com>
  *
@@ -161,6 +162,12 @@ enum mtu3_g_ep0_state {
 	MU3D_EP0_STATE_RX,
 	MU3D_EP0_STATE_TX_END,
 	MU3D_EP0_STATE_STALL,
+};
+
+enum usb_state_enum {
+	USB_SUSPEND = 0,
+	USB_UNCONFIGURED,
+	USB_CONFIGURED
 };
 
 /**
@@ -503,6 +510,7 @@ void ssusb_phy_power_off(struct ssusb_mtk *ssusb);
 void ssusb_ip_sw_reset(struct ssusb_mtk *ssusb);
 #else
 extern void mtu3_check_ltssm_work(struct work_struct *data);
+extern void BATTERY_SetUSBState(int usb_state_value);
 extern bool mtu3_hal_is_vbus_exist(void);
 extern void disconnect_check(struct mtu3 *mtu);
 extern bool is_saving_mode(void);

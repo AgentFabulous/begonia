@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -360,8 +361,57 @@ static int ion_mm_heap_allocate(struct ion_heap *heap,
 	struct ion_mm_buffer_info *buffer_info = NULL;
 	unsigned long long start, end;
 	unsigned long user_va = 0;
+#ifdef CONFIG_MTK_PSEUDO_M4U
+	struct page *page;
+#endif
 
 	INIT_LIST_HEAD(&pages);
+
+#if (defined(CONFIG_MTK_M4U) || defined(CONFIG_MTK_PSEUDO_M4U))
+	if (heap->id == ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA) {
+		/*for va-->mva case, align is used for va value */
+		table = m4u_create_sgtable(align, (unsigned int)size);
+		user_va = align;
+		if (size % PAGE_SIZE != 0)
+			IONDBG("%s va(0x%lx)size(%ld) not align page.\n",
+			       __func__, user_va, size);
+		if (IS_ERR_OR_NULL(table)) {
+			IONMSG("%s create table error 0x%p!!\n",
+			       __func__, table);
+			return -ENOMEM;
+		}
+
+		goto map_mva_exit;
+	}
+
+	if (heap->id == ION_HEAP_TYPE_MULTIMEDIA_PA2MVA) {
+		table = kzalloc(sizeof(*table), GFP_KERNEL);
+		if (!table) {
+			IONMSG("%s kzalloc failed table is null.\n", __func__);
+			goto err;
+		}
+		ret = sg_alloc_table(table, 1, GFP_KERNEL);
+		if (ret) {
+			IONMSG("%s PA2MVA sg table fail %d\n", __func__, ret);
+			goto err1;
+		}
+		sg_dma_address(table->sgl) = align;
+		sg_dma_len(table->sgl) = size;
+		table->sgl->length = size;
+#ifdef CONFIG_MTK_PSEUDO_M4U
+		page = phys_to_page(align);
+		sg_set_page(table->sgl, page, size, 0);
+#endif
+
+		goto map_mva_exit;
+	}
+#endif
+	if (align > PAGE_SIZE) {
+		IONMSG("%s align %lu is larger than PAGE_SIZE.\n", __func__,
+		       align);
+		return -EINVAL;
+	}
+
 	if (size / PAGE_SIZE > totalram_pages / 2) {
 		IONMSG("%s size %lu is larger than totalram_pages.\n", __func__,
 		       size);
@@ -422,6 +472,9 @@ static int ion_mm_heap_allocate(struct ion_heap *heap,
 		kfree(info);
 	}
 
+#if (defined(CONFIG_MTK_M4U) || defined(CONFIG_MTK_PSEUDO_M4U))
+map_mva_exit:
+#endif
 	/* create MM buffer info for it */
 	buffer_info = kzalloc(sizeof(*buffer_info), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(buffer_info)) {
@@ -611,6 +664,19 @@ void ion_mm_heap_free(struct ion_buffer *buffer)
 	LIST_HEAD(pages);
 	int i;
 
+#if (defined(CONFIG_MTK_M4U) || defined(CONFIG_MTK_PSEUDO_M4U))
+	if (heap->id == ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA ||
+	    heap->id == ION_HEAP_TYPE_MULTIMEDIA_PA2MVA) {
+		ion_mm_heap_free_buffer_info(buffer);
+#if defined(CONFIG_MTK_IOMMU_PGTABLE_EXT) && \
+	(CONFIG_MTK_IOMMU_PGTABLE_EXT > 32)
+		sg_free_table(table);
+		kfree(table);
+#endif
+		return;
+	}
+#endif
+
 	/* uncached pages come from the page pools, zero them before return */
 	/*for security purposes (other allocations are zerod at alloc time */
 	if (!(buffer->private_flags & ION_PRIV_FLAG_SHRINKER_FREE))
@@ -764,6 +830,7 @@ static int ion_mm_heap_phys(struct ion_heap *heap, struct ion_buffer *buffer,
 	    (struct ion_mm_buffer_info *)buffer->priv_virt;
 	struct port_mva_info_t port_info;
 	int ret = 0;
+	bool non_vmalloc_request = false;
 	int domain_idx = 0;
 #ifdef MTK_ION_MAPPING_PERF_DEBUG
 	unsigned long long start = 0, end = 0;
@@ -868,15 +935,70 @@ static int ion_mm_heap_phys(struct ion_heap *heap, struct ion_buffer *buffer,
 		}
 
 #if (defined(CONFIG_MTK_M4U) || defined(CONFIG_MTK_PSEUDO_M4U))
+		if (heap->id == ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA ||
+		    heap->id == ION_HEAP_TYPE_MULTIMEDIA_PA2MVA) {
+			port_info.va = (unsigned long)buffer_info->VA;
+			port_info.flags |= M4U_FLAGS_SG_READY;
+			/*userspace va without vmalloc, has no page struct */
+			if (port_info.va < PAGE_OFFSET &&
+			    (port_info.va < VMALLOC_START ||
+			     port_info.va > VMALLOC_END))
+				non_vmalloc_request = true;
+		}
+#endif
+
+#if (defined(CONFIG_MTK_M4U) || defined(CONFIG_MTK_PSEUDO_M4U))
 		ret = m4u_alloc_mva_sg(&port_info, buffer->sg_table);
+
+{ /* alloc new iova */
+#if defined(CONFIG_MTK_IOMMU_PGTABLE_EXT) && \
+        (CONFIG_MTK_IOMMU_PGTABLE_EXT > 32)
+	dma_addr_t expected, dma_addr;
+	unsigned long s_pa = 0;
+	struct scatterlist *s;
+	unsigned long long ts_start, ts_end; /* for performance */
+	int i, flag = 0;
+
+	ts_start = sched_clock();
+	dma_addr = sg_dma_address(buffer->sg_table->sgl);
+	expected = sg_dma_address(buffer->sg_table->sgl);
+	s_pa = (unsigned long)sg_phys(buffer->sg_table->sgl);
+	for_each_sg(buffer->sg_table->sgl, s, buffer->sg_table->nents, i) {
+		if (sg_dma_address(s) != expected) {
+			flag = 1;
+			IONMSG("hc3 %s new warning, sz:0x%zx,%u, i:%d--%u, dma_addr:0x%pa -- 0x%pa, 0x%lx+0x%lx, pa:0x%lx(0x%lx), 0x%p--0x%p\n",
+			       __func__, buffer->size,
+			       buffer->heap->id,
+			       i, buffer->sg_table->nents,
+			       &dma_addr, &expected,
+			       (unsigned long)sg_dma_address(s),
+			       (unsigned long)sg_dma_len(s),
+			       (unsigned long)sg_phys(s),
+			       s_pa,
+			       buffer->sg_table,
+			       buffer_info->table_orig);
+		}
+		if (flag && i > 10)
+			break;
+
+		expected = sg_dma_address(s) + sg_dma_len(s);
+	}
+
+	ts_end = sched_clock();
+	if (ts_end - ts_start > 1000000) //1ms
+		pr_info("hc3 %s new check sg_table time:%llu, nents:%u\n",
+			__func__, (ts_end - ts_start), buffer->sg_table->nents);
+#endif
+}
 #endif
 		if (ret < 0) {
 			IONMSG("[%s]Error: p:%d MVA:0x%x dom:%d ret:%d",
 			       __func__, port_info.emoduleid,
 			       *(unsigned int *)addr, domain_idx, ret);
-			IONMSG("(region 0x%x-0x%x)(VA 0x%lx-%zu)\n",
+			IONMSG("(region 0x%x-0x%x)(VA 0x%lx-%zu-%d)\n",
 			       port_info.iova_start, port_info.iova_end,
-			       (unsigned long)buffer_info->VA, buffer->size);
+			       (unsigned long)buffer_info->VA, buffer->size,
+			       non_vmalloc_request);
 			*addr = 0;
 			if (port_info.flags > 0)
 				buffer_info->FIXED_MVA[domain_idx] = 0;
@@ -927,6 +1049,44 @@ static int ion_mm_heap_phys(struct ion_heap *heap, struct ion_buffer *buffer,
 #if defined(CONFIG_MTK_IOMMU_PGTABLE_EXT) && \
 	(CONFIG_MTK_IOMMU_PGTABLE_EXT > 32)
 		buffer->sg_table = &buffer_info->table[domain_idx];
+
+	{ /* reuse iova */
+		dma_addr_t expected, dma_addr;
+		unsigned long s_pa = 0;
+		struct scatterlist *s;
+		unsigned long long ts_start, ts_end; /* for performance */
+		int i, flag = 0;
+
+		ts_start = sched_clock();
+		dma_addr = sg_dma_address(buffer->sg_table->sgl);
+		expected = sg_dma_address(buffer->sg_table->sgl);
+		s_pa = (unsigned long)sg_phys(buffer->sg_table->sgl);
+		for_each_sg(buffer->sg_table->sgl, s, buffer->sg_table->nents, i) {
+			if (sg_dma_address(s) != expected) {
+				flag = 1;
+				IONMSG("hc3 reuse %s warning, sz:0x%zx, i:%d--%u, dma_addr:0x%pa -- 0x%pa, 0x%lx+0x%lx, pa:0x%lx(0x%lx), 0x%p--0x%p\n",
+				       __func__, buffer->size,
+				       i, buffer->sg_table->nents,
+				       &dma_addr, &expected,
+				       (unsigned long)sg_dma_address(s),
+				       (unsigned long)sg_dma_len(s),
+				       (unsigned long)sg_phys(s),
+				       s_pa,
+				       buffer->sg_table,
+				       buffer_info->table_orig);
+			}
+			if (flag && i > 10)
+				break;
+
+			expected = sg_dma_address(s) + sg_dma_len(s);
+		}
+
+		ts_end = sched_clock();
+		if (ts_end - ts_start > 1000000) //1ms
+			pr_info("hc3 %s reuse check sg_table time:%llu, nents:%u\n",
+				__func__, (ts_end - ts_start), buffer->sg_table->nents);
+	}
+
 		IONDBG(
 		       "%d, iova reuse done, module:%d, buffer:0x%p, port:%d, mva:0x%lx, fix:0x%lx, return:0x%lx, cnt=%d, domain%d\n",
 		       __LINE__, buffer, buffer_info->module_id,
@@ -941,10 +1101,10 @@ static int ion_mm_heap_phys(struct ion_heap *heap, struct ion_buffer *buffer,
 		IONDBG("[%s] Port %d, in_len 0x%x, MVA(0x%x-%zu)",
 		       __func__, port_info.emoduleid, *(unsigned int *)len,
 		       *(unsigned int *)addr, buffer->size);
-		IONDBG("(region 0x%x--0x%x) (VA 0x%lx)\n",
+		IONDBG("(region 0x%x--0x%x) (VA 0x%lx-%d)\n",
 		       buffer_info->iova_start[domain_idx],
 		       buffer_info->iova_end[domain_idx],
-		       (unsigned long)buffer_info->VA);
+		       (unsigned long)buffer_info->VA, non_vmalloc_request);
 	}
 
 	*len = buffer->size;
@@ -1161,6 +1321,10 @@ static int ion_dump_all_share_fds(struct seq_file *s)
 	int res;
 	struct dump_fd_data data;
 
+	/* function is not available, just return */
+	if (ion_drv_file_to_buffer(NULL) == ERR_PTR(-EPERM))
+		return 0;
+
 	ION_DUMP(s,
 		 "%18s %9s %16s %5s %5s %16s %4s %8s %8s %8s %9s\n",
 		 "buffer", "alloc_pid", "alloc_client", "pid",
@@ -1191,6 +1355,8 @@ static int ion_mm_heap_debug_show(struct ion_heap *heap, struct seq_file *s,
 	int i;
 	bool has_orphaned = false;
 	struct ion_mm_buffer_info *bug_info;
+	unsigned long uncached_total = 0;
+	unsigned long cached_total = 0;
 	unsigned long long current_ts;
 
 	current_ts = sched_clock();
@@ -1210,6 +1376,12 @@ static int ion_mm_heap_debug_show(struct ion_heap *heap, struct seq_file *s,
 			 pool->low_count, pool->order,
 			 (1 << pool->order) * PAGE_SIZE *
 			 pool->low_count);
+
+		uncached_total += (1 << pool->order) * PAGE_SIZE *
+			pool->high_count;
+		uncached_total += (1 << pool->order) * PAGE_SIZE *
+			pool->low_count;
+
 		pool = sys_heap->cached_pools[i];
 		ION_DUMP(s,
 			 "%d order %u highmem pages in cached_pool = %lu total\n",
@@ -1221,7 +1393,20 @@ static int ion_mm_heap_debug_show(struct ion_heap *heap, struct seq_file *s,
 			 pool->low_count, pool->order,
 			 (1 << pool->order) * PAGE_SIZE *
 			 pool->low_count);
+
+		cached_total += (1 << pool->order) * PAGE_SIZE *
+			 pool->high_count;
+		cached_total += (1 << pool->order) * PAGE_SIZE *
+			 pool->low_count;
 	}
+
+	ION_DUMP(s,
+		"uncached pool = %lu cached pool = %lu\n",
+		uncached_total, cached_total);
+	ION_DUMP(s,
+		"pool total (uncached + cached) = %lu\n",
+		uncached_total + cached_total);
+
 	if (heap->flags & ION_HEAP_FLAG_DEFER_FREE)
 		ION_DUMP(s, "mm_heap_freelist total_size=%zu\n",
 			 ion_heap_freelist_size(heap));
@@ -1273,6 +1458,9 @@ static int ion_mm_heap_debug_show(struct ion_heap *heap, struct seq_file *s,
 		bug_info = (struct ion_mm_buffer_info *)buffer->priv_virt;
 		if (heap->id == ION_HEAP_TYPE_MULTIMEDIA_FOR_CAMERA &&
 		    buffer->heap->id != ION_HEAP_TYPE_MULTIMEDIA_FOR_CAMERA)
+			continue;
+		if (heap->id == ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA &&
+		    buffer->heap->id != ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA)
 			continue;
 
 		ion_buffer_dump(buffer, s);
@@ -1334,7 +1522,10 @@ static int ion_mm_heap_debug_show(struct ion_heap *heap, struct seq_file *s,
 			    handle->buffer->heap->id !=
 				ION_HEAP_TYPE_MULTIMEDIA_FOR_CAMERA)
 				continue;
-
+			if (heap->id == ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA &&
+			    handle->buffer->heap->id !=
+				ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA)
+				continue;
 			client->dbg_hnd_cnt++;
 			ION_DUMP(s,
 				 "\thandle=0x%p (id: %d), buffer=0x%p/0x%lx, heap=%u, fd=%4d, ts: %lldms (%d)\n",
@@ -2027,14 +2218,6 @@ long ion_mm_ioctl(struct ion_client *client, unsigned int cmd,
 			int domain_idx = ion_get_domain_id(
 				1, &param.config_buffer_param.module_id);
 			buffer_sec = buffer_info->security;
-			if (domain_idx < 0 ||
-			    (domain_idx >= DOMAIN_NUM &&
-			    domain_idx != MTK_GET_DOMAIN_IGNORE)) {
-				IONMSG("%s ION_FB_HEAP dom out of bound\n", __func__);
-				ret = -EINVAL;
-				ion_drv_put_kernel_handle(kernel_handle);
-				break;
-			}
 #ifndef CONFIG_MTK_IOMMU_V2
 			if (buffer_info->MVA[domain_idx] == 0) {
 #endif
@@ -2045,13 +2228,6 @@ long ion_mm_ioctl(struct ion_client *client, unsigned int cmd,
 				buffer_info->coherent =
 				    param.config_buffer_param.coherent;
 				if (param.mm_cmd == ION_MM_CONFIG_BUFFER_EXT) {
-					if (domain_idx == MTK_GET_DOMAIN_IGNORE) {
-						IONMSG("%s GPU not support ION_FB_HEAP_EXT\n",
-						       __func__);
-						ret = -EINVAL;
-						ion_drv_put_kernel_handle(kernel_handle);
-						break;
-				}
 					buffer_info->iova_start[domain_idx] =
 				param.config_buffer_param.reserve_iova_start;
 					buffer_info->iova_end[domain_idx] =
@@ -2171,8 +2347,7 @@ long ion_mm_ioctl(struct ion_client *client, unsigned int cmd,
 				param.get_phys_param.len = 0;
 				IONMSG(" %s: Error. Cannot get iova.\n",
 				       __func__);
-				ion_drv_put_kernel_handle(kernel_handle);
-				return -EFAULT;
+				ret = -EFAULT;
 			}
 			param.get_phys_param.phy_addr = phy_addr;
 

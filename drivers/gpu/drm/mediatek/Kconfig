@@ -18,6 +18,11 @@ config DRM_MEDIATEK
 	  This driver provides kernel mode setting and
 	  buffer management to userspace.
 
+config DRM_MEDIATEK_BOMB
+	tristate "DRM Support for BOMB Mediatek SoCs"
+	help
+	  Choose this option if you have a BOMB Mediatek SoCs.
+
 config DRM_MEDIATEK_HDMI
 	tristate "DRM HDMI Support for Mediatek SoCs"
 	depends on DRM_MEDIATEK
@@ -57,3 +62,11 @@ config DRM_MTK_DISABLE_AEE_LAYER
 	  if this value is y, will not produce AEE.
 	  if this value is n, will produce AEE.
 	  If you do not produce AEE, please set it to Y in xxx_defconfig.
+
+config DRM_DFPS
+	bool "Dynamic frame rate switching"
+	default n
+	help
+	  Enable DFPS if you want to dynamic frame rate switching.
+	  if this value is y, DFPS is on.
+	  if this value is n, DFPS is off.

@@ -1544,7 +1544,7 @@ static int __init thermal_init(void)
 	result = class_register(&thermal_class);
 	if (result)
 		goto unregister_governors;
-
+	
 	result = genetlink_init();
 	if (result)
 		goto unregister_class;
@@ -1555,8 +1555,7 @@ static int __init thermal_init(void)
 
 	result = register_pm_notifier(&thermal_pm_nb);
 	if (result)
-		pr_warn("Thermal: Can not register suspend notifier, return %d\n",
-			result);
+		pr_warn("Thermal: Can not register suspend notifier, return %d\n", result);
 
 	return 0;
 

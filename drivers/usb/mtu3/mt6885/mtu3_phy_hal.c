@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,12 +22,10 @@
 #include "mtu3.h"
 #include "mtu3_priv.h"
 
-static struct phy *mtk_phy;
+#define VCORE_OPP 0
 
-#ifdef CONFIG_MACH_MT6885
-#define VCORE_OPP 1
+static struct phy *mtk_phy;
 static struct pm_qos_request vcore_pm_qos;
-#endif
 
 #if !defined(CONFIG_USB_MU3D_DRV)
 void Charger_Detect_Init(void)
@@ -66,7 +65,6 @@ int ssusb_dual_phy_power_on(struct ssusb_mtk *ssusb, bool host_mode)
 {
 	int ret;
 
-#ifdef CONFIG_MACH_MT6885
 	if (host_mode) {
 		if (pm_qos_request_active(&vcore_pm_qos)) {
 			pm_qos_update_request(&vcore_pm_qos, VCORE_OPP);
@@ -79,7 +77,7 @@ int ssusb_dual_phy_power_on(struct ssusb_mtk *ssusb, bool host_mode)
 								VCORE_OPP);
 		}
 	}
-#endif
+
 	ret = phy_power_on(ssusb->phys[0]);
 
 	if (host_mode) {
@@ -91,7 +89,6 @@ int ssusb_dual_phy_power_on(struct ssusb_mtk *ssusb, bool host_mode)
 
 void ssusb_dual_phy_power_off(struct ssusb_mtk *ssusb, bool host_mode)
 {
-#ifdef CONFIG_MACH_MT6885
 	if (host_mode) {
 		if (pm_qos_request_active(&vcore_pm_qos)) {
 			pm_qos_remove_request(&vcore_pm_qos);
@@ -101,7 +98,7 @@ void ssusb_dual_phy_power_off(struct ssusb_mtk *ssusb, bool host_mode)
 
 		usb_mtkphy_host_mode(ssusb->phys[0], false);
 	}
-#endif
+
 	phy_power_off(ssusb->phys[0]);
 }
 

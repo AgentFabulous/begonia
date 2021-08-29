@@ -208,7 +208,13 @@ static int lcm_panel_bias_disable(void)
 
 static void lcm_panel_init(struct lcm *ctx)
 {
-	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	ctx->reset_gpio =
+		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio)) {
+		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
+		return;
+	}
 	gpiod_set_value(ctx->reset_gpio, 0);
 	udelay(15 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 1);
@@ -573,19 +579,36 @@ static int lcm_unprepare(struct drm_panel *panel)
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 	lcm_panel_bias_disable();
 #else
-	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	ctx->reset_gpio =
+		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio)) {
+		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
+		return PTR_ERR(ctx->reset_gpio);
+	}
 	gpiod_set_value(ctx->reset_gpio, 0);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
-	ctx->bias_neg =
-	    devm_gpiod_get_index(ctx->dev, "bias", 1, GPIOD_OUT_HIGH);
+
+	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
+		"bias", 1, GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_neg)) {
+		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
+			__func__, PTR_ERR(ctx->bias_neg));
+		return PTR_ERR(ctx->bias_neg);
+	}
 	gpiod_set_value(ctx->bias_neg, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
 
 	udelay(1000);
 
-	ctx->bias_pos =
-	    devm_gpiod_get_index(ctx->dev, "bias", 0, GPIOD_OUT_HIGH);
+	ctx->bias_pos = devm_gpiod_get_index(ctx->dev,
+		"bias", 0, GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_pos)) {
+		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
+			__func__, PTR_ERR(ctx->bias_pos));
+		return PTR_ERR(ctx->bias_pos);
+	}
 	gpiod_set_value(ctx->bias_pos, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
 #endif
@@ -605,15 +628,25 @@ static int lcm_prepare(struct drm_panel *panel)
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 	lcm_panel_bias_enable();
 #else
-	ctx->bias_pos =
-	    devm_gpiod_get_index(ctx->dev, "bias", 0, GPIOD_OUT_HIGH);
+	ctx->bias_pos = devm_gpiod_get_index(ctx->dev,
+		"bias", 0, GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_pos)) {
+		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
+			__func__, PTR_ERR(ctx->bias_pos));
+		return PTR_ERR(ctx->bias_pos);
+	}
 	gpiod_set_value(ctx->bias_pos, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
 
 	udelay(2000);
 
-	ctx->bias_neg =
-	    devm_gpiod_get_index(ctx->dev, "bias", 1, GPIOD_OUT_HIGH);
+	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
+		"bias", 1, GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_neg)) {
+		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
+			__func__, PTR_ERR(ctx->bias_neg));
+		return PTR_ERR(ctx->bias_neg);
+	}
 	gpiod_set_value(ctx->bias_neg, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
 #endif
@@ -653,17 +686,17 @@ static int lcm_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (10)
+#define HFP (16)
 #define HSA (6)
-#define HBP (40)
+#define HBP (43)
 #define VFP (20)
 #define VSA (4)
-#define VBP (20)
+#define VBP (32)
 #define VAC (2300)
 #define HAC (1080)
 
 static struct drm_display_mode default_mode = {
-	.clock = 160872,
+	.clock = 161857,
 	.hdisplay = HAC,
 	.hsync_start = HAC + HFP,
 	.hsync_end = HAC + HFP + HSA,
@@ -680,7 +713,13 @@ static int panel_ext_reset(struct drm_panel *panel, int on)
 {
 	struct lcm *ctx = panel_to_lcm(panel);
 
-	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	ctx->reset_gpio =
+		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio)) {
+		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
+		return PTR_ERR(ctx->reset_gpio);
+	}
 	gpiod_set_value(ctx->reset_gpio, on);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
@@ -703,10 +742,13 @@ static int panel_ata_check(struct drm_panel *panel)
 
 	DDPINFO("ATA read data %x %x %x\n", data[0], data[1], data[2]);
 
-	if (data[0] == id[0] && data[1] == id[1] && data[2] == id[2])
+	if (data[0] == id[0] &&
+			data[1] == id[1] &&
+			data[2] == id[2])
 		return 1;
 
-	DDPINFO("ATA expect read data is %x %x %x\n", id[0], id[1], id[2]);
+	DDPINFO("ATA expect read data is %x %x %x\n",
+			id[0], id[1], id[2]);
 
 	return 0;
 }
@@ -726,8 +768,18 @@ static int lcm_setbacklight_cmdq(void *dsi, dcs_write_gce cb, void *handle,
 	return 0;
 }
 
+static int lcm_get_virtual_heigh(void)
+{
+	return VAC;
+}
+
+static int lcm_get_virtual_width(void)
+{
+	return HAC;
+}
+
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 519,
+	.pll_clk = 542,
 	.vfp_low_power = 810,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
@@ -743,6 +795,8 @@ static struct mtk_panel_funcs ext_funcs = {
 	.reset = panel_ext_reset,
 	.set_backlight_cmdq = lcm_setbacklight_cmdq,
 	.ata_check = panel_ata_check,
+	.get_virtual_heigh = lcm_get_virtual_heigh,
+	.get_virtual_width = lcm_get_virtual_width,
 };
 #endif
 
@@ -844,24 +898,24 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 
 	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio)) {
-		dev_err(dev, "cannot get reset-gpios %ld\n",
-			PTR_ERR(ctx->reset_gpio));
+		dev_err(dev, "%s: cannot get reset-gpios %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
 		return PTR_ERR(ctx->reset_gpio);
 	}
 	devm_gpiod_put(dev, ctx->reset_gpio);
 
 	ctx->bias_pos = devm_gpiod_get_index(dev, "bias", 0, GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->bias_pos)) {
-		dev_err(dev, "cannot get bias-gpios 0 %ld\n",
-			PTR_ERR(ctx->bias_pos));
+		dev_err(dev, "%s: cannot get bias-pos 0 %ld\n",
+			__func__, PTR_ERR(ctx->bias_pos));
 		return PTR_ERR(ctx->bias_pos);
 	}
 	devm_gpiod_put(dev, ctx->bias_pos);
 
 	ctx->bias_neg = devm_gpiod_get_index(dev, "bias", 1, GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->bias_neg)) {
-		dev_err(dev, "cannot get bias-gpios 1 %ld\n",
-			PTR_ERR(ctx->bias_neg));
+		dev_err(dev, "%s: cannot get bias-neg 1 %ld\n",
+			__func__, PTR_ERR(ctx->bias_neg));
 		return PTR_ERR(ctx->bias_neg);
 	}
 	devm_gpiod_put(dev, ctx->bias_neg);

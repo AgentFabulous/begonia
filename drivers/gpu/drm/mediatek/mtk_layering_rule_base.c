@@ -178,29 +178,21 @@ static int is_overlap_on_yaxis(struct drm_mtk_layer_config *lhs,
 	return 1;
 }
 
-static bool is_layer_across_each_pipe(struct drm_crtc *crtc,
-			struct drm_mtk_layer_config *layer_info)
+static bool is_layer_across_each_pipe(struct drm_mtk_layer_config *layer_info)
 {
-	unsigned int dst_x, dst_w;
-	unsigned int disp_w;
-	struct mtk_drm_crtc *mtk_crtc;
+/* TODO: support dual pipe */
+#if 0
+	int dst_x, dst_w;
 
-	if (crtc == NULL)
+	if (!get_layering_opt(LYE_OPT_DUAL_PIPE))
 		return true;
-
-	mtk_crtc = to_mtk_crtc(crtc);
-	if (!mtk_crtc->is_dual_pipe)
-		return true;
-
-	disp_w = crtc->mode.hdisplay;
 
 	dst_x = layer_info->dst_offset_x;
 	dst_w = layer_info->dst_width;
-
-	if ((dst_x + dst_w <= disp_w / 2) ||
-	    (dst_x > disp_w / 2))
+	if ((dst_x + dst_w <= primary_display_get_width() / 2) ||
+	    (dst_x > primary_display_get_width() / 2))
 		return false;
-
+#endif
 	return true;
 }
 
@@ -209,8 +201,8 @@ static inline bool is_extended_layer(struct drm_mtk_layer_config *layer_info)
 	return (layer_info->ext_sel_layer != -1);
 }
 
-static bool is_extended_base_layer_valid(struct drm_crtc *crtc,
-		struct drm_mtk_layer_config *configs, int layer_idx)
+static bool is_extended_base_layer_valid(struct drm_mtk_layer_config *configs,
+					 int layer_idx)
 {
 	if ((layer_idx == 0) ||
 		(configs->src_fmt == MTK_DRM_FORMAT_DIM) ||
@@ -223,14 +215,9 @@ static bool is_extended_base_layer_valid(struct drm_crtc *crtc,
 	 * because extended layer would not find base layer in one of
 	 * display pipe.
 	 * So always mark this specific layer as overlap to avoid the fail case.
-	 * *
-	 * UPDATE @ 2020/12/17
-	 * Could skip this step through revise ovl extended layer config
-	 * flow; by enable attached layer index's RDMA, extended layer
-	 * can work well even attached layer does not enable.
 	 */
-	//if (!is_layer_across_each_pipe(crtc, configs))
-	//	return false;
+	if (!is_layer_across_each_pipe(configs))
+		return false;
 
 	return true;
 }
@@ -249,8 +236,8 @@ static inline bool is_extended_over_limit(int ext_cnt)
  * 1. check all ext layers, if overlapped with any one, change it to phy layer
  * 2. if more than 1 ext layer exist, need to check the phy layer
  */
-static int is_continuous_ext_layer_overlap(struct drm_crtc *crtc,
-		struct drm_mtk_layer_config *configs, int curr)
+static int is_continuous_ext_layer_overlap(struct drm_mtk_layer_config *configs,
+					   int curr)
 {
 	int overlapped;
 	struct drm_mtk_layer_config *src_info, *dst_info;
@@ -266,7 +253,7 @@ static int is_continuous_ext_layer_overlap(struct drm_crtc *crtc,
 				break;
 		} else {
 			overlapped |= is_overlap_on_yaxis(src_info, dst_info);
-			if (!is_extended_base_layer_valid(crtc, src_info, i))
+			if (!is_extended_base_layer_valid(src_info, i))
 				overlapped |= 1;
 			break;
 		}
@@ -501,8 +488,6 @@ static void dump_disp_trace(struct drm_mtk_layering_info *disp_info)
 			     disp_info->gles_tail[i]);
 
 		for (j = 0; j < disp_info->layer_num[i]; j++) {
-			if (n >= len)
-				break;
 			c = &disp_info->input_config[i][j];
 			n += snprintf(msg + n, len - n,
 				      "|L%d->%d(%u,%u,%ux%u),f:0x%x,c:%d",
@@ -829,7 +814,7 @@ static void ext_id_adjustment_and_retry(struct drm_device *dev,
 
 		if (ext_idx == -1) {
 			layer_info->ext_sel_layer = -1;
-			if (is_extended_base_layer_valid(NULL, layer_info, j))
+			if (is_extended_base_layer_valid(layer_info, j))
 				ext_idx = j;
 		} else {
 			layer_info->ext_sel_layer = ext_idx;
@@ -1412,14 +1397,11 @@ static int calc_hrt_num(struct drm_device *dev,
 			_calc_hrt_num(dev, disp_info, HRT_SECONDARY,
 				      HRT_TYPE_EMI, scan_overlap, false);
 	}
-	/* Virtual Display should not add to HRT sum: ovl -> wdma */
-	/*
 	if (has_hrt_limit(disp_info, HRT_THIRD)) {
-		sum_overlap_w += calc_hrt_num(dev, disp_info, HRT_THIRD,
-				HRT_TYPE_EMI, scan_overlap,
-				false);
+		sum_overlap_w += _calc_hrt_num(dev, disp_info, HRT_THIRD,
+					       HRT_TYPE_EMI, scan_overlap,
+					       false);
 	}
-	*/
 
 	emi_hrt_level = get_hrt_level(sum_overlap_w, false);
 
@@ -1467,7 +1449,6 @@ static int ext_layer_grouping(struct drm_device *dev,
 	int is_ext_layer, disp_idx, i;
 	struct drm_mtk_layer_config *src_info, *dst_info;
 	int available_layers = 0, phy_layer_cnt = 0;
-	struct drm_crtc *crtc;
 
 	for (disp_idx = 0; disp_idx < HRT_TYPE_NUM; disp_idx++) {
 		/* initialize ext layer info */
@@ -1482,13 +1463,6 @@ static int ext_layer_grouping(struct drm_device *dev,
 			continue;
 #endif
 
-		if (disp_idx == HRT_PRIMARY) {
-			drm_for_each_crtc(crtc, dev)
-				if (drm_crtc_index(crtc) == disp_idx)
-					break;
-		} else {
-			crtc = NULL;
-		}
 		/*
 		 * If the physical layer > input layer,
 		 * then skip using extended layer.
@@ -1520,7 +1494,7 @@ static int ext_layer_grouping(struct drm_device *dev,
 				continue;
 			}
 
-			is_ext_layer = !is_continuous_ext_layer_overlap(crtc,
+			is_ext_layer = !is_continuous_ext_layer_overlap(
 				disp_info->input_config[disp_idx], i);
 
 			/*
@@ -1589,11 +1563,11 @@ static int mtk_lye_get_comp_id(int disp_idx, struct drm_device *drm_dev,
 		else
 			return DDP_COMPONENT_OVL0;
 	}
-#if defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6893)
+#if defined(CONFIG_MACH_MT6885)
 	else if (disp_idx == 1)
 		return DDP_COMPONENT_OVL2_2L;
 	else
-		return DDP_COMPONENT_OVL2_2L;
+		return DDP_COMPONENT_OVL1_2L;
 #else
 	/* When open VDS path switch feature, vds OVL is OVL0_2L */
 	else if (mtk_drm_helper_get_opt(priv->helper_opt,
@@ -2013,8 +1987,7 @@ static int set_disp_info(struct drm_mtk_layering_info *disp_info_user,
 		sizeof(struct drm_mtk_layering_info));
 
 	for (i = 0; i < HRT_TYPE_NUM; i++)
-		if (_copy_layer_info_from_disp(disp_info_user, debug_mode, i))
-			return -EFAULT;
+		_copy_layer_info_from_disp(disp_info_user, debug_mode, i);
 
 	memset(l_rule_info->addon_scn, 0x0, sizeof(l_rule_info->addon_scn));
 	return 0;
@@ -2216,129 +2189,6 @@ static bool same_ratio_limitation(struct drm_crtc *crtc,
 		return false;
 }
 
-#define UNIT 32768
-#define TILE_LOSS 4
-static int check_cross_pipe_rpo(
-	unsigned int src_x, unsigned int src_w,
-	unsigned int dst_x, unsigned int dst_w,
-	unsigned int disp_w)
-{
-	int left = dst_x;
-	int right = dst_x + dst_w - 1;
-	int tile_idx = 0;
-	int tile_loss = 4;
-	u32 step = 0;
-	s32 init_phase = 0;
-	s32 offset[2] = {0};
-	s32 int_offset[2] = {0};
-	s32 sub_offset[2] = {0};
-	u32 tile_in_len[2] = {0};
-	u32 tile_out_len[2] = {0};
-	u32 out_x[2] = {0};
-	bool is_dual = true;
-	int width = disp_w;
-	struct mtk_rsz_param param[2];
-
-	if (right < width / 2)
-		tile_idx = 0;
-	else if (left >= width / 2)
-		tile_idx = 1;
-	else
-		is_dual = true;
-
-	step = (UNIT * (src_w - 1) + (dst_w - 2)) /
-			(dst_w - 1);
-
-	offset[0] = (step * (dst_w - 1) -
-		UNIT * (src_w - 1)) / 2;
-	init_phase = UNIT - offset[0];
-	sub_offset[0] = -offset[0];
-	if (sub_offset[0] < 0) {
-		int_offset[0]--;
-		sub_offset[0] = UNIT + sub_offset[0];
-	}
-	if (sub_offset[0] >= UNIT) {
-		int_offset[0]++;
-		sub_offset[0] = sub_offset[0] - UNIT;
-	}
-	if (is_dual) {
-		/*left side*/
-		tile_in_len[0] = (((width / 2) * src_w * 10) /
-			dst_w + 5) / 10 - src_x + tile_loss;
-		tile_out_len[0] = width / 2 - dst_x;
-		out_x[0] = dst_x;
-	} else {
-		tile_in_len[0] = src_w;
-		tile_out_len[0] = dst_w;
-		if (tile_idx == 0)
-			out_x[0] = dst_x;
-		else
-			out_x[0] = dst_x - width / 2;
-	}
-
-	param[tile_idx].out_x = out_x[0];
-	param[tile_idx].step = step;
-	param[tile_idx].int_offset = (u32)(int_offset[0] & 0xffff);
-	param[tile_idx].sub_offset = (u32)(sub_offset[0] & 0x1fffff);
-	param[tile_idx].in_len = tile_in_len[0];
-	param[tile_idx].out_len = tile_out_len[0];
-	DDPINFO("HRT %s:%s:step:%u,offset:%u.%u,len:%u->%u,out_x:%u\n", __func__,
-		   is_dual ? "dual" : "single",
-		   param[0].step,
-		   param[0].int_offset,
-		   param[0].sub_offset,
-		   param[0].in_len,
-		   param[0].out_len,
-		   param[0].out_x);
-
-	/* right half */
-	tile_out_len[1] = dst_w - tile_out_len[0];
-	tile_in_len[1] = ((tile_out_len[1] * src_w * 10) /
-		dst_w + 5) / 10 + tile_loss + (offset[0] ? 1 : 0);
-
-	offset[1] = (-offset[0]) + (tile_out_len[0] * step) -
-			(src_w - tile_in_len[1]) * UNIT;
-	/*
-	 * offset[1] = (init_phase + dst_w / 2 * step) -
-	 *	(src_w / 2 - tile_loss - (offset[0] ? 1 : 0) + 1) * UNIT +
-	 *	UNIT;
-	 */
-	DDPINFO("HRT %s,in_ph:%d,off[1]:%d\n", __func__, init_phase, offset[1]);
-	int_offset[1] = offset[1] / UNIT;
-	sub_offset[1] = offset[1] - UNIT * int_offset[1];
-	/*
-	if (int_offset[1] & 0x1) {
-		int_offset[1]++;
-		tile_in_len[1]++;
-		DDPINFO("HRT right tile int_offset: make odd to even\n");
-	}
-	*/
-	param[1].step = step;
-	param[1].out_x = 0;
-	param[1].int_offset = (u32)(int_offset[1] & 0xffff);
-	param[1].sub_offset = (u32)(sub_offset[1] & 0x1fffff);
-	param[1].in_len = tile_in_len[1];
-	param[1].out_len = tile_out_len[1];
-
-	DDPINFO("HRT %s:%s:step:%u,offset:%u.%u,len:%u->%u,out_x:%u\n", __func__,
-		   is_dual ? "dual" : "single",
-		   param[1].step,
-		   param[1].int_offset,
-		   param[1].sub_offset,
-		   param[1].in_len,
-		   param[1].out_len,
-		   param[1].out_x);
-
-	if (param[1].in_len == param[1].out_len) {
-		DDPDBG("skip_pipe1_no_scale\n");
-		return -1;
-	}
-
-	if (tile_in_len[1] > tile_out_len[1] || tile_in_len[0] > tile_out_len[0])
-		return -1;
-
-	return 0;
-}
 static int RPO_rule(struct drm_crtc *crtc,
 		struct drm_mtk_layering_info *disp_info, int disp_idx,
 		bool has_pq)
@@ -2349,8 +2199,6 @@ static int RPO_rule(struct drm_crtc *crtc,
 	struct mtk_rect dst_layer_roi = {0};
 	struct mtk_rect src_roi = {0};
 	struct mtk_rect dst_roi = {0};
-	unsigned int disp_w = crtc->state->adjusted_mode.hdisplay;
-	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
 	int rsz_idx = -1;
 	int i = 0;
 
@@ -2420,14 +2268,6 @@ static int RPO_rule(struct drm_crtc *crtc,
 				dst_roi.width, dst_roi.height);
 			break;
 		}
-
-		if (!is_layer_across_each_pipe(crtc, c))
-			break;
-
-		if (mtk_crtc->is_dual_pipe &&
-			check_cross_pipe_rpo(src_roi.x, src_roi.width,
-						dst_roi.x, dst_roi.width, disp_w))
-			break;
 
 		if (src_roi.width > RSZ_TILE_LENGTH ||
 		    src_roi.height > RSZ_IN_MAX_HEIGHT)

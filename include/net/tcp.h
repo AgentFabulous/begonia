@@ -133,7 +133,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 
 #define TCP_DELACK_MAX	((unsigned)(HZ/5))	/* maximal time to delay before sending an ACK */
 #if HZ >= 100
-#define TCP_DELACK_MIN	((unsigned)(HZ/25))	/* minimal time to delay before sending an ACK */
+#define TCP_DELACK_MIN	((unsigned)(HZ/200))	/* minimal time to delay before sending an ACK */
 #define TCP_ATO_MIN	((unsigned)(HZ/25))
 #else
 #define TCP_DELACK_MIN	4U

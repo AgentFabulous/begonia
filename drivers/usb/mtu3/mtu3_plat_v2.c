@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -568,6 +569,11 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
 			dev_info(ssusb->dev, "couldn't get extcon device\n");
 			return -EPROBE_DEFER;
 		}
+	}
+
+	ssusb->host_clk = devm_clk_get(dev, "host_ck");
+	if (IS_ERR(ssusb->host_clk)) {
+		dev_info(dev, "failed to get host clock\n");
 	}
 
 	dev_info(dev, "dr_mode: %d, is_u3_dr: %d, is_u3h_dr: %d\n",

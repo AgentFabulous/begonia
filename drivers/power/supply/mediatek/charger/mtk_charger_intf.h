@@ -174,7 +174,6 @@ struct charger_custom_data {
 	int charging_host_charger_current;
 	int apple_1_0a_charger_current;
 	int apple_2_1a_charger_current;
-	int usb_unlimited_current;
 	int ta_ac_charger_current;
 	int pd_charger_current;
 
@@ -431,9 +430,6 @@ struct charger_manager {
 	u_int g_scd_pid;
 	struct scd_cmd_param_t_1 sc_data;
 
-	bool force_disable_pp[TOTAL_CHARGER];
-	bool enable_pp[TOTAL_CHARGER];
-	struct mutex pp_lock[TOTAL_CHARGER];
 };
 
 /* charger related module interface */

@@ -1222,7 +1222,6 @@ static int dma_buf_debug_show(struct seq_file *s, void *unused)
 				 "\tERROR locking buffer object: skipping\n");
 			continue;
 		}
-
 	/*
 	 *  buf_obj->file is freed by fput(), because dma_buf_release() is moved to
 	 *  dentry_ops, so this part will lead use-after-free issue.
@@ -1236,7 +1235,6 @@ static int dma_buf_debug_show(struct seq_file *s, void *unused)
 	 *                      file_inode(buf_obj->file)->i_ino,
 	 *                      buf_obj->name ?: "");
 	 */
-
 		robj = buf_obj->resv;
 		while (true) {
 			seq = read_seqcount_begin(&robj->seq);

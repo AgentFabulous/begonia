@@ -198,7 +198,6 @@ struct ufs_mtk_host {
 	bool pm_qos_init;
 	struct pm_qos_request *req_vcore;
 	struct pm_qos_request req_cpu_dma_latency;
-	struct pm_qos_request req_mm_bandwidth;
 
 	/* passthrough keyhint if number of key slots is enough */
 	bool passthrough_keyhint;
@@ -231,8 +230,6 @@ int ufs_mtk_generic_read_dme(u32 uic_cmd, u16 mib_attribute,
 	u16 gen_select_index, u32 *value, unsigned long retry_ms);
 void ufs_mtk_hwfde_cfg_cmd(struct ufs_hba *hba,
 	struct scsi_cmnd *cmd);
-void ufs_mtk_wait_idle_state(struct ufs_hba *hba,
-			    unsigned long retry_ms);
 int ufs_mtk_wait_link_state(struct ufs_hba *hba, u32 *state,
 			    unsigned long retry_ms);
 int ufs_mtk_linkup_fail_handler(struct ufs_hba *hba, int left_retry);
@@ -245,14 +242,12 @@ int ufs_mtk_ioctl_ffu(struct scsi_device *dev, void __user *buf_user);
 int ufs_mtk_ioctl_get_fw_ver(struct scsi_device *dev, void __user *buf_user);
 int ufs_mtk_ioctl_query(struct ufs_hba *hba, u8 lun, void __user *buf_user);
 int ufs_mtk_ioctl_rpmb(struct ufs_hba *hba, void __user *buf_user);
+bool ufs_mtk_is_data_write_cmd(char cmd_op);
 void ufs_mtk_rpmb_dump_frame(struct scsi_device *sdev, u8 *data_frame, u32 cnt);
 struct rpmb_dev *ufs_mtk_rpmb_get_raw_dev(void);
 void ufs_mtk_runtime_pm_init(struct scsi_device *sdev);
 void ufs_mtk_device_quiesce(struct ufs_hba *hba);
 void ufs_mtk_device_resume(struct ufs_hba *hba);
-int ufs_mtk_perf_heurisic_if_allow_cmd(struct ufs_hba *hba,
-	struct scsi_cmnd *cmd);
-void ufs_mtk_perf_heurisic_req_done(struct ufs_hba *hba, struct scsi_cmnd *cmd);
 
 #ifdef CONFIG_MTK_UFS_LBA_CRC16_CHECK
 void ufs_mtk_di_init(struct ufs_hba *hba);

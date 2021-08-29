@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -4419,7 +4420,7 @@ void pll_if_on(void)
 	if (ret > 0) {
 #ifdef CONFIG_MTK_ENG_BUILD
 		print_enabled_clks_once();
-		BUG_ON(1);
+		//BUG_ON(1);
 #else
 		aee_kernel_warning("CCF MT6873",
 			"@%s():%d, PLLs are not off\n", __func__, __LINE__);

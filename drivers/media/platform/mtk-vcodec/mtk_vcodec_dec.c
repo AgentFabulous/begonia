@@ -407,8 +407,7 @@ static void mtk_vdec_queue_error_event(struct mtk_vcodec_ctx *ctx)
 	v4l2_event_queue_fh(&ctx->fh, &ev_error);
 }
 
-static void mtk_vdec_flush_decoder(struct mtk_vcodec_ctx *ctx,
-	struct mtk_vcodec_mem *current_bs)
+static void mtk_vdec_flush_decoder(struct mtk_vcodec_ctx *ctx)
 {
 	unsigned int src_chg = 0;
 	int ret = 0;
@@ -423,7 +422,7 @@ static void mtk_vdec_flush_decoder(struct mtk_vcodec_ctx *ctx,
 		return;
 	}
 
-	clean_free_bs_buffer(ctx, current_bs);
+	clean_free_bs_buffer(ctx, NULL);
 	clean_display_buffer(ctx, 0);
 	clean_free_fm_buffer(ctx);
 }
@@ -802,7 +801,7 @@ static void mtk_vdec_worker(struct work_struct *work)
 			 * remaining buffers from before the resolution change
 			 * point, so call flush decode here
 			 */
-			mtk_vdec_flush_decoder(ctx, NULL);
+			mtk_vdec_flush_decoder(ctx);
 			/*
 			 * After all buffers containing decoded frames from
 			 * before the resolution change point ready to be
@@ -910,10 +909,9 @@ void mtk_vdec_unlock(struct mtk_vcodec_ctx *ctx, u32 hw_id)
 	mtk_v4l2_debug(4, "ctx %p [%d] hw_id %d sem_cnt %d",
 		ctx, ctx->id, hw_id, ctx->dev->dec_sem[hw_id].count);
 
-	if (hw_id < MTK_VDEC_HW_NUM) {
-		ctx->hw_locked[hw_id] = 0;
+	if (hw_id < MTK_VDEC_HW_NUM)
 		up(&ctx->dev->dec_sem[hw_id]);
-	}
+	ctx->hw_locked[hw_id] = 0;
 }
 
 int mtk_vdec_lock(struct mtk_vcodec_ctx *ctx, u32 hw_id)
@@ -998,8 +996,8 @@ void mtk_vcodec_dec_release(struct mtk_vcodec_ctx *ctx)
 				vdec_decode_unprepare(ctx, i);
 			/* user killed when waiting lock, do not unlock*/
 			if (ctx->hw_locked[i] == -1) {
-				mtk_vdec_pmqos_end_frame(ctx, i);
 				mtk_vcodec_dec_clock_off(&ctx->dev->pm, i);
+				mtk_vdec_pmqos_end_frame(ctx, i);
 			}
 		}
 }
@@ -2451,39 +2449,19 @@ static void vb2ops_vdec_stop_streaming(struct vb2_queue *q)
 {
 	struct vb2_buffer *src_buf = NULL, *dst_buf = NULL;
 	struct mtk_vcodec_ctx *ctx = vb2_get_drv_priv(q);
-	struct vb2_v4l2_buffer *vb2_v4l2 = NULL;
-	struct mtk_video_dec_buf *src_buf_info = NULL;
 	unsigned int i = 0;
 
 	mtk_v4l2_debug(4, "[%d] (%d) state=(%x) ctx->decoded_frame_cnt=%d",
 		ctx->id, q->type, ctx->state, ctx->decoded_frame_cnt);
 
 	if (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-		if (ctx->state >= MTK_STATE_HEADER) {
-			src_buf = v4l2_m2m_next_src_buf(ctx->m2m_ctx);
-			if (src_buf != NULL) {
-				vb2_v4l2 = to_vb2_v4l2_buffer(src_buf);
-				src_buf_info = container_of(vb2_v4l2,
-					struct mtk_video_dec_buf, vb);
-				/* for bs buffer reuse case & avoid put to done twice*/
-				mtk_vdec_flush_decoder(ctx, &src_buf_info->bs_buffer);
-			} else {
-				mtk_vdec_flush_decoder(ctx, NULL);
-			}
-		}
+		if (ctx->state >= MTK_STATE_HEADER)
+			mtk_vdec_flush_decoder(ctx);
 		while ((src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx)))
 			if (to_vb2_v4l2_buffer(src_buf)
-				!= &ctx->dec_flush_buf->vb) {
-
-				vb2_v4l2 = to_vb2_v4l2_buffer(src_buf);
-
-				mtk_v4l2_debug(2,
-					"[%d] src_buf_remove queue id=%d",
-					ctx->id, vb2_v4l2->vb2_buf.index);
-
-				v4l2_m2m_buf_done(vb2_v4l2,
+				!= &ctx->dec_flush_buf->vb)
+				v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf),
 					VB2_BUF_STATE_ERROR);
-			}
 		return;
 	}
 
@@ -2508,20 +2486,19 @@ static void vb2ops_vdec_stop_streaming(struct vb2_queue *q)
 			ctx->last_decoded_picinfo.buf_h,
 			ctx->picinfo.bitdepth);
 
-		mtk_vdec_flush_decoder(ctx, NULL);
+		mtk_vdec_flush_decoder(ctx);
 	}
 
 	while ((dst_buf = v4l2_m2m_dst_buf_remove(ctx->m2m_ctx))) {
+		struct vb2_v4l2_buffer *vb2_v4l2 = NULL;
+
 		for (i = 0; i < dst_buf->num_planes; i++)
 			vb2_set_plane_payload(dst_buf, i, 0);
 
-		vb2_v4l2 = to_vb2_v4l2_buffer(dst_buf);
+		vb2_v4l2 = container_of(dst_buf,
+			struct vb2_v4l2_buffer, vb2_buf);
 
-		mtk_v4l2_debug(2,
-			"[%d] dst_buf_remove queue id=%d",
-			ctx->id, vb2_v4l2->vb2_buf.index);
-
-		v4l2_m2m_buf_done(vb2_v4l2,
+		v4l2_m2m_buf_done(to_vb2_v4l2_buffer(dst_buf),
 						  VB2_BUF_STATE_ERROR);
 	}
 
@@ -2531,14 +2508,6 @@ static void m2mops_vdec_device_run(void *priv)
 {
 	struct mtk_vcodec_ctx *ctx = priv;
 	struct mtk_vcodec_dev *dev = ctx->dev;
-	unsigned int enable = 1;
-
-	if (ctx->dec_param_change & MTK_DEC_PARAM_FORCE_RES_CHANGE) {
-		if (vdec_if_set_param(ctx, SET_PARAM_FORCE_RES_CHANGE, &enable) != 0)
-			mtk_v4l2_err("[%d] Error!! Cannot set param", ctx->id);
-		ctx->dec_param_change &= (~MTK_DEC_PARAM_FORCE_RES_CHANGE);
-	}
-
 
 	queue_work(dev->decode_workqueue, &ctx->decode_work);
 }
@@ -2664,19 +2633,11 @@ static int mtk_vdec_s_ctrl(struct v4l2_ctrl *ctrl)
 		mtk_dma_contig_set_secure_mode(&ctx->dev->plat_dev->dev,
 					ctx->dec_params.svp_mode);
 #endif
-		mtk_v4l2_debug(4, "[%d] V4L2_CID_MPEG_MTK_SEC_DECODE id %d val %d",
+		mtk_v4l2_debug(0, "[%d] V4L2_CID_MPEG_MTK_SEC_DECODE id %d val %d",
 			ctx->id, ctrl->id, ctrl->val);
 	}
 
 	switch (ctrl->id) {
-
-	case V4L2_CID_MPEG_MTK_FORCE_RES_CHANGE:
-		ctx->dec_params.force_res_change = ctrl->val;
-		ctx->dec_param_change |= MTK_DEC_PARAM_FORCE_RES_CHANGE;
-		mtk_v4l2_debug(0, "[%d] V4L2_CID_MPEG_MTK_FORCE_RES_CHANGE id %d val %d",
-			ctx->id, ctrl->id, ctrl->val);
-		break;
-
 	case V4L2_CID_MPEG_MTK_DECODE_MODE:
 		ctx->dec_params.decode_mode = ctrl->val;
 		ctx->dec_param_change |= MTK_DEC_PARAM_DECODE_MODE;
@@ -2838,11 +2799,6 @@ int mtk_vcodec_dec_ctrls_setup(struct mtk_vcodec_ctx *ctx)
 		&mtk_vcodec_dec_ctrl_ops,
 		V4L2_CID_MPEG_MTK_SEC_DECODE,
 		0, 32, 1, 0);
-
-	ctrl = v4l2_ctrl_new_std(&ctx->ctrl_hdl,
-		&mtk_vcodec_dec_ctrl_ops,
-		V4L2_CID_MPEG_MTK_FORCE_RES_CHANGE,
-		0, 32, 1, 2);
 
 	ctrl = v4l2_ctrl_new_std(&ctx->ctrl_hdl,
 		&mtk_vcodec_dec_ctrl_ops,

@@ -43,13 +43,6 @@
 
 struct gt9896s_module gt9896s_modules;
 
-
-/*put resume in workqueue to screen on*/
-static struct gt9896s_ts_core *resume_core_data;
-static struct work_struct touch_resume_work;
-static struct workqueue_struct *touch_resume_workqueue;
-static int touch_suspend_flag;
-
 /**
  * __do_register_ext_module - register external module
  * to register into touch core modules structure
@@ -646,6 +639,134 @@ static ssize_t gt9896s_ts_irq_info_store(struct device *dev,
 	return count;
 }
 
+/*reg read/write */
+static u16 rw_addr;
+static u32 rw_len;
+static u8 rw_flag;
+static u8 store_buf[32];
+static u8 show_buf[PAGE_SIZE];
+static ssize_t gt9896s_ts_reg_rw_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	int ret;
+	struct gt9896s_ts_core *core_data = dev_get_drvdata(dev);
+	struct gt9896s_ts_device *ts_dev = core_data->ts_dev;
+
+	if (!rw_addr || !rw_len) {
+		ts_err("address(0x%x) and length(%d) cann't be null\n",
+			rw_addr, rw_len);
+		return -EINVAL;
+	}
+
+	if (rw_flag != 1) {
+		ts_err("invalid rw flag %d, only support [1/2]", rw_flag);
+		return -EINVAL;
+	}
+
+	ret = ts_dev->hw_ops->read(ts_dev, rw_addr, show_buf, rw_len);
+	if (ret) {
+		ts_err("failed read addr(%x) length(%d)\n", rw_addr, rw_len);
+		return snprintf(buf, PAGE_SIZE,
+				"failed read addr(%x), len(%d)\n",
+				rw_addr, rw_len);
+	}
+
+	return snprintf(buf, PAGE_SIZE, "0x%x,%d {%*ph}\n",
+			rw_addr, rw_len, rw_len, show_buf);
+}
+
+static ssize_t gt9896s_ts_reg_rw_store(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t count)
+{
+	struct gt9896s_ts_core *core_data = dev_get_drvdata(dev);
+	struct gt9896s_ts_device *ts_dev = core_data->ts_dev;
+	char *pos = NULL, *token = NULL;
+	long result = 0;
+	int ret, i;
+
+	if (!buf || !count) {
+		ts_err("invalid params\n");
+		goto err_out;
+	}
+
+	if (buf[0] == 'r') {
+		rw_flag = 1;
+	} else if (buf[0] == 'w') {
+		rw_flag = 2;
+	} else {
+		ts_err("string must start with 'r/w'\n");
+		goto err_out;
+	}
+
+	/* get addr */
+	pos = (char *)buf;
+	pos += 2;
+	token = strsep(&pos, ":");
+	if (!token) {
+		ts_err("invalid address info\n");
+		goto err_out;
+	} else {
+		if (kstrtol(token, 16, &result)) {
+			ts_err("failed get addr info\n");
+			goto err_out;
+		}
+		rw_addr = (u16)result;
+		ts_info("rw addr is 0x%x\n", rw_addr);
+	}
+
+	/* get length */
+	token = strsep(&pos, ":");
+	if (!token) {
+		ts_err("invalid length info\n");
+		goto err_out;
+	} else {
+		if (kstrtol(token, 0, &result)) {
+			ts_err("failed get length info\n");
+			goto err_out;
+		}
+		rw_len = (u32)result;
+		ts_info("rw length info is %d\n", rw_len);
+		if (rw_len > sizeof(store_buf)) {
+			ts_err("data len > %lu\n", sizeof(store_buf));
+			goto err_out;
+		}
+	}
+
+	if (rw_flag == 1)
+		return count;
+
+	for (i = 0; i < rw_len; i++) {
+		token = strsep(&pos, ":");
+		if (!token) {
+			ts_err("invalid data info\n");
+			goto err_out;
+		} else {
+			if (kstrtol(token, 16, &result)) {
+				ts_err("failed get data[%d] info\n", i);
+				goto err_out;
+			}
+			store_buf[i] = (u8)result;
+			ts_info("get data[%d]=0x%x\n", i, store_buf[i]);
+		}
+	}
+	ret = ts_dev->hw_ops->write(ts_dev, rw_addr, store_buf, rw_len);
+	if (ret) {
+		ts_err("failed write addr(%x) data %*ph\n", rw_addr,
+			rw_len, store_buf);
+		goto err_out;
+	}
+
+	ts_info("%s write to addr (%x) with data %*ph\n",
+		"success", rw_addr, rw_len, store_buf);
+
+	return count;
+err_out:
+	snprintf(show_buf, PAGE_SIZE, "%s\n",
+		"invalid params, format{r/w:4100:length:[41:21:31]}");
+	return -EINVAL;
+}
+
 static DEVICE_ATTR(extmod_info, S_IRUGO, gt9896s_ts_extmod_show, NULL);
 static DEVICE_ATTR(driver_info, S_IRUGO, gt9896s_ts_driver_info_show, NULL);
 static DEVICE_ATTR(chip_info, S_IRUGO, gt9896s_ts_chip_info_show, NULL);
@@ -654,6 +775,8 @@ static DEVICE_ATTR(send_cfg, S_IWUSR | S_IWGRP, NULL, gt9896s_ts_send_cfg_store)
 static DEVICE_ATTR(read_cfg, S_IRUGO, gt9896s_ts_read_cfg_show, NULL);
 static DEVICE_ATTR(irq_info, S_IRUGO | S_IWUSR | S_IWGRP,
 		   gt9896s_ts_irq_info_show, gt9896s_ts_irq_info_store);
+static DEVICE_ATTR(reg_rw, S_IRUGO | S_IWUSR | S_IWGRP,
+		   gt9896s_ts_reg_rw_show, gt9896s_ts_reg_rw_store);
 
 static struct attribute *sysfs_attrs[] = {
 	&dev_attr_extmod_info.attr,
@@ -663,6 +786,7 @@ static struct attribute *sysfs_attrs[] = {
 	&dev_attr_send_cfg.attr,
 	&dev_attr_read_cfg.attr,
 	&dev_attr_irq_info.attr,
+	&dev_attr_reg_rw.attr,
 	NULL,
 };
 
@@ -1294,6 +1418,12 @@ static void gt9896s_ts_set_input_params(struct input_dev *input_dev,
 			     0, ts_bdata->input_max_y, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR,
 			     0, ts_bdata->panel_max_w, 0, 0);
+
+	if (ts_bdata->panel_max_key) {
+		for (i = 0; i < ts_bdata->panel_max_key; i++)
+			input_set_capability(input_dev, EV_KEY,
+					     ts_bdata->panel_key_map[i]);
+	}
 }
 
 /**
@@ -1563,7 +1693,7 @@ int gt9896s_ts_esd_init(struct gt9896s_ts_core *core)
 	return 0;
 }
 
-void gt9896s_ts_release_connects(struct gt9896s_ts_core *core_data)
+static void gt9896s_ts_release_connects(struct gt9896s_ts_core *core_data)
 {
 	struct input_dev *input_dev = core_data->input_dev;
 	struct input_mt *mt = input_dev->mt;
@@ -1747,12 +1877,6 @@ out:
 	return 0;
 }
 
-/* resume work queue callback */
-static void resume_workqueue_callback(struct work_struct *work)
-{
-	gt9896s_ts_resume(resume_core_data);
-}
-
 #ifdef CONFIG_FB
 /**
  * gt9896s_ts_fb_notifier_callback - Framebuffer notifier callback
@@ -1764,28 +1888,16 @@ int gt9896s_ts_fb_notifier_callback(struct notifier_block *self,
 	struct gt9896s_ts_core *core_data =
 		container_of(self, struct gt9896s_ts_core, fb_notifier);
 	struct fb_event *fb_event = data;
-	int err = 0;
 
 	if (fb_event && fb_event->data && core_data) {
 		if (event == FB_EARLY_EVENT_BLANK) {
 			/* before fb blank */
 		} else if (event == FB_EVENT_BLANK) {
 			int *blank = fb_event->data;
-			if (*blank == FB_BLANK_UNBLANK) {
-				if (touch_suspend_flag) {
-					queue_work(touch_resume_workqueue, &touch_resume_work);
-					touch_suspend_flag = 0;
-				}
-			} else if (*blank == FB_BLANK_POWERDOWN) {
-				if (!touch_suspend_flag) {
-					err = cancel_work_sync(
-						&touch_resume_work);
-					if (!err)
-						ts_err("cancel resume_workqueue failed\n");
-					gt9896s_ts_suspend(core_data);
-				}
-				touch_suspend_flag = 1;
-			}
+			if (*blank == FB_BLANK_UNBLANK)
+				gt9896s_ts_resume(core_data);
+			else if (*blank == FB_BLANK_POWERDOWN)
+				gt9896s_ts_suspend(core_data);
 		}
 	}
 
@@ -1968,8 +2080,6 @@ static int gt9896s_ts_probe(struct platform_device *pdev)
 	core_data->ts_dev = ts_device;
 	platform_set_drvdata(pdev, core_data);
 
-	resume_core_data = core_data;
-
 	r = gt9896s_ts_power_init(core_data);
 	if (r < 0)
 		goto out;
@@ -2009,10 +2119,6 @@ static int gt9896s_ts_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-	/* create work queue for resume */
-	touch_resume_workqueue = create_singlethread_workqueue("touch_resume");
-	INIT_WORK(&touch_resume_work, resume_workqueue_callback);
-
 	/* Try start a thread to get config-bin info */
 	r = gt9896s_start_later_init(core_data);
 	if (r) {
@@ -2046,7 +2152,7 @@ out:
 	return r;
 }
 
-int gt9896s_ts_remove(struct platform_device *pdev)
+static int gt9896s_ts_remove(struct platform_device *pdev)
 {
 	struct gt9896s_ts_core *core_data = platform_get_drvdata(pdev);
 

@@ -368,10 +368,7 @@ static struct mtk_panel_params ext_params = {
 		.rc_tgt_offset_hi      =  DSC_RC_TGT_OFFSET_HI,
 		.rc_tgt_offset_lo      =  DSC_RC_TGT_OFFSET_LO,
 	},
-	.dyn_fps = {
-		.data_rate = MODE_0_DATA_RATE,
-	},
-	.data_rate = MODE_2_DATA_RATE,
+	.data_rate = MODE_0_DATA_RATE,
 };
 static struct mtk_panel_params ext_params_mode_1 = {
 	.cust_esd_check = 0,
@@ -419,10 +416,7 @@ static struct mtk_panel_params ext_params_mode_1 = {
 		.rc_tgt_offset_hi      =  DSC_RC_TGT_OFFSET_HI,
 		.rc_tgt_offset_lo      =  DSC_RC_TGT_OFFSET_LO,
 	},
-	.dyn_fps = {
-		.data_rate = MODE_1_DATA_RATE,
-	},
-	.data_rate = MODE_2_DATA_RATE,
+	.data_rate = MODE_1_DATA_RATE,
 };
 
 static struct mtk_panel_params ext_params_mode_2 = {
@@ -470,9 +464,6 @@ static struct mtk_panel_params ext_params_mode_2 = {
 		.rc_quant_incr_limit1  =  DSC_RC_QUANT_INCR_LIMIT1,
 		.rc_tgt_offset_hi      =  DSC_RC_TGT_OFFSET_HI,
 		.rc_tgt_offset_lo      =  DSC_RC_TGT_OFFSET_LO,
-	},
-	.dyn_fps = {
-		.data_rate = MODE_2_DATA_RATE,
 	},
 	.data_rate = MODE_2_DATA_RATE,
 };
@@ -775,8 +766,6 @@ static int panel_ext_reset(struct drm_panel *panel, int on)
 
 static struct mtk_panel_funcs ext_funcs = {
 	.set_backlight_cmdq = tianma_setbacklight_cmdq,
-	/* Not real backlight cmd in AOD, just for QC purpose */
-	.set_aod_light_mode = tianma_setbacklight_cmdq,
 	.ext_param_set = mtk_panel_ext_param_set,
 	.mode_switch = mode_switch,
 	.reset = panel_ext_reset,
@@ -846,7 +835,7 @@ static int tianma_get_modes(struct drm_panel *panel)
 
 	mode_3 = drm_mode_duplicate(panel->drm, &switch_mode_2);
 	if (!mode_3) {
-		dev_err(panel->drm->dev, "failed to add mode %ux%ux@%u\n",
+		dev_info(panel->drm->dev, "failed to add mode %ux%ux@%u\n",
 			switch_mode_2.hdisplay,
 			switch_mode_2.vdisplay,
 			switch_mode_2.vrefresh);

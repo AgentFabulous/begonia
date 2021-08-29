@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * Author: Tiffany Lin <tiffany.lin@mediatek.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -63,6 +64,7 @@ enum mtk_dec_dtsi_reg_idx {
 	VDEC_VLD,
 	VDEC_MISC,
 	VDEC_LAT_MISC,
+	VDEC_LAT_VLD,
 	VDEC_RACING_CTRL,
 	NUM_MAX_VDEC_REG_BASE,
 };

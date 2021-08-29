@@ -150,8 +150,8 @@ int mtk_merge_analysis(struct mtk_ddp_comp *comp)
 	u32 dbg1 = 0;
 
 	const int len = 100;
-	int ret;
 	char msg[len];
+	int n = 0;
 
 	enable = readl(baddr + DISP_REG_MERGE_CTRL);
 	width = readl(baddr + DISP_REG_MERGE_WIDTH);
@@ -161,20 +161,18 @@ int mtk_merge_analysis(struct mtk_ddp_comp *comp)
 
 	DDPDUMP("== DISP %s ANALYSIS ==\n", mtk_dump_comp_str(comp));
 
-	ret = snprintf(msg, len,
-		"en:%d,swap:%d,dcm_dis:%d,width_L:%d,width_R:%d,h:%d,pix_cnt:%d,line_cnt:%d\n",
-		REG_FLD_VAL_GET(FLD_MERGE_EN, enable),
-		REG_FLD_VAL_GET(FLD_MERGE_LR_SWAP, enable),
-		REG_FLD_VAL_GET(FLD_MERGE_DCM_DIS, enable),
-		REG_FLD_VAL_GET(FLD_IN_WIDHT_L, width),
-		REG_FLD_VAL_GET(FLD_IN_WIDHT_R, width),
-		REG_FLD_VAL_GET(FLD_IN_HEIGHT, height),
-		REG_FLD_VAL_GET(FLD_PIXEL_CNT, dbg0),
-		REG_FLD_VAL_GET(FLD_MERGE_STATE, dbg0),
-		REG_FLD_VAL_GET(FLD_LINE_CNT, dbg1));
-
-	if (ret >= 0)
-		DDPDUMP("%s", msg);
+	n = snprintf(msg, len,
+		     "en:%d,swap:%d,dcm_dis:%d,width_L:%d,width_R:%d,h:%d,pix_cnt:%d,line_cnt:%d\n",
+		     REG_FLD_VAL_GET(FLD_MERGE_EN, enable),
+		     REG_FLD_VAL_GET(FLD_MERGE_LR_SWAP, enable),
+		     REG_FLD_VAL_GET(FLD_MERGE_DCM_DIS, enable),
+		     REG_FLD_VAL_GET(FLD_IN_WIDHT_L, width),
+		     REG_FLD_VAL_GET(FLD_IN_WIDHT_R, width),
+		     REG_FLD_VAL_GET(FLD_IN_HEIGHT, height),
+		     REG_FLD_VAL_GET(FLD_PIXEL_CNT, dbg0),
+		     REG_FLD_VAL_GET(FLD_MERGE_STATE, dbg0),
+		     REG_FLD_VAL_GET(FLD_LINE_CNT, dbg1));
+	DDPDUMP("%s", msg);
 
 	return 0;
 }

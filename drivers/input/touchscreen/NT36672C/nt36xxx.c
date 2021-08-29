@@ -40,10 +40,6 @@
 #include <linux/jiffies.h>
 #endif				/* #if NVT_TOUCH_ESD_PROTECT */
 
-#ifdef CONFIG_DRM_MEDIATEK
-#include "mtk_panel_ext.h"
-#endif
-
 #if NVT_TOUCH_ESD_PROTECT
 static struct delayed_work nvt_esd_check_work;
 static struct workqueue_struct *nvt_esd_check_wq;
@@ -68,9 +64,6 @@ static int nvt_fb_notifier_callback(struct notifier_block *self, unsigned long e
 static void nvt_ts_early_suspend(struct early_suspend *h);
 static void nvt_ts_late_resume(struct early_suspend *h);
 #endif
-
-static int32_t nvt_ts_resume(struct device *dev);
-static int32_t nvt_ts_suspend(struct device *dev);
 
 uint32_t ENG_RST_ADDR = 0x7FFF80;
 uint32_t SWRST_N8_ADDR;	//read from dtsi
@@ -183,20 +176,16 @@ static inline int32_t spi_read_write(struct spi_device *client, uint8_t *buf, si
 		.len = len,
 	};
 
+	memcpy(ts->xbuf, buf, len + DUMMY_BYTES);
+
 	switch (rw) {
 	case NVTREAD:
-		if (len + DUMMY_BYTES > NVT_TRANSFER_LEN + 1)
-			return -EINVAL;
-		memcpy(ts->xbuf, buf, len + DUMMY_BYTES);
 		t.tx_buf = ts->xbuf;
 		t.rx_buf = ts->rbuf;
 		t.len = (len + DUMMY_BYTES);
 		break;
 
 	case NVTWRITE:
-		if (len > NVT_TRANSFER_LEN + 1)
-			return -EINVAL;
-		memcpy(ts->xbuf, buf, len);
 		t.tx_buf = ts->xbuf;
 		break;
 	}
@@ -334,7 +323,7 @@ return:
 *******************************************************/
 void nvt_bld_crc_enable(void)
 {
-	uint8_t buf[4] = { 0 };
+	uint8_t buf[2] = { 0 };
 
 	//---set xdata index to BLD_CRC_EN_ADDR---
 	nvt_set_page(ts->mmap->BLD_CRC_EN_ADDR);
@@ -359,7 +348,7 @@ return:
 *******************************************************/
 void nvt_fw_crc_enable(void)
 {
-	uint8_t buf[4] = { 0 };
+	uint8_t buf[2] = { 0 };
 
 	//---set xdata index to EVENT BUF ADDR---
 	nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
@@ -595,7 +584,7 @@ return:
 *******************************************************/
 int32_t nvt_read_pid(void)
 {
-	uint8_t buf[4] = { 0 };
+	uint8_t buf[3] = { 0 };
 	int32_t ret = 0;
 
 	//---set xdata index to EVENT BUF ADDR---
@@ -1459,28 +1448,6 @@ out:
 	return ret;
 }
 
-#ifdef CONFIG_DRM_MEDIATEK
-static int nvt_tp_power_on_reinit(void)
-{
-	int32_t ret;
-
-	pr_info("%s is called\n", __func__);
-
-	/* do esd recovery, bootloader reset */
-	ret = nvt_ts_suspend(&ts->client->dev);
-	if (ret) {
-		pr_info("%s  is called suspend %d\n", __func__, ret);
-		return ret;
-	}
-
-	ret = nvt_ts_resume(&ts->client->dev);
-	if (ret)
-		pr_info("%s  is called resume %d\n", __func__, ret);
-
-	return ret;
-}
-#endif
-
 /*******************************************************
 Description:
 	Novatek touchscreen driver probe function.
@@ -1509,10 +1476,6 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	int32_t retry = 0;
 #endif
 
-#ifdef CONFIG_DRM_MEDIATEK
-	void **retval = NULL;
-#endif
-
 	NVT_LOG("start\n");
 
 	ts = kmalloc(sizeof(struct nvt_ts_data), GFP_KERNEL);
@@ -1521,7 +1484,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 		return -ENOMEM;
 	}
 
-	ts->xbuf = kzalloc((NVT_TRANSFER_LEN + 1), GFP_KERNEL);
+	ts->xbuf = (uint8_t *) kzalloc((NVT_TRANSFER_LEN + 1), GFP_KERNEL);
 	if (ts->xbuf == NULL) {
 		NVT_ERR("kzalloc for xbuf failed!\n");
 		if (ts) {
@@ -1815,14 +1778,6 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 
 	bTouchIsAwake = 1;
 	NVT_LOG("end\n");
-
-#ifdef CONFIG_DRM_MEDIATEK
-	pr_info("%s, disp notifier register func!\n", __func__);
-	if (mtk_panel_tch_handle_init()) {
-		retval = mtk_panel_tch_handle_init();
-		*retval = (void *)nvt_tp_power_on_reinit;
-	}
-#endif
 
 	nvt_irq_enable(true);
 

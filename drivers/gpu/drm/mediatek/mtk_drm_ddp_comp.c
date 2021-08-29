@@ -301,7 +301,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
 	{DDP_COMPONENT_DSI0, MTK_DSI, 0, NULL, 1},
 	{DDP_COMPONENT_DSI1, MTK_DSI, 1, NULL, 1},
 	{DDP_COMPONENT_GAMMA0, MTK_DISP_GAMMA, 0, NULL, 0},
-	{DDP_COMPONENT_GAMMA1, MTK_DISP_GAMMA, 1, NULL, 0},
+	{DDP_COMPONENT_GAMMA1, MTK_DISP_GAMMA, 0, NULL, 0},
 	{DDP_COMPONENT_OD, MTK_DISP_OD, 0, &ddp_od, 0},
 	{DDP_COMPONENT_OD1, MTK_DISP_OD, 1, &ddp_od, 0},
 	{DDP_COMPONENT_OVL0, MTK_DISP_OVL, 0, NULL, 0},
@@ -343,11 +343,6 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
 	{DDP_COMPONENT_DMDP_AAL0, MTK_DMDP_AAL, 0, NULL, 0},
 	{DDP_COMPONENT_DMDP_RSZ0, MTK_DMDP_RSZ, 0, NULL, 0},
 	{DDP_COMPONENT_DMDP_TDSHP0, MTK_DMDP_TDSHP, 0, NULL, 0},
-	{DDP_COMPONENT_DMDP_RDMA1, MTK_DMDP_RDMA, 1, NULL, 0},
-	{DDP_COMPONENT_DMDP_HDR1, MTK_DMDP_HDR, 1, NULL, 0},
-	{DDP_COMPONENT_DMDP_AAL1, MTK_DMDP_AAL, 1, NULL, 0},
-	{DDP_COMPONENT_DMDP_RSZ1, MTK_DMDP_RSZ, 1, NULL, 0},
-	{DDP_COMPONENT_DMDP_TDSHP1, MTK_DMDP_TDSHP, 1, NULL, 0},
 	{DDP_COMPONENT_DSC0, MTK_DISP_DSC, 0, NULL, 0},
 	{DDP_COMPONENT_MERGE0, MTK_DISP_MERGE, 0, NULL, 0},
 	{DDP_COMPONENT_DPTX, MTK_DISP_DPTX, 0, NULL, 1},
@@ -379,10 +374,7 @@ void mtk_ddp_comp_get_name(struct mtk_ddp_comp *comp, char *buf, int buf_len)
 
 	if (buf_len > sizeof(buf))
 		buf_len = sizeof(buf);
-	if (mtk_ddp_matches[comp->id].type < 0) {
-		DDPPR_ERR("%s invalid type\n", __func__);
-		return;
-	}
+
 	r = snprintf(buf, buf_len, "%s%d",
 		  mtk_ddp_comp_stem[mtk_ddp_matches[comp->id].type],
 		  mtk_ddp_matches[comp->id].alias_id);
@@ -614,8 +606,8 @@ int mtk_ddp_comp_register(struct drm_device *drm, struct mtk_ddp_comp *comp)
 void mtk_ddp_comp_unregister(struct drm_device *drm, struct mtk_ddp_comp *comp)
 {
 	struct mtk_drm_private *private = drm->dev_private;
-	if (comp && comp->id >= 0)
-		private->ddp_comp[comp->id] = NULL;
+
+	private->ddp_comp[comp->id] = NULL;
 }
 
 void mtk_ddp_comp_clk_prepare(struct mtk_ddp_comp *comp)

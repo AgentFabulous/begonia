@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -82,10 +83,8 @@ enum DISP_PMQOS_SLOT {
 	(DISP_SLOT_CUR_CONFIG_FENCE_BASE + (0x4 * (n)))
 #define DISP_SLOT_PRESENT_FENCE(n)                                          \
 	(DISP_SLOT_CUR_CONFIG_FENCE(OVL_LAYER_NR) + (0x4 * (n)))
-#define DISP_SLOT_SF_PRESENT_FENCE(n)                                          \
-	(DISP_SLOT_PRESENT_FENCE(MAX_CRTC) + (0x4 * (n)))
 #define DISP_SLOT_SUBTRACTOR_WHEN_FREE_BASE                                    \
-	(DISP_SLOT_SF_PRESENT_FENCE(MAX_CRTC) + 0x4)
+	(DISP_SLOT_PRESENT_FENCE(MAX_CRTC) + 0x4)
 #define DISP_SLOT_SUBTRACTOR_WHEN_FREE(n)                                      \
 	(DISP_SLOT_SUBTRACTOR_WHEN_FREE_BASE + (0x4 * (n)))
 #define DISP_SLOT_ESD_READ_BASE DISP_SLOT_SUBTRACTOR_WHEN_FREE(OVL_LAYER_NR)
@@ -352,7 +351,6 @@ enum MTK_CRTC_PROP {
 	CRTC_PROP_OVERLAP_LAYER_NUM,
 	CRTC_PROP_LYE_IDX,
 	CRTC_PROP_PRES_FENCE_IDX,
-	CRTC_PROP_SF_PRES_FENCE_IDX,
 	CRTC_PROP_DOZE_ACTIVE,
 	CRTC_PROP_OUTPUT_ENABLE,
 	CRTC_PROP_OUTPUT_FENCE_IDX,
@@ -367,6 +365,8 @@ enum MTK_CRTC_PROP {
 	CRTC_PROP_COLOR_TRANSFORM,
 	CRTC_PROP_USER_SCEN,
 	CRTC_PROP_HDR_ENABLE,
+	CRTC_PROP_ICON_ENABLE,
+	CRTC_PROP_ENROLL_ENABLE,
 	CRTC_PROP_MAX,
 };
 
@@ -472,17 +472,6 @@ enum CRTC_DDP_PATH {
 	DDP_PATH_NR,
 };
 
-/**
- * enum CWB_BUFFER_TYPE - user want to use buffer type
- * @IMAGE_ONLY: u8 *image
- * @CARRY_METADATA: struct user_cwb_buffer
- */
-enum CWB_BUFFER_TYPE {
-	IMAGE_ONLY,
-	CARRY_METADATA,
-	BUFFER_TYPE_NR,
-};
-
 struct mtk_crtc_path_data {
 	const enum mtk_ddp_comp_id *path[DDP_MODE_NR][DDP_PATH_NR];
 	unsigned int path_len[DDP_MODE_NR][DDP_PATH_NR];
@@ -493,7 +482,6 @@ struct mtk_crtc_path_data {
 	//for dual path
 	const enum mtk_ddp_comp_id *dual_path[DDP_PATH_NR];
 	unsigned int dual_path_len[DDP_PATH_NR];
-	const struct mtk_addon_scenario_data *addon_data_dual;
 };
 
 struct mtk_crtc_gce_obj {
@@ -545,73 +533,6 @@ struct disp_ccorr_config {
 	int mode;
 	int color_matrix[16];
 	bool featureFlag;
-};
-
-struct user_cwb_image {
-	u8 *image;
-	int width, height;
-};
-
-struct user_cwb_metadata {
-	unsigned long long timestamp;
-	unsigned int frameIndex;
-};
-
-struct user_cwb_buffer {
-	struct user_cwb_image data;
-	struct user_cwb_metadata meta;
-};
-
-struct mtk_cwb_buffer_info {
-	struct mtk_rect dst_roi;
-	u32 addr_mva;
-	u64 addr_va;
-	struct drm_framebuffer *fb;
-	unsigned long long timestamp;
-};
-
-struct mtk_cwb_funcs {
-	/**
-	 * @get_buffer:
-	 *
-	 * This function is optional.
-	 *
-	 * If user hooks this callback, driver will use this first when
-	 * wdma irq is arrived. (capture done)
-	 * User need fill buffer address to *buffer.
-	 *
-	 * If user not hooks this callback driver will confirm whether
-	 * mtk_wdma_capture_info->user_buffer is NULL or not.
-	 * User can use setUserBuffer() assigned this param.
-	 */
-	void (*get_buffer)(void **buffer);
-
-	/**
-	 * @copy_done:
-	 *
-	 * When Buffer copy done will be use this callback to notify user.
-	 */
-	void (*copy_done)(void *buffer, enum CWB_BUFFER_TYPE type);
-};
-
-struct mtk_cwb_info {
-	unsigned int enable;
-
-	struct mtk_rect src_roi;
-	unsigned int count;
-	bool is_sec;
-
-	unsigned int buf_idx;
-	struct mtk_cwb_buffer_info buffer[2];
-	unsigned int copy_w;
-	unsigned int copy_h;
-
-	enum addon_scenario scn;
-	struct mtk_ddp_comp *comp;
-
-	void *user_buffer;
-	enum CWB_BUFFER_TYPE type;
-	const struct mtk_cwb_funcs *funcs;
 };
 
 /**
@@ -670,8 +591,6 @@ struct mtk_drm_crtc {
 	struct mtk_drm_esd_ctx *esd_ctx;
 #ifdef CONFIG_MTK_ROUND_CORNER_SUPPORT
 	struct mtk_drm_gem_obj *round_corner_gem;
-	struct mtk_drm_gem_obj *round_corner_gem_l;
-	struct mtk_drm_gem_obj *round_corner_gem_r;
 #endif
 	struct mtk_drm_qos_ctx *qos_ctx;
 	bool sec_on;
@@ -691,14 +610,11 @@ struct mtk_drm_crtc {
 	atomic_t dc_main_path_commit_event;
 	struct task_struct *trigger_event_task;
 	struct task_struct *trigger_delay_task;
-	struct task_struct *trig_cmdq_task;
 	atomic_t trig_event_act;
 	atomic_t trig_delay_act;
 	atomic_t delayed_trig;
-	atomic_t cmdq_trig;
 	wait_queue_head_t trigger_delay;
 	wait_queue_head_t trigger_event;
-	wait_queue_head_t trigger_cmdq;
 
 	unsigned int avail_modes_num;
 	struct drm_display_mode *avail_modes;
@@ -720,17 +636,6 @@ struct mtk_drm_crtc {
 	wait_queue_head_t present_fence_wq;
 	struct task_struct *pf_release_thread;
 	atomic_t pf_event;
-
-	wait_queue_head_t sf_present_fence_wq;
-	struct task_struct *sf_pf_release_thread;
-	atomic_t sf_pf_event;
-
-	/*capture write back ctx*/
-	struct mutex cwb_lock;
-	struct mtk_cwb_info *cwb_info;
-	struct task_struct *cwb_task;
-	wait_queue_head_t cwb_wq;
-	atomic_t cwb_task_active;
 };
 
 struct mtk_crtc_state {
@@ -745,7 +650,6 @@ struct mtk_crtc_state {
 	struct mtk_lye_ddp_state lye_state;
 	struct mtk_rect rsz_src_roi;
 	struct mtk_rect rsz_dst_roi;
-	struct mtk_rsz_param rsz_param[2];
 	atomic_t plane_enabled_num;
 
 	/* property */
@@ -787,11 +691,8 @@ struct mtk_ddp_comp *mtk_ddp_comp_request_output(struct mtk_drm_crtc *mtk_crtc);
 /* get fence */
 int mtk_drm_crtc_getfence_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *file_priv);
-int mtk_drm_crtc_get_sf_fence_ioctl(struct drm_device *dev, void *data,
-				    struct drm_file *file_priv);
 
 long mtk_crtc_wait_status(struct drm_crtc *crtc, bool status, long timeout);
-void mtk_crtc_cwb_path_disconnect(struct drm_crtc *crtc);
 int mtk_crtc_path_switch(struct drm_crtc *crtc, unsigned int path_sel,
 			 int need_lock);
 void mtk_need_vds_path_switch(struct drm_crtc *crtc);
@@ -809,8 +710,6 @@ void mtk_crtc_disconnect_default_path(struct mtk_drm_crtc *mtk_crtc);
 void mtk_crtc_config_default_path(struct mtk_drm_crtc *mtk_crtc);
 void mtk_crtc_restore_plane_setting(struct mtk_drm_crtc *mtk_crtc);
 bool mtk_crtc_set_status(struct drm_crtc *crtc, bool status);
-int mtk_crtc_attach_addon_path_comp(struct drm_crtc *crtc,
-	const struct mtk_addon_module_data *module_data, bool is_attach);
 void mtk_crtc_connect_addon_module(struct drm_crtc *crtc);
 void mtk_crtc_disconnect_addon_module(struct drm_crtc *crtc);
 int mtk_crtc_gce_flush(struct drm_crtc *crtc, void *gce_cb, void *cb_data,
@@ -880,12 +779,6 @@ bool mtk_drm_get_hdr_property(void);
 int mtk_drm_aod_setbacklight(struct drm_crtc *crtc, unsigned int level);
 
 int mtk_drm_crtc_wait_blank(struct mtk_drm_crtc *mtk_crtc);
-void mtk_drm_crtc_init_para(struct drm_crtc *crtc);
-void mtk_drm_layer_dispatch_to_dual_pipe(
-	struct mtk_plane_state *plane_state,
-	struct mtk_plane_state *plane_state_l,
-	struct mtk_plane_state *plane_state_r,
-	unsigned int w);
 /* ********************* Legacy DISP API *************************** */
 unsigned int DISP_GetScreenWidth(void);
 unsigned int DISP_GetScreenHeight(void);

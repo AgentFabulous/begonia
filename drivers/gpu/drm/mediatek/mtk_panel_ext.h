@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,9 +21,13 @@
 #define ESD_CHECK_NUM 3
 #define MAX_TX_CMD_NUM 20
 #define MAX_RX_CMD_NUM 20
-#define READ_DDIC_SLOT_NUM 4
+#define READ_DDIC_SLOT_NUM (4 * MAX_RX_CMD_NUM)
 #define MAX_DYN_CMD_NUM 20
 
+extern atomic_t fod_hbm_on_flag;
+#ifdef CONFIG_HWCONF_MANAGER
+extern atomic_t panel_active_count_enable;
+#endif
 
 struct mtk_dsi;
 struct cmdq_pkt;
@@ -128,6 +133,28 @@ enum FPS_CHANGE_INDEX {
 	DYNFPS_DSI_MIPI_CLK = 4,
 };
 
+enum doze_bkl {
+	DOZE_TO_NORMAL = 0,
+	DOZE_BRIGHTNESS_HBM,
+	DOZE_BRIGHTNESS_LBM,
+};
+
+enum bkl_dimming_state {
+	STATE_NONE,
+	STATE_DIM_BLOCK,
+	STATE_DIM_RESTORE,
+	STATE_ALL
+};
+
+enum crc_state {
+	CRC_OFF,
+	CRC_P3,
+	CRC_P3_D65,
+	CRC_P3_FLAT,
+	CRC_SRGB,
+	CRC_NONE,
+};
+
 struct mtk_panel_dsc_params {
 	unsigned int enable;
 	unsigned int ver; /* [7:4] major [3:0] minor */
@@ -205,8 +232,10 @@ struct dfps_switch_cmd {
 struct dynamic_fps_params {
 	unsigned int switch_en;
 	unsigned int vact_timing_fps;
-	unsigned int data_rate;
 	struct dfps_switch_cmd dfps_cmd_table[MAX_DYN_CMD_NUM];
+
+	unsigned int lfr_enable;
+	unsigned int lfr_minimum_fps;
 };
 
 struct mtk_panel_params {
@@ -229,11 +258,7 @@ struct mtk_panel_params {
 	unsigned int corner_pattern_height;
 	unsigned int corner_pattern_height_bot;
 	unsigned int corner_pattern_tp_size;
-	unsigned int corner_pattern_tp_size_l;
-	unsigned int corner_pattern_tp_size_r;
 	void *corner_pattern_lt_addr;
-	void *corner_pattern_lt_addr_l;
-	void *corner_pattern_lt_addr_r;
 	unsigned int physical_width_um;
 	unsigned int physical_height_um;
 	unsigned int lane_swap_en;
@@ -242,16 +267,17 @@ struct mtk_panel_params {
 		lane_swap[MIPITX_PHY_PORT_NUM][MIPITX_PHY_LANE_NUM];
 	struct mtk_panel_dsc_params dsc_params;
 	unsigned int output_mode;
-	unsigned int lcm_cmd_if;
-	unsigned int hbm_en_time;
-	unsigned int hbm_dis_time;
+	unsigned int hbm_en_wait_vsync;
+	unsigned int hbm_en_pre_time;
+	unsigned int hbm_en_post_time;
+	unsigned int hbm_dis_pre_time;
+	unsigned int hbm_dis_post_time;
 	unsigned int lcm_index;
 	unsigned int wait_sof_before_dec_vfp;
 	unsigned int doze_delay;
-
-//Settings for LFR Function:
-	unsigned int lfr_enable;
-	unsigned int lfr_minimum_fps;
+	unsigned int icon_en_time;
+	unsigned int icon_dis_time;
+	unsigned int dc_backlight_threhold;
 };
 
 struct mtk_panel_ext {
@@ -269,8 +295,6 @@ struct mtk_panel_ctx {
 struct mtk_panel_funcs {
 	int (*set_backlight_cmdq)(void *dsi_drv, dcs_write_gce cb,
 		void *handle, unsigned int level);
-	int (*set_aod_light_mode)(void *dsi_drv, dcs_write_gce cb,
-		void *handle, unsigned int mode);
 	int (*set_backlight_grp_cmdq)(void *dsi_drv, dcs_grp_write_gce cb,
 		void *handle, unsigned int level);
 	int (*reset)(struct drm_panel *panel, int on);
@@ -282,6 +306,7 @@ struct mtk_panel_funcs {
 		unsigned int dst_mode, enum MTK_PANEL_MODE_SWITCH_STAGE stage);
 	int (*get_virtual_heigh)(void);
 	int (*get_virtual_width)(void);
+	int (*panel_whitepoint_get)(struct drm_panel *panel);
 	/**
 	 * @doze_enable_start:
 	 *
@@ -338,10 +363,48 @@ struct mtk_panel_funcs {
 	int (*hbm_set_cmdq)(struct drm_panel *panel, void *dsi_drv,
 			    dcs_write_gce cb, void *handle, bool en);
 	void (*hbm_get_state)(struct drm_panel *panel, bool *state);
+	void (*hbm_set_state)(struct drm_panel *panel, bool *state);
 	void (*hbm_get_wait_state)(struct drm_panel *panel, bool *wait);
 	bool (*hbm_set_wait_state)(struct drm_panel *panel, bool wait);
+	int (*hbm_fod_control)(struct drm_panel *panel, bool en);
+	int (*normal_hbm_control)(struct drm_panel *panel, bool en);
+	int (*setbacklight_control)(struct drm_panel *panel, unsigned int level, bool fod_cal_flag);
+	int (*set_doze_brightness)(struct drm_panel *panel, int doze_brightness);
+	int (*get_doze_brightness)(struct drm_panel *panel, char *buf);
+	int (*set_aod_light_mode)(struct drm_panel *panel, void *dsi_drv, dcs_write_gce cb,
+		void *handle, unsigned int mode);
+	void (*aod_set_state)(struct drm_panel *panel, bool *state);
+	void (*aod_get_state)(struct drm_panel *panel, bool *state);
+	void (*set_nolp)(struct drm_panel *panel);
+	void (*get_unset_doze_brightness)(struct drm_panel *panel, int *state);
+	int (*get_panel_info)(struct drm_panel *panel, char *buf);
+	void (*panel_id_get)(struct drm_panel *panel);
+	void (*esd_restore_backlight)(struct drm_panel *panel,
+		void *dsi_drv, dcs_write_gce cb, void *handle);
+	void (*panel_set_crc_srgb)(struct drm_panel *panel);
+	void (*panel_set_crc_p3)(struct drm_panel *panel);
+	void (*panel_set_crc_p3_d65)(struct drm_panel *panel);
+	void (*panel_set_flat_crc_p3)(struct drm_panel *panel);
+	void (*panel_set_crc_off)(struct drm_panel *panel);
+	void (*panel_dimming_control)(struct drm_panel *panel, bool en);
+	int (*panel_freq_switch)(struct drm_panel *panel, unsigned int cur_mode, unsigned int dst_mode);
+	void (*hbm_need_delay)(struct drm_panel *panel, bool *state);
+	void (*panel_elvss_control)(struct drm_panel *panel, bool en);
+	void (*get_hbm_solution)(struct drm_panel *panel, int *solution);
 };
 
+int mtk_fod_backlight_flag(struct drm_connector *c);
+int mtk_dc_flag(struct drm_connector *c);
+int mtk_doze_flag(struct drm_connector *c);
+int mtk_fod_hbm_flag(struct drm_connector *c);
+int mtk_normal_hbm_flag(struct drm_connector *c);
+int mtk_clear_fod_status(struct drm_connector *c);
+int mtk_clear_esd_status(struct drm_connector *c);
+bool mtk_get_esd_status(struct drm_connector *c);
+
+int mtk_ddic_dsi_read_cmd(struct mtk_ddic_dsi_msg *cmd_msg);
+int mtk_ddic_dsi_send_cmd(struct mtk_ddic_dsi_msg *cmd_msg,
+			bool blocking, bool aod_cmd);
 void mtk_panel_init(struct mtk_panel_ctx *ctx);
 void mtk_panel_add(struct mtk_panel_ctx *ctx);
 void mtk_panel_remove(struct mtk_panel_ctx *ctx);

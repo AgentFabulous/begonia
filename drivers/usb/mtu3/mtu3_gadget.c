@@ -2,6 +2,7 @@
  * mtu3_gadget.c - MediaTek usb3 DRD peripheral support
  *
  * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * Author: Chunfeng Yun <chunfeng.yun@mediatek.com>
  *
@@ -19,6 +20,9 @@
 #include "mtu3.h"
 #include "mtu3_dr.h"
 #include <linux/usb/composite.h>
+#ifdef CONFIG_USB_MTU3_PLAT_PHONE
+#include <mt-plat/mtk_boot.h>
+#endif
 
 void mtu3_req_complete(struct mtu3_ep *mep,
 		     struct usb_request *req, int status)
@@ -343,12 +347,21 @@ struct usb_request *mtu3_alloc_request(struct usb_ep *ep, gfp_t gfp_flags)
 
 void mtu3_free_request(struct usb_ep *ep, struct usb_request *req)
 {
+	struct mtu3_request *mreq = to_mtu3_request(req);
+	struct mtu3_request *r;
 	struct mtu3_ep *mep = to_mtu3_ep(ep);
 	struct mtu3 *mtu = mep->mtu;
 	unsigned long flags;
 
 	spin_lock_irqsave(&mtu->lock, flags);
-	kfree(to_mtu3_request(req));
+	list_for_each_entry(r, &mep->req_list, list) {
+		if (r == mreq) {
+			list_del(&mreq->list);
+			break;
+		}
+	}
+
+	kfree(mreq);
 	spin_unlock_irqrestore(&mtu->lock, flags);
 }
 
@@ -616,8 +629,11 @@ static int mtu3_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	spin_unlock_irqrestore(&mtu->lock, flags);
 	#ifdef CONFIG_USB_MTU3_PLAT_PHONE
 	/* Trigger connection when force on*/
-	if (mtu3_cable_mode == CABLE_MODE_FORCEON) {
-		dev_info(mtu->dev, "%s CABLE_MODE_FORCEON\n", __func__);
+	if ((mtu3_cable_mode == CABLE_MODE_FORCEON) ||
+		(get_boot_mode() == META_BOOT) ||
+		(get_boot_mode() == ADVMETA_BOOT)) {
+		dev_info(mtu->dev, "%s CABLE_MODE_FORCEON or META_MODE\n",
+			__func__);
 		ssusb_set_mailbox(&mtu->ssusb->otg_switch,
 			MTU3_VBUS_VALID);
 	}
@@ -844,6 +860,11 @@ void mtu3_gadget_suspend(struct mtu3 *mtu)
 void mtu3_gadget_disconnect(struct mtu3 *mtu)
 {
 	struct usb_gadget_driver *driver;
+
+	if (!mtu) {
+		pr_err("[%s] mtu3 is null\n", __func__);
+		return;
+	}
 
 	dev_info(mtu->dev, "gadget DISCONNECT\n");
 	if (mtu->gadget_driver && mtu->gadget_driver->disconnect) {

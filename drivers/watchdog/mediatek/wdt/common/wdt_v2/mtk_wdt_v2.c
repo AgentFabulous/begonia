@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -45,7 +46,6 @@
 #include <mach/wd_api.h>
 #include <linux/irqchip/mtk-eic.h>
 #include <linux/sched/clock.h>
-#include <linux/soc/mediatek/pmic_wrap.h>
 #ifndef __USING_DUMMY_WDT_DRV__
 #include <mt-plat/upmu_common.h>
 #endif
@@ -60,7 +60,6 @@ int	wdt_irq_id;
 int wdt_sspm_irq_id;
 int ext_debugkey_io_eint = -1;
 static int g_apwdt_en_doe = 1;
-static void __iomem *apxgpt_base;
 
 static const struct of_device_id rgu_of_match[] = {
 	{ .compatible = "mediatek,toprgu", },
@@ -671,6 +670,8 @@ void wdt_arch_reset(char mode)
 	/* dump RGU registers */
 	wdt_dump_reg();
 
+	/* clear extra cnt to prevent from Q->R update cannot reboot automatically issue */
+	wdt_mode_val &= ~MTK_WDT_MODE_EXTRA_CNT;
 	mt_reg_sync_writel(wdt_mode_val, MTK_WDT_MODE);
 
 	mt_reg_sync_writel(__raw_readl(MTK_WDT_STATUS), MTK_WDT_NONRST_REG);
@@ -724,8 +725,6 @@ void wdt_arch_reset(char mode)
 #endif
 	{
 		/* trigger SW reset */
-		pr_info("%s: disable pwrap before wdt reset\n", __func__);
-		pwrap_disable();
 		mt_reg_sync_writel(MTK_WDT_SWRST_KEY, MTK_WDT_SWRST);
 	}
 
@@ -1178,11 +1177,6 @@ int mtk_wdt_dfd_timeout(int value)
 	return 0;
 }
 
-void __iomem *mtk_wdt_apxgpt_base(void)
-{
-	return apxgpt_base;
-}
-
 #ifndef CONFIG_FIQ_GLUE
 static void wdt_report_info(void)
 {
@@ -1295,20 +1289,14 @@ int mtk_wdt_dfd_count_en(int value) {return 0; }
 int mtk_wdt_dfd_thermal1_dis(int value) {return 0; }
 int mtk_wdt_dfd_thermal2_dis(int value) {return 0; }
 int mtk_wdt_dfd_timeout(int value) {return 0; }
-void __iomem *mtk_wdt_apxgpt_base(void) {return 0; }
-#endif /* #ifndef __USING_DUMMY_WDT_DRV__ */
 
-static const struct of_device_id apxgpt_of_match[] = {
-	{ .compatible = "mediatek,apxgpt", },
-	{},
-};
+#endif /* #ifndef __USING_DUMMY_WDT_DRV__ */
 
 static int mtk_wdt_probe(struct platform_device *dev)
 {
 	int ret = 0;
 	struct device_node *node;
 	u32 ints[2] = { 0, 0 };
-	struct device_node *np_apxgpt;
 
 	pr_info("mtk wdt driver probe ..\n");
 
@@ -1449,20 +1437,6 @@ static int mtk_wdt_probe(struct platform_device *dev)
 		__raw_readl(MTK_WDT_MODE), __raw_readl(MTK_WDT_NONRST_REG));
 	pr_debug("WDT_REQ_MODE(0x%x)\n", __raw_readl(MTK_WDT_REQ_MODE));
 	pr_debug("WDT_REQ_IRQ_EN(0x%x)\n", __raw_readl(MTK_WDT_REQ_IRQ_EN));
-
-	/*
-	 * In order to dump kick and check bit mask in ATF, the two value
-	 * is kept in apxgpt registers
-	 */
-	for_each_matching_node(np_apxgpt, apxgpt_of_match) {
-		pr_info("%s: compatible node found: %s\n",
-			 __func__, np_apxgpt->name);
-		break;
-	}
-
-	apxgpt_base = of_iomap(np_apxgpt, 0);
-	if (!apxgpt_base)
-		pr_debug("apxgpt iomap failed\n");
 
 	return ret;
 }

@@ -2,6 +2,7 @@
  * A fairly generic DMA-API to IOMMU-API glue layer.
  *
  * Copyright (C) 2014-2015 ARM Ltd.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * based in part on arch/arm/mm/dma-mapping.c:
  * Copyright (C) 2000-2004 Russell King
@@ -794,6 +795,11 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
 				__func__, s_iova_len,
 				s_length, s_iova_off, count);
 	}
+
+	/* avoid sg don'tbe deal fully */
+	if (i != nents)
+		pr_info("hc3 %s maybe error, i:%d--%d, count:%d\n", __func__, i, nents, count);
+
 	return count;
 }
 
@@ -1257,16 +1263,9 @@ int iommu_dma_get_iovad_info(struct device *dev,
 	unsigned long *base, unsigned long *max)
 {
 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-	struct iommu_dma_cookie *cookie;
-	struct iova_domain *iovad;
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 
-	if (!domain) {
-		pr_info("%s get domain is fail, dev:%s\n", __func__, dev_name(dev));
-		return -1;
-	}
-
-	cookie = domain->iova_cookie;
-	iovad = &cookie->iovad;
 	*base = iovad->start_pfn << iova_shift(iovad);
 	*max = domain->geometry.aperture_end;
 

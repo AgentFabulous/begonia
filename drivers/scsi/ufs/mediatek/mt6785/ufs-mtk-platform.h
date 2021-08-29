@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -24,9 +25,6 @@
 
 /* If UPMU function not ready, comment this define */
 #define UPMU_READY
-
-/* If srclkenRC function not ready, comment this define */
-/* #define SR_CLKEN_RC_READY */
 #endif
 
 #define HIE_CHANGE_KEY_IN_NORMAL_WORLD

@@ -15,7 +15,11 @@ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/misc/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/typec/tcpc/
 subdir-ccflags-$(CONFIG_MTK_USB_TYPEC_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/typec/u3_switch/
 subdir-ccflags-$(CONFIG_MTK_USB_TYPEC_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/typec/inc
+ifeq ($(CONFIG_MTK_CHARGER_CANNON),y)
+obj-y += extcon_usb.o boost_manager_cannon.o
+else
 obj-y += extcon_usb.o boost_manager.o
+endif
 obj-$(CONFIG_MTK_USB_IDDIG) += usb-iddig.o
 obj-$(CONFIG_TCPC_CLASS) += usb-tcpc.o
 obj-$(CONFIG_DUAL_ROLE_USB_INTF) += usb_dual_role.o

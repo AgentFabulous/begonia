@@ -178,7 +178,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
 		clipped_freq = cpufreq_cdev->clipped_freq;
 
 		if (policy->max > clipped_freq)
-			cpufreq_verify_within_limits(policy, 0, clipped_freq);
+				cpufreq_verify_within_limits(policy, 0, clipped_freq);
 		break;
 	}
 	mutex_unlock(&cooling_list_lock);
@@ -453,7 +453,6 @@ static int cpufreq_set_cur_state(struct thermal_cooling_device *cdev,
 	/* Check if the old cooling action is same as new cooling action */
 	if (cpufreq_cdev->cpufreq_state == state)
 		return 0;
-
 	clip_freq = cpufreq_cdev->freq_table[state].frequency;
 	cpufreq_cdev->cpufreq_state = state;
 	cpufreq_cdev->clipped_freq = clip_freq;

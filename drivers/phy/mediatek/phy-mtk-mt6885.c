@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -26,6 +27,7 @@
 #include <linux/phy/phy.h>
 #include <dt-bindings/phy/phy.h>
 #include <linux/delay.h>
+#include <linux/debugfs.h>
 
 #include "phy-mtk.h"
 
@@ -53,6 +55,29 @@ enum mt_phy_version {
 	MT_PHY_V1 = 1,
 	MT_PHY_V2,
 };
+
+enum {
+	HW_VERSION_CN,
+	HW_VERSION_GL,
+	HW_VERSION_INDIA,
+};
+
+static int hw_version = HW_VERSION_CN;
+
+static int __init early_parse_hw_version(char *p)
+{
+	if (p) {
+		if (!strncmp(p, "CN", 2))
+			hw_version = HW_VERSION_CN;
+		else if (!strncmp(p, "GL", 2))
+			hw_version = HW_VERSION_GL;
+		else if (!strncmp(p, "India", 5))
+			hw_version = HW_VERSION_INDIA;
+	}
+
+	return 0;
+}
+__setup("androidboot.hwc=", early_parse_hw_version);
 
 static bool usb_enable_clock(struct mtk_phy_drv *u3phy, bool enable)
 {
@@ -390,55 +415,79 @@ reg_done:
 	usb_enable_clock(phy_drv, false);
 }
 
-#define VAL_MAX_WIDTH_2	0x3
-#define VAL_MAX_WIDTH_3	0x7
+#define MAX_VRT_VREF	0x7
+#define MAX_TERM_VREF	0x7
+#define MAX_ENHANCEMENT	0x3
+#define MAX_DISCTH	0xF
+#define MAX_INTRCAL	0x1F
 static void usb_phy_tuning(struct mtk_phy_instance *instance)
 {
 	s32 u2_vrt_ref, u2_term_ref, u2_enhance;
+	s32 u2_intr_cal, u2_discth;
 	struct device_node *of_node;
 
 	if (!instance->phy_tuning.inited) {
-		instance->phy_tuning.u2_vrt_ref = 6;
-		instance->phy_tuning.u2_term_ref = 6;
-		instance->phy_tuning.u2_enhance = 1;
+		/* default value */
+		instance->phy_tuning.u2_vrt_ref = 5;
+		instance->phy_tuning.u2_term_ref = 5;
+		instance->phy_tuning.u2_enhance = 3;
+		instance->phy_tuning.u2_intr_cal = 18;
+		instance->phy_tuning.u2_discth = 5;
+
 		of_node = of_find_compatible_node(NULL, NULL,
 			instance->phycfg->tuning_node_name);
 		if (of_node) {
-			/* value won't be updated if property not being found */
-			of_property_read_u32(of_node, "u2_vrt_ref",
-				(u32 *) &instance->phy_tuning.u2_vrt_ref);
-			of_property_read_u32(of_node, "u2_term_ref",
-				(u32 *) &instance->phy_tuning.u2_term_ref);
-			of_property_read_u32(of_node, "u2_enhance",
-				(u32 *) &instance->phy_tuning.u2_enhance);
+			/* update value from dts */
+			if (hw_version == HW_VERSION_CN) {
+				of_property_read_u32(of_node, "u2_vrt_ref_cn", (u32 *) &instance->phy_tuning.u2_vrt_ref);
+				of_property_read_u32(of_node, "u2_term_ref_cn", (u32 *) &instance->phy_tuning.u2_term_ref);
+				of_property_read_u32(of_node, "u2_enhance_cn", (u32 *) &instance->phy_tuning.u2_enhance);
+				of_property_read_u32(of_node, "u2_intr_cal_cn", (u32 *) &instance->phy_tuning.u2_intr_cal);
+				of_property_read_u32(of_node, "u2_discth_cn", (u32 *) &instance->phy_tuning.u2_discth);
+			} else if (hw_version == HW_VERSION_GL || hw_version == HW_VERSION_INDIA) {
+				of_property_read_u32(of_node, "u2_vrt_ref_gl_india", (u32 *) &instance->phy_tuning.u2_vrt_ref);
+				of_property_read_u32(of_node, "u2_term_ref_gl_india", (u32 *) &instance->phy_tuning.u2_term_ref);
+				of_property_read_u32(of_node, "u2_enhance_gl_india", (u32 *) &instance->phy_tuning.u2_enhance);
+				of_property_read_u32(of_node, "u2_intr_cal_gl_india", (u32 *) &instance->phy_tuning.u2_intr_cal);
+				of_property_read_u32(of_node, "u2_discth_gl_india", (u32 *) &instance->phy_tuning.u2_discth);
+			}
 		}
+
 		instance->phy_tuning.inited = true;
 	}
+
+	/* update value from sys/kernel/debug/phy_tuning */
+	if (instance->phy_drv->u2_vrt_ref != 0)
+		instance->phy_tuning.u2_vrt_ref = instance->phy_drv->u2_vrt_ref;
+	if (instance->phy_drv->u2_term_ref != 0)
+		instance->phy_tuning.u2_term_ref = instance->phy_drv->u2_term_ref;
+	if (instance->phy_drv->u2_enhance != 0)
+		instance->phy_tuning.u2_enhance = instance->phy_drv->u2_enhance;
+	if (instance->phy_drv->u2_intr_cal != 0)
+		instance->phy_tuning.u2_intr_cal = instance->phy_drv->u2_intr_cal;
+	if (instance->phy_drv->u2_discth != 0)
+		instance->phy_tuning.u2_discth = instance->phy_drv->u2_discth;
+
 	u2_vrt_ref = instance->phy_tuning.u2_vrt_ref;
 	u2_term_ref = instance->phy_tuning.u2_term_ref;
 	u2_enhance = instance->phy_tuning.u2_enhance;
+	u2_intr_cal = instance->phy_tuning.u2_intr_cal;
+	u2_discth = instance->phy_tuning.u2_discth;
 
-	if (u2_vrt_ref != -1) {
-		if (u2_vrt_ref <= VAL_MAX_WIDTH_3) {
-			u3phywrite32(U3D_USBPHYACR1,
-				RG_USB20_VRT_VREF_SEL_OFST,
-				RG_USB20_VRT_VREF_SEL, u2_vrt_ref);
-		}
-	}
-	if (u2_term_ref != -1) {
-		if (u2_term_ref <= VAL_MAX_WIDTH_3) {
-			u3phywrite32(U3D_USBPHYACR1,
-				RG_USB20_TERM_VREF_SEL_OFST,
-				RG_USB20_TERM_VREF_SEL, u2_term_ref);
-		}
-	}
-	if (u2_enhance != -1) {
-		if (u2_enhance <= VAL_MAX_WIDTH_2) {
-			u3phywrite32(U3D_USBPHYACR6,
-				RG_USB20_PHY_REV_6_OFST,
-				RG_USB20_PHY_REV_6, u2_enhance);
-		}
-	}
+	phy_printk(K_ERR, "%s [hw_version vrt_ref term_ref enhance intr_cal discth] = [%d %d %d %d %d %d]\n",
+			__func__, hw_version, u2_vrt_ref, u2_term_ref, u2_enhance, u2_intr_cal, u2_discth);
+
+	/* execute value*/
+	if (u2_vrt_ref >= 0 && u2_vrt_ref <= MAX_VRT_VREF)
+		u3phywrite32(U3D_USBPHYACR1, RG_USB20_VRT_VREF_SEL_OFST, RG_USB20_VRT_VREF_SEL, u2_vrt_ref);
+	if (u2_term_ref >= 0 && u2_term_ref <= MAX_TERM_VREF)
+		u3phywrite32(U3D_USBPHYACR1, RG_USB20_TERM_VREF_SEL_OFST, RG_USB20_TERM_VREF_SEL, u2_term_ref);
+	if (u2_enhance >= 0 && u2_enhance <= MAX_ENHANCEMENT)
+		u3phywrite32(U3D_USBPHYACR6, RG_USB20_PHY_REV_6_OFST, RG_USB20_PHY_REV_6, u2_enhance);
+	if (u2_intr_cal >= 0 && u2_intr_cal <= MAX_INTRCAL)
+		u3phywrite32(U3D_USBPHYACR1, RG_USB20_INTR_CAL_OFST, RG_USB20_INTR_CAL, u2_intr_cal);
+	if (u2_discth >= 0 && u2_discth <= MAX_DISCTH)
+		u3phywrite32(U3D_USBPHYACR6, RG_USB20_DISCTH_OFST, RG_USB20_DISCTH, u2_discth);
 
 	phy_printk(K_INFO, "%s - SSUSB TX EYE Tuning\n", __func__);
 	u3phywrite32(U3D_PHYD_MIX6, RG_SSUSB_IDRVSEL_OFST,
@@ -1000,6 +1049,22 @@ int usb2jtag_usb_init(void)
 }
 #endif
 
+static void create_debugfs_entry(struct mtk_phy_drv *mtkphy)
+{
+	mtkphy->debug_root = debugfs_create_dir("phy_tuning", NULL);
+
+	if (!mtkphy->debug_root)
+		phy_printk(K_ERR, "Failed to create debug dir\n");
+
+	if (mtkphy->debug_root) {
+		debugfs_create_x32("u2_vrt_ref", S_IFREG | S_IWUSR | S_IRUGO, mtkphy->debug_root, &(mtkphy->u2_vrt_ref));
+		debugfs_create_x32("u2_term_ref", S_IFREG | S_IWUSR | S_IRUGO, mtkphy->debug_root, &(mtkphy->u2_term_ref));
+		debugfs_create_x32("u2_enhance", S_IFREG | S_IWUSR | S_IRUGO, mtkphy->debug_root, &(mtkphy->u2_enhance));
+		debugfs_create_x32("u2_intr_cal", S_IFREG | S_IWUSR | S_IRUGO, mtkphy->debug_root, &(mtkphy->u2_intr_cal));
+		debugfs_create_x32("u2_discth", S_IFREG | S_IWUSR | S_IRUGO, mtkphy->debug_root, &(mtkphy->u2_discth));
+	}
+}
+
 static int mtk_phy_drv_init(struct platform_device *pdev,
 	struct mtk_phy_drv *mtkphy)
 {
@@ -1035,6 +1100,8 @@ static int mtk_phy_drv_init(struct platform_device *pdev,
 		}
 		mtkphy->clk = NULL;
 	}
+
+	create_debugfs_entry(mtkphy);
 
 	return ret;
 }
