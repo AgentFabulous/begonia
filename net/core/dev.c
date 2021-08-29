@@ -3858,6 +3858,18 @@ static bool skb_flow_limit(struct sk_buff *skb, unsigned int qlen)
 	return false;
 }
 
+
+static int parseDHCPReply(struct sk_buff *skb)
+{
+	const struct iphdr *iph = (const struct iphdr *)skb->data;
+	if(iph->protocol != IPPROTO_UDP)
+		return 0;
+	struct udphdr *uh = (struct udphdr *)(skb->data+(iph->ihl<<2));
+	if(uh->source == 0x4300 && uh->dest == 0x4400)
+		return 1;
+	return 0;
+}
+
 /*
  * enqueue_to_backlog is called to queue an skb to a per CPU backlog
  * queue (may be a remote CPU queue).
@@ -4056,8 +4068,17 @@ static int netif_rx_internal(struct sk_buff *skb)
 
 		preempt_disable();
 		rcu_read_lock();
-
-		cpu = get_rps_cpu(skb->dev, skb, &rflow);
+		if(skb->dev && (0==strncmp(skb->dev->name,"wlan0",5)||0==strncmp(skb->dev->name,"wlan1",5)))
+                {
+			if((ntohs(skb->protocol) == ETH_P_ARP) || (ntohs(skb->protocol) == ETH_P_PAE)
+				||(ntohs(skb->protocol) == ETH_P_IP && parseDHCPReply(skb)) ) {
+				cpu = smp_processor_id();
+                        }
+			else
+				cpu = get_rps_cpu(skb->dev, skb, &rflow);
+                }
+		else
+			cpu = get_rps_cpu(skb->dev, skb, &rflow);
 		if (cpu < 0)
 			cpu = smp_processor_id();
 
@@ -4270,12 +4291,14 @@ sch_handle_ingress(struct sk_buff *skb, struct packet_type **pt_prev, int *ret,
 		break;
 	case TC_ACT_SHOT:
 		qdisc_qstats_cpu_drop(cl->q);
+            	printk(KERN_ERR "ADDLOG %s:%d ",__func__,__LINE__);
 		kfree_skb(skb);
 		return NULL;
 	case TC_ACT_STOLEN:
 	case TC_ACT_QUEUED:
 	case TC_ACT_TRAP:
 		consume_skb(skb);
+            	printk(KERN_ERR "ADDLOG %s:%d ",__func__,__LINE__);
 		return NULL;
 	case TC_ACT_REDIRECT:
 		/* skb_mac_header check was done by cls/act_bpf, so
@@ -4283,6 +4306,7 @@ sch_handle_ingress(struct sk_buff *skb, struct packet_type **pt_prev, int *ret,
 		 * redirecting to another netdev
 		 */
 		__skb_push(skb, skb->mac_len);
+            	printk(KERN_ERR "ADDLOG %s:%d ",__func__,__LINE__);
 		skb_do_redirect(skb);
 		return NULL;
 	default:
@@ -4429,8 +4453,10 @@ another_round:
 	if (skb->protocol == cpu_to_be16(ETH_P_8021Q) ||
 	    skb->protocol == cpu_to_be16(ETH_P_8021AD)) {
 		skb = skb_vlan_untag(skb);
-		if (unlikely(!skb))
+		if (unlikely(!skb)){
+			printk(KERN_ERR "ADDLOG %s:%d  ret:%d",__func__,__LINE__,ret);
 			goto out;
+                }
 	}
 
 	if (skb_skip_tc_classify(skb))
@@ -4455,11 +4481,15 @@ skip_taps:
 #ifdef CONFIG_NET_INGRESS
 	if (static_key_false(&ingress_needed)) {
 		skb = sch_handle_ingress(skb, &pt_prev, &ret, orig_dev);
-		if (!skb)
+		if (!skb){
+			printk(KERN_ERR "ADDLOG %s:%d ret:%d",__func__,__LINE__,ret);
 			goto out;
+                }
 
-		if (nf_ingress(skb, &pt_prev, &ret, orig_dev) < 0)
+		if (nf_ingress(skb, &pt_prev, &ret, orig_dev) < 0){
+                  	printk(KERN_ERR "ADDLOG %s:%d ret:%d",__func__,__LINE__,ret);
 			goto out;
+                }
 	}
 #endif
 	skb_reset_tc(skb);
@@ -4474,8 +4504,10 @@ skip_classify:
 		}
 		if (vlan_do_receive(&skb))
 			goto another_round;
-		else if (unlikely(!skb))
-			goto out;
+		else if (unlikely(!skb)){
+                  	printk(KERN_ERR "ADDLOG %s:%d dev:%s state:%lu  , dropped:%d",__func__,__LINE__,ret);
+                  	goto out;
+                }
 	}
 
 	rx_handler = rcu_dereference(skb->dev->rx_handler);
@@ -4554,8 +4586,11 @@ static int __netif_receive_skb_one_core(struct sk_buff *skb, bool pfmemalloc)
 	int ret;
 
 	ret = __netif_receive_skb_core(skb, pfmemalloc, &pt_prev);
-	if (pt_prev)
+	if (pt_prev) {
 		ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+		if (ret==NET_RX_DROP)
+			printk(KERN_ERR "ADDLOG %s:%d func:%pS",__func__,__LINE__,pt_prev->func);
+	}
 	return ret;
 }
 

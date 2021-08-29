@@ -5053,11 +5053,15 @@ struct sk_buff *skb_vlan_untag(struct sk_buff *skb)
 	}
 
 	skb = skb_share_check(skb, GFP_ATOMIC);
-	if (unlikely(!skb))
+	if (unlikely(!skb)){
+                printk(KERN_ERR "ADDLOG %s:%d ",__func__,__LINE__);
 		goto err_free;
+        }
 
-	if (unlikely(!pskb_may_pull(skb, VLAN_HLEN)))
+	if (unlikely(!pskb_may_pull(skb, VLAN_HLEN))){
+          	printk(KERN_ERR "ADDLOG %s:%d ",__func__,__LINE__);
 		goto err_free;
+        }
 
 	vhdr = (struct vlan_hdr *)skb->data;
 	vlan_tci = ntohs(vhdr->h_vlan_TCI);
@@ -5067,8 +5071,10 @@ struct sk_buff *skb_vlan_untag(struct sk_buff *skb)
 	vlan_set_encap_proto(skb, vhdr);
 
 	skb = skb_reorder_vlan_header(skb);
-	if (unlikely(!skb))
+	if (unlikely(!skb)){
+          	printk(KERN_ERR "ADDLOG %s:%d ",__func__,__LINE__);
 		goto err_free;
+        }
 
 	skb_reset_network_header(skb);
 	skb_reset_transport_header(skb);

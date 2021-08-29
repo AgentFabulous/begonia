@@ -104,7 +104,6 @@
 #endif
 
 #define	INFINITY_LIFE_TIME	0xFFFFFFFF
-#define	RTR_SOLICITS_MAX	3
 
 #define IPV6_MAX_STRLEN \
 	sizeof("ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255")
@@ -3338,7 +3337,7 @@ static void addrconf_dev_config(struct net_device *dev)
 	    (dev->type != ARPHRD_IPGRE) &&
 	    (dev->type != ARPHRD_TUNNEL) &&
 	    (dev->type != ARPHRD_NONE) &&
-	    (dev->type != ARPHRD_RAWIP)) {
+	    (dev->type != ARPHRD_PUREIP)) {
 		/* Alas, we support only Ethernet autoconfiguration. */
 		idev = __in6_dev_get(dev);
 		if (!IS_ERR_OR_NULL(idev) && dev->flags & IFF_UP &&
@@ -3352,7 +3351,7 @@ static void addrconf_dev_config(struct net_device *dev)
 		return;
 
 	/* mobile device doesn't need auto-linklocal addr */
-	if (dev->type == ARPHRD_RAWIP)
+	if (dev->type == ARPHRD_PUREIP)
 		return;
 
 	/* this device type has no EUI support */
@@ -3876,12 +3875,6 @@ static void addrconf_rs_timer(unsigned long data)
 	if (idev->if_flags & IF_RA_RCVD)
 		goto out;
 
-	if (idev->rs_probes == RTR_SOLICITS_MAX && (idev->if_flags & IF_RS_VZW_SENT)) {
-		idev->if_flags &= ~IF_RS_VZW_SENT;
-		inet6_no_ra_notify(RTM_DELADDR, idev);
-		goto out;
-	}
-
 	if (idev->rs_probes++ < idev->cnf.rtr_solicits || idev->cnf.rtr_solicits < 0) {
 		write_unlock(&idev->lock);
 		if (!ipv6_get_lladdr(dev, &lladdr, IFA_F_TENTATIVE))
@@ -3904,6 +3897,12 @@ static void addrconf_rs_timer(unsigned long data)
 				      idev->cnf.rtr_solicit_delay :
 				      idev->rs_interval);
 	} else {
+		inet6_no_ra_notify(RTM_DELADDR, idev);
+		if (sysctl_optr == MTK_IPV6_VZW_ALL ||
+		    sysctl_optr == MTK_IPV6_EX_RS_INTERVAL) {
+			if (idev->if_flags & IF_RS_VZW_SENT)
+				idev->if_flags &= ~IF_RS_VZW_SENT;
+		}
 		/*
 		 * Note: we do not support deprecated "all on-link"
 		 * assumption any longer.
@@ -4433,6 +4432,7 @@ static void inet6_send_rs_vzw(struct inet6_ifaddr *ifp)
 	 *so this first using global address
 	 */
 	if (ipv6_accept_ra(ifp->idev) &&
+	    ifp->idev->cnf.rtr_solicits > 0 &&
 	    (dev->flags & IFF_LOOPBACK) == 0) {
 		pr_info("[mtk_net][IPv6][%s] send refresh rs: dev name:%s\n",
 			__func__, dev->name);
