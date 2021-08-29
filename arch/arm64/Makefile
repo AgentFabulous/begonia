@@ -174,7 +174,8 @@ all:	Image.gz $(KBUILD_DTBS) $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_KERNEL_I
 
 MTK_PLATFORM := $(CONFIG_MTK_PLATFORM:"%"=%)
 MTK_PROJECT := $(CONFIG_ARCH_MTK_PROJECT:"%"=%)
-export MTK_PLATFORM MTK_PROJECT
+export MTK_PLATFORM MTK_PROJECT MTK_TARGET_PROJECT
+-include $(srctree)/scripts/drvgen/drvgen.mk
 
 Image: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
@@ -185,12 +186,12 @@ Image.%: Image
 zinstall install:
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-%.dtb: scripts
+%.dtb: scripts $(DRVGEN_FILE_LIST)
 	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
 
 PHONY += dtbs dtbs_install
 
-dtbs: prepare scripts
+dtbs: prepare scripts dtbo_check
 	$(Q)$(MAKE) $(build)=$(boot)/dts
 
 dtbs_install:
