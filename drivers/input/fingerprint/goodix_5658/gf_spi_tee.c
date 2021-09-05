@@ -110,7 +110,7 @@ static struct work_struct fp_display_work;
 static struct work_struct fp_freq_work;
 
 static unsigned int bufsiz = (25 * 1024);
-module_param(bufsiz, uint, S_IRUGO);
+module_param(bufsiz, uint, 0444);
 MODULE_PARM_DESC(bufsiz, "maximum data bytes for SPI message");
 
 #ifdef CONFIG_OF
@@ -142,9 +142,9 @@ static ssize_t performance_store(struct device *dev,
 				 struct device_attribute *attr, const char *buf,
 				 size_t count);
 
-static DEVICE_ATTR(debug, S_IRUGO | S_IWUSR, gf_debug_show, gf_debug_store);
+static DEVICE_ATTR(debug, 0644, gf_debug_show, gf_debug_store);
 
-static DEVICE_ATTR(performance, S_IRUGO | S_IWUSR, NULL, performance_store);
+static DEVICE_ATTR(performance, 0644, NULL, performance_store);
 
 static struct attribute *gf_debug_attrs[] = {
 	&dev_attr_debug.attr,

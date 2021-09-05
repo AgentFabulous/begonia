@@ -204,7 +204,7 @@ static ssize_t hw_reset_set(struct device *dev,
 	return ret ? ret : count;
 }
 
-static DEVICE_ATTR(hw_reset, S_IWUSR, NULL, hw_reset_set);
+static DEVICE_ATTR(hw_reset, 0200, NULL, hw_reset_set);
 
 /**
 * sysfs node for controlling whether the driver is allowed
@@ -228,7 +228,7 @@ static ssize_t wakeup_enable_set(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(wakeup_enable, S_IWUSR, NULL, wakeup_enable_set);
+static DEVICE_ATTR(wakeup_enable, 0200, NULL, wakeup_enable_set);
 
 /**
 * sysfs node for sending event to make the system interactive,
@@ -254,7 +254,7 @@ static ssize_t do_wakeup_set(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(do_wakeup, S_IWUSR, NULL, do_wakeup_set);
+static DEVICE_ATTR(do_wakeup, 0200, NULL, do_wakeup_set);
 
 static ssize_t clk_enable_set(struct device *dev,
 			      struct device_attribute *attr, const char *buf,
@@ -283,7 +283,7 @@ static ssize_t clk_enable_set(struct device *dev,
 	}
 }
 
-static DEVICE_ATTR(clk_enable, S_IWUSR, NULL, clk_enable_set);
+static DEVICE_ATTR(clk_enable, 0200, NULL, clk_enable_set);
 
 /**
 * sysf node to check the interrupt status of the sensor, the interrupt
@@ -310,7 +310,7 @@ static ssize_t irq_ack(struct device *device,
 	return count;
 }
 
-static DEVICE_ATTR(irq, S_IRUSR | S_IWUSR, irq_get, irq_ack);
+static DEVICE_ATTR(irq, 0600, irq_get, irq_ack);
 
 static ssize_t fpc_ic_is_exist(struct device *device,
 			       struct device_attribute *attribute, char *buffer)
@@ -324,7 +324,7 @@ static ssize_t fpc_ic_is_exist(struct device *device,
 	return scnprintf(buffer, PAGE_SIZE, "%i\n", fpc_exist);
 }
 
-static DEVICE_ATTR(fpid_get, S_IRUSR | S_IWUSR, fpc_ic_is_exist, NULL);
+static DEVICE_ATTR(fpid_get, 0600, fpc_ic_is_exist, NULL);
 
 static struct attribute *attributes[] = {
 	&dev_attr_hw_reset.attr,
