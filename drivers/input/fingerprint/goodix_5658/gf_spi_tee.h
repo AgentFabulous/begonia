@@ -29,7 +29,7 @@ u8 g_debug_level = DEBUG_LOG;
 
 #define gf_debug(level, fmt, args...) do { \
 			if (g_debug_level >= level) {\
-				pr_warn("[gf] " fmt, ##args); \
+				pr_debug("[gf] " fmt, ##args); \
 			} \
 		} while (0)
 
