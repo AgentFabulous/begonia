@@ -866,7 +866,7 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case GF_IOC_RESET:
-		printk("%s: chip reset command\n", __func__);
+		gf_debug(DEBUG_LOG, "%s: chip reset command\n", __func__);
 		gf_hw_reset(gf_dev, 60);
 		break;
 
@@ -881,12 +881,12 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case GF_IOC_ENABLE_SPI_CLK:
-		printk("%s: GF_IOC_ENABLE_SPI_CLK ======\n", __func__);
+		gf_debug(DEBUG_LOG, "%s: GF_IOC_ENABLE_SPI_CLK ======\n", __func__);
 		gf_spi_clk_enable(gf_dev, 1);
 		break;
 
 	case GF_IOC_DISABLE_SPI_CLK:
-		printk("%s: GF_IOC_DISABLE_SPI_CLK ======\n", __func__);
+		gf_debug(DEBUG_LOG, "%s: GF_IOC_DISABLE_SPI_CLK ======\n", __func__);
 		gf_spi_clk_enable(gf_dev, 0);
 		break;
 
@@ -1342,7 +1342,7 @@ static ssize_t gf_debug_store(struct device *dev,
 			 "%s: parameter is -13, Vendor ID test --> 0x%x\n",
 			 __func__, g_vendor_id);
 		gf_spi_read_bytes(gf_dev, 0x0000, 4, rx_test);
-		printk("%s rx_test chip id:0x%x 0x%x 0x%x 0x%x \n", __func__,
+		gf_debug(DEBUG_LOG, "%s rx_test chip id:0x%x 0x%x 0x%x 0x%x \n", __func__,
 		       rx_test[0], rx_test[1], rx_test[2], rx_test[3]);
 	} else {
 		gf_debug(ERR_LOG, "%s: wrong parameter!===============\n",
@@ -2134,7 +2134,7 @@ static int gf_probe(struct spi_device *spi)
 
 	mdelay(1);
 	gf_spi_read_bytes(gf_dev, 0x0000, 4, rx_test);
-	printk("%s rx_test chip id:0x%x 0x%x 0x%x 0x%x \n", __func__,
+	gf_debug(DEBUG_LOG, "%s rx_test chip id:0x%x 0x%x 0x%x 0x%x \n", __func__,
 	       rx_test[0], rx_test[1], rx_test[2], rx_test[3]);
 
 	if (1) {
