@@ -34,10 +34,6 @@ ifeq ($(CONFIG_MTK_COMBO_CHIP),)
     $(error CONFIG_MTK_COMBO_CHIP not defined)
 endif
 
-ifeq ($(TARGET_BUILD_VARIANT),$(filter $(TARGET_BUILD_VARIANT),userdebug user))
-    #ldflags-y += -s
-endif
-
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
 ###############################################################################
@@ -182,17 +178,11 @@ ccflags-y += -D WMT_UART_RX_MODE_WORK=0 # 1. work thread 0. tasklet
 ccflags-y += -D WMT_SDIO_MODE=1
 ccflags-y += -D WMT_CREATE_NODE_DYNAMIC=1
 
-ifneq ($(TARGET_BUILD_VARIANT),eng)
 ifeq ($(CONFIG_EXTREME_LOW_RAM), y)
 ccflags-y += -DLOG_STP_DEBUG_DISABLE
 endif
-endif
 
-ifneq ($(TARGET_BUILD_VARIANT), user)
-    ccflags-y += -D WMT_DBG_SUPPORT=1
-else
-    ccflags-y += -D WMT_DBG_SUPPORT=0
-endif
+ccflags-y += -D WMT_DBG_SUPPORT=0
 
 ifeq ($(CONFIG_MTK_DEVAPC),y)
     ccflags-y += -D WMT_DEVAPC_DBG_SUPPORT=1
@@ -208,10 +198,6 @@ endif
 # MTK eng/userdebug/user load: Support
 # Customer eng/userdebug load: Support
 # Customer user load: Not support
-
-ifneq ($(TARGET_BUILD_VARIANT),user)
-	ccflags-y += -D CFG_WMT_STEP
-endif
 
 ifeq ($(findstring evb, $(MTK_PROJECT)), evb)
 ccflags-y += -D CFG_WMT_EVB
@@ -270,15 +256,5 @@ endif
 $(MODULE_NAME)-objs += debug_utility/ring.o
 $(MODULE_NAME)-objs += debug_utility/ring_emi.o
 $(MODULE_NAME)-objs += debug_utility/connsys_debug_utility.o
-###############################################################################
-# test
-###############################################################################
-ifeq ($(TARGET_BUILD_VARIANT),eng)
-ccflags-y += -I$(src)/test/include
-endif
-
-ifeq ($(TARGET_BUILD_VARIANT),eng)
-$(MODULE_NAME)-objs += test/wmt_step_test.o
-endif
 
 endif

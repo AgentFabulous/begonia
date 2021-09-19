@@ -22,9 +22,7 @@ endif
 ifndef TOP
     TOP := $(srctree)/..
 endif
-ifeq ($(TARGET_BUILD_VARIANT),$(filter $(TARGET_BUILD_VARIANT),userdebug user))
-    ldflags-y += -s
-endif
+ldflags-y += -s
 
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
