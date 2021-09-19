@@ -92,7 +92,6 @@ u32 gf_spi_speed = 1 * 1000000;
 
 bool goodix_fp_exist = false;
 extern bool fpc1022_fp_exist;
-//int mtkfb_prim_panel_unblank(int timeout);
 struct spi_device *spi_fingerprint;
 struct TEEC_UUID uuid_ta_gf = { 0x8888c03f, 0xc30c, 0x4dd0,
 	{0xa3, 0x19, 0xea, 0x29, 0x64, 0x3d, 0x4d, 0x4b}
@@ -186,7 +185,6 @@ const struct mt_chip_conf spi_ctrdata = {
 	.rx_endian = SPI_LENDIAN,
 
 	.com_mod = FIFO_TRANSFER,
-	/* .com_mod = DMA_TRANSFER, */
 
 	.pause = 0,
 	.finish_intr = 1,
@@ -195,30 +193,6 @@ const struct mt_chip_conf spi_ctrdata = {
 	.tckdly = 0,
 };
 #endif
-
-/* -------------------------------------------------------------------- */
-/* timer function								*/
-/* -------------------------------------------------------------------- */
-/*
-#define TIME_START	   0
-#define TIME_STOP	   1
-
-static long int prev_time, cur_time;
-
-long int kernel_time(unsigned int step)
-{
-	cur_time = ktime_to_us(ktime_get());
-	if (step == TIME_START) {
-		prev_time = cur_time;
-		return 0;
-	} else if (step == TIME_STOP) {
-		gf_debug(DEBUG_LOG, "%s, use: %ld us\n", __func__, (cur_time - prev_time));
-		return cur_time - prev_time;
-	}
-	prev_time = cur_time;
-	return -1;
-}
-*/
 
 /* -------------------------------------------------------------------- */
 /* fingerprint chip hardware configuration								  */
@@ -275,20 +249,10 @@ static int gf_get_gpio_dts_info(struct gf_device *gf_dev)
 		ret = PTR_ERR(gf_dev->pins_irq);
 		gf_debug(ERR_LOG, "%s can't find fingerprint pinctrl irq\n",
 			 __func__);
-		//return ret;
 	}
 
 	gf_debug(ERR_LOG, "[gf][goodix_test] %s goodix_irq found\n", __func__);
 
-	//C3D project workaround, 2 spi device on spi1, just use miso as 'cs-gpios', change to spi mode.
-	/*
-	   gf_dev->pins_miso_spi = pinctrl_lookup_state(gf_dev->pinctrl_gpios, "miso_spi");
-	   if (IS_ERR(gf_dev->pins_miso_spi)) {
-	   ret = PTR_ERR(gf_dev->pins_miso_spi);
-	   gf_debug(ERR_LOG, "%s can't find fingerprint pinctrl miso_spi\n", __func__);
-	   return ret;
-	   }
-	 */
 #ifdef SUPPORT_REE_OSWEGO
 	gf_dev->pins_miso_spi =
 	    pinctrl_lookup_state(gf_dev->pinctrl_gpios, "miso_spi");
@@ -369,7 +333,6 @@ static void gf_hw_power_enable(struct gf_device *gf_dev, u8 onoff)
 	if (onoff && enable) {
 		pr_err("%s %d now reset sensor,pull low\n", __func__, __LINE__);
 		/* TODO:  set power  according to actual situation  */
-//              hwPowerOn(MT6331_POWER_LDO_VIBR, VOL_2800, "fingerprint");
 		enable = 0;
 #ifdef CONFIG_OF
 		pinctrl_select_state(gf_dev->pinctrl_gpios,
@@ -382,7 +345,6 @@ static void gf_hw_power_enable(struct gf_device *gf_dev, u8 onoff)
 #endif
 	} else if (!onoff && !enable) {
 		pr_err("%s %d do nothing\n", __func__, __LINE__);
-//              hwPowerDown(MT6331_POWER_LDO_VIBR, "fingerprint");
 		enable = 1;
 	}
 }
@@ -390,7 +352,6 @@ static void gf_hw_power_enable(struct gf_device *gf_dev, u8 onoff)
 static void gf_spi_clk_enable(struct gf_device *gf_dev, u8 bonoff)
 {
 	static int count = 0;
-	//pr_err("%s line:%d try to control spi clk\n", __func__, __LINE__);
 #ifdef CONFIG_MTK_CLKMGR
 	if (bonoff && (count == 0)) {
 		gf_debug(DEBUG_LOG,
@@ -428,8 +389,6 @@ static void gf_irq_gpio_cfg(struct gf_device *gf_dev)
 {
 #ifdef CONFIG_OF
 	struct device_node *node;
-
-	//pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_irirq);
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,goodix-fp");
 	if (node) {
@@ -1170,15 +1129,6 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		mutex_unlock(&gf_dev->buf_lock);
 		break;
 #endif
-/*
-	case GF_IOC_TRANSFER_RAW_CMD:
-	    retval =gf_ioctl_transfer_raw_cmd(gf_dev,arg,bufsiz);
-		break;
-
-	case GF_IOC_SPI_INIT_CFG_CMD:
-	    retval = gf_ioctl_spi_init_cfg_cmd(&gf_dev->spi_mcc,arg);
-		break;
-*/
 #endif //SUPPORT_REE_SPI
 	default:
 		gf_debug(ERR_LOG, "gf doesn't support this command(%x)\n", cmd);
@@ -1217,14 +1167,12 @@ static unsigned int gf_poll(struct file *filp, struct poll_table_struct *wait)
 static ssize_t gf_debug_show(struct device *dev,
 			     struct device_attribute *attr, char *buf)
 {
-	//gf_debug(INFO_LOG, "%s: Show debug_level = 0x%x\n", __func__, g_debug_level);
 	return sprintf(buf, "vendor id 0x%x\n", g_vendor_id);
 }
 
 static void unblank_work(struct work_struct *work)
 {
 	gf_debug(INFO_LOG, " entry %s line %d \n", __func__, __LINE__);
-	//mtkfb_prim_panel_unblank(200);
 }
 
 static void freq_release(struct work_struct *work)
@@ -1258,7 +1206,6 @@ static int freq_hold(int sec)
 			freq_to_set[i].min = 2050000;
 		else
 			freq_to_set[i].min = 2000000;
-		//gf_debug(INFO_LOG, "min freq is %d for %d core\n",freq_to_set[i].min,i);
 		freq_to_set[i].max = -1;
 	}
 	if (atomic_read(&boosted) == 0) {
@@ -1574,7 +1521,6 @@ int gf_spi_read_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len,
 	spi_sync(gf_dev->spi, &msg);
 
 	spi_message_init(&msg);
-	/* memset((tmp_buf + 4), 0x00, data_len + 1); */
 	/* 4 bytes align */
 	*(tmp_buf + 4) = 0xF1;
 	xfer[1].tx_buf = tmp_buf + 4;
@@ -1987,7 +1933,6 @@ int gf_spi_read_bytes(struct gf_device *gf_dev, u16 addr, u32 data_len,
 	spi_sync(gf_dev->spi, &msg);
 
 	spi_message_init(&msg);
-	/* memset((tmp_buf + 4), 0x00, data_len + 1); */
 	/* 4 bytes align */
 	*(tmp_buf + 4) = 0xF1;
 	xfer[1].tx_buf = tmp_buf + 4;
@@ -2079,11 +2024,6 @@ static int gf_probe(struct spi_device *spi)
 	int status = -EINVAL;
 	unsigned char rx_test[10] = { 0 };
 
-	// int retval = 0;
-
-	//struct device_node *gpio_node = NULL;
-	//void __iomem *gpio_reg_base = NULL;
-
 	FUNC_ENTRY();
 
 	/* Allocate driver data */
@@ -2140,7 +2080,6 @@ static int gf_probe(struct spi_device *spi)
 	spi_setup(gf_dev->spi);
 #endif
 	gf_dev->irq = 0;
-	//spi_set_drvdata(spi, gf_dev);
 
 	/* allocate buffer for SPI transfer */
 	gf_dev->spi_buffer = kzalloc(bufsiz, GFP_KERNEL);
@@ -2165,14 +2104,10 @@ static int gf_probe(struct spi_device *spi)
 	}
 
 	/* get gpio info from dts or defination */
-	// printk("goodix goto test switch miso pin mode\n");
 
 	gf_get_gpio_dts_info(gf_dev);
 
 	gf_get_sensor_dts_info();
-
-	//pr_err("%s() switch miso pin mode\n", __func__);
-	//pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_miso_spi);
 
 	/*enable the power */
 	pr_err("%s %d now get dts info done!", __func__, __LINE__);
@@ -2208,7 +2143,6 @@ static int gf_probe(struct spi_device *spi)
 			gf_debug(ERR_LOG,
 				 "%s, get goodix FP sensor chipID fail!!\n",
 				 __func__);
-			//goto err_readid;
 
 			//workaround to solve two spi device
 			pr_err("%s cannot find the sensor,now exit\n",
@@ -2229,7 +2163,6 @@ static int gf_probe(struct spi_device *spi)
 
 		} else {
 			goodix_fp_exist = true;
-			//set_fp_vendor(FP_VENDOR_GOODIX);
 			memcpy(&uuid_fp, &uuid_ta_gf, sizeof(struct TEEC_UUID));
 			pr_err("%s %d Goodix fingerprint sensor detected\n",
 			       __func__, __LINE__);
@@ -2356,7 +2289,6 @@ static int gf_probe(struct spi_device *spi)
 	__set_bit(GF_NAV_INPUT_DOUBLE_CLICK, gf_dev->input->keybit);
 	__set_bit(GF_NAV_INPUT_LONG_PRESS, gf_dev->input->keybit);
 	__set_bit(GF_NAV_INPUT_HEAVY, gf_dev->input->keybit);
-	//__set_bit(GF_KEY_INPUT_KPENTER, gf_dev->input->keybit);
 
 	gf_dev->input->name = GF_INPUT_NAME;
 	if (input_register_device(gf_dev->input)) {
@@ -2416,7 +2348,6 @@ err_class:
 err_fw:
 #endif
 #endif
-//err_readid:
 	pr_err("%s cannot find the sensor,now exit\n", __func__);
 	gf_hw_power_enable(gf_dev, 0);
 	gf_spi_clk_enable(gf_dev, 0);
@@ -2426,12 +2357,10 @@ err_freqbuff:
 err_buf:
 	mutex_destroy(&gf_dev->buf_lock);
 	mutex_destroy(&gf_dev->release_lock);
-	//spi_set_drvdata(spi, NULL);
 	gf_dev->spi = NULL;
 	kfree(gf_dev);
 	gf_dev = NULL;
 err:
-	//spi_unregister_driver(&gf_spi_driver);
 	gf_debug(ERR_LOG, "[gf][goodix_test] %s, probe fail\n", __func__);
 	FUNC_EXIT();
 	return status;
@@ -2509,12 +2438,6 @@ static int __init gf_init(void)
 
 	FUNC_ENTRY();
 	pr_err("%s %d\n", __func__, __LINE__);
-	/*
-	   if (fpc1022_fp_exist) {
-	   pr_err("%s FPC sensor has been detected, so exit Goodxi sensor detect.\n",__func__);
-	   return -EINVAL;
-	   }
-	 */
 
 	status = spi_register_driver(&gf_spi_driver);
 	if (status < 0) {

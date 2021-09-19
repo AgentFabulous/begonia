@@ -229,7 +229,6 @@ struct gf_device {
 
 #ifndef SUPPORT_REE_SPI
 #define SUPPORT_REE_SPI
-//#define SUPPORT_REE_OSWEGO
 #endif
 
 #ifdef SUPPORT_REE_SPI
