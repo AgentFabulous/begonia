@@ -108,14 +108,14 @@ TRACE_EVENT(ccci_skb_rx,
 #define DPMA_DRB_LOG(fmt, args...) \
 do { \
 	ccci_dump_write(0, CCCI_DUMP_DPMA_DRB, 0, fmt, ##args); \
-	pr_info("[ccci]" fmt, ##args); \
+	pr_debug("[ccci]" fmt, ##args); \
 } while (0)
 
 #define DPMA_DRB_LOG_TIME(fmt, args...) \
 do { \
 	ccci_dump_write(0, CCCI_DUMP_DPMA_DRB|CCCI_DUMP_TIME_FLAG, \
 			0, fmt, ##args); \
-	pr_info("[ccci]" fmt, ##args); \
+	pr_debug("[ccci]" fmt, ##args); \
 } while (0)
 
 

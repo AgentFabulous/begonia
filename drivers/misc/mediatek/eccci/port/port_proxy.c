@@ -99,7 +99,7 @@ int port_dev_kernel_read(struct port_t *port, char *buf, int size)
 	md_state = ccci_fsm_get_md_state(port->md_id);
 	if (md_state != READY && port->tx_ch != CCCI_FS_TX &&
 		port->tx_ch != CCCI_RPC_TX) {
-		pr_info_ratelimited(
+		pr_err(
 			"port %s read data fail when md_state = %d\n",
 			port->name, md_state);
 		return -ENODEV;

@@ -104,7 +104,7 @@ static int ccci_util_skbtime_getdata(struct input_event *data)
 	if (skb_times_ring.count > 0) {
 		if (skb_times_ring.beg < 0
 			|| skb_times_ring.beg >= SKB_TIME_BUF_LEN) {
-			pr_notice("%s:invalid index = %d\n",
+			pr_err("%s:invalid index = %d\n",
 				__func__, skb_times_ring.beg);
 			spin_unlock_irqrestore(&s_event_update_lock, flag);
 			return 0;
@@ -135,7 +135,7 @@ static void ccci_util_skbtime_adddata(__be16 ipid, int skb_len, __u16 port)
 
 	index = skb_times_ring.end;
 	if (index < 0 || index >= SKB_TIME_BUF_LEN) {
-		pr_notice("%s:invalid index = %d\n", __func__, index);
+		pr_err("%s:invalid index = %d\n", __func__, index);
 		spin_unlock_irqrestore(&s_event_update_lock, flag);
 		return;
 	}
@@ -378,7 +378,7 @@ int mix_event_init(void)
 
 	ret = alloc_chrdev_region(&s_ge_status_dev, 0, 1, "mix_event");
 	if (ret) {
-		pr_notice("[mixdev] alloc chrdev fail (%d)\n", ret);
+		pr_err("[mixdev] alloc chrdev fail (%d)\n", ret);
 		goto _exit_1;
 	}
 
@@ -387,7 +387,7 @@ int mix_event_init(void)
 
 	ret = cdev_add(&s_ge_char_dev, s_ge_status_dev, 1);
 	if (ret) {
-		pr_notice("[mixdev] cdev_add failed\n");
+		pr_err("[mixdev] cdev_add failed\n");
 		goto _exit_2;
 	}
 
