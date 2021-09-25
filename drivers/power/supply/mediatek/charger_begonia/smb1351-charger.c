@@ -607,8 +607,7 @@ static int smb1351_read_reg(struct smb1351_charger *chip, int reg, u8 *val)
 		*val = ret;
 	}
 	pm_relax(chip->dev);
-	// pr_debug("Reading 0x%02x=0x%02x\n", reg, *val);
-	pr_info("Reading 0x%02x=0x%02x\n", reg, *val);
+	pr_debug("Reading 0x%02x=0x%02x\n", reg, *val);
 	return 0;
 }
 
@@ -2007,7 +2006,7 @@ static int smb1351_is_charging_enabled(struct charger_device *chg_dev, bool *en)
 
 	*en = (reg & CMD_CHG_EN_BIT) ? true : false;
 
-	pr_err("charging is enabled %d, CMD_CHG_REG reg: 0x%x. \n", *en, reg);
+	pr_debug("charging is enabled %d, CMD_CHG_REG reg: 0x%x. \n", *en, reg);
 	return 0;
 }
 
@@ -2016,7 +2015,7 @@ static int smb1351_is_charging_done(struct charger_device *chg_dev, bool *done)
 	struct smb1351_charger *chip = dev_get_drvdata(&chg_dev->dev);
 
 	*done = chip->batt_full;
-	pr_err("charging is %s\n", chip->batt_full ? "done" : "not done");
+	pr_debug("charging is %s\n", chip->batt_full ? "done" : "not done");
 	return 0;
 }
 
@@ -2026,7 +2025,7 @@ static int smb1351_is_chip_enabled(struct charger_device *chg_dev, bool *en)
 
 	*en = chip->chip_enable;
 
-	pr_err("smb1351_is_chip_enabled : %d\n", *en);
+	pr_debug("smb1351_is_chip_enabled : %d\n", *en);
 	return 0;
 }
 
