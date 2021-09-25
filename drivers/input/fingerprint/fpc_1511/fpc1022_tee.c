@@ -185,7 +185,7 @@ static int hw_reset(struct fpc1022_data *fpc1022)
 	pinctrl_select_state(fpc1022->pinctrl, fpc1022->st_rst_h);
 	usleep_range(FPC1022_RESET_HIGH1_US, FPC1022_RESET_HIGH1_US + 100);
 
-	dev_info(dev, "IRQ after reset %d\n", GPIO_GET(fpc1022->irq_gpio));
+	dev_dbg(dev, "IRQ after reset %d\n", GPIO_GET(fpc1022->irq_gpio));
 
 	return 0;
 }
@@ -269,12 +269,12 @@ static ssize_t clk_enable_set(struct device *dev,
 	}
 	if (*buf == 49) {
 		mt_spi_enable_master_clk(fpc1022->spi);
-		dev_err(fpc1022->dev, " enable spi clk %s\n", __func__);
+		dev_dbg(fpc1022->dev, " enable spi clk %s\n", __func__);
 		return 1;
 	}
 	if (*buf == 48) {
 		mt_spi_disable_master_clk(fpc1022->spi);
-		dev_err(fpc1022->dev, " disable spi clk %s\n", __func__);
+		dev_dbg(fpc1022->dev, " disable spi clk %s\n", __func__);
 		return 1;
 	} else {
 		dev_err(fpc1022->dev, " invalid spi clk parameter %s\n",
@@ -364,8 +364,8 @@ static int fpc1022_platform_probe(struct platform_device *pldev)
 	struct device *dev = &pldev->dev;
 	struct device_node *np = dev->of_node;
 
-	dev_info(dev, "%s\n", __func__);
-	dev_info(dev, "%s test new\n", __func__);
+	dev_dbg(dev, "%s\n", __func__);
+	dev_dbg(dev, "%s test new\n", __func__);
 
 	if (!np) {
 		dev_err(dev, "no of node found\n");
@@ -484,7 +484,7 @@ static int fpc1022_platform_probe(struct platform_device *pldev)
 		dev_err(dev, "could not request irq %d\n", fpc1022->irq_num);
 		goto err_request_irq;
 	}
-	dev_info(dev, "requested irq %d\n", fpc1022->irq_num);
+	dev_dbg(dev, "requested irq %d\n", fpc1022->irq_num);
 
 	/* Request that the interrupt should be wakeable */
 	enable_irq_wake(fpc1022->irq_num);
@@ -497,7 +497,7 @@ static int fpc1022_platform_probe(struct platform_device *pldev)
 	}
 
 	hw_reset(fpc1022);
-	dev_info(dev, "%s: ok\n", __func__);
+	dev_dbg(dev, "%s: ok\n", __func__);
 
 	return ret;
 
@@ -526,7 +526,7 @@ static int fpc1022_platform_remove(struct platform_device *pldev)
 	struct device *dev = &pldev->dev;
 	struct fpc1022_data *fpc1022 = dev_get_drvdata(dev);
 
-	dev_info(dev, "%s\n", __func__);
+	dev_dbg(dev, "%s\n", __func__);
 
 	sysfs_remove_group(&dev->kobj, &attribute_group);
 
