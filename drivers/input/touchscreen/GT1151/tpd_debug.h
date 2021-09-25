@@ -22,7 +22,7 @@ extern int tpd_down_status;
 #define TPD_DEBUG_PRINT_INT                           \
 	do {                                          \
 		if (tpd_debug_time) {                         \
-			pr_info("tp_int\n");                      \
+			pr_debug("tp_int\n");                      \
 		}                                            \
 	} while (0)
 

@@ -143,7 +143,7 @@ static int tpd_debug_log_open(struct inode *inode, struct file *file)
 		tpd_buf.buffer =
 			vmalloc(tpd_log_line_cnt * tpd_log_line_buffer);
 	if (tpd_buf.buffer == NULL) {
-		pr_info("tpd_log: nomem for tpd_buf->buffer\n");
+		TPD_DEBUG("tpd_log: nomem for tpd_buf->buffer\n");
 		return -ENOMEM;
 	}
 	spin_lock(&tpd_buf.buffer_lock);
@@ -223,7 +223,7 @@ static unsigned char *tpd_log_find_buffer(void)
 	unsigned int unit = tpd_log_line_buffer;
 
 	if (tpd_buf.buffer == NULL) {
-		pr_info("[tpd_em_log] :tpd_buf.buffer is NULL\n");
+		TPD_DEBUG("[tpd_em_log] :tpd_buf.buffer is NULL\n");
 		return NULL;
 	}
 	spin_lock(&tpd_buf.buffer_lock);
@@ -329,7 +329,7 @@ void tpd_em_log_store(int raw_x, int raw_y,
 
 	buffer = tpd_log_find_buffer();
 	if (buffer == NULL) {
-		pr_info("not buffer\n");
+		TPD_DEBUG("not buffer\n");
 		return;
 	}
 	do_gettimeofday(&t);
@@ -420,10 +420,10 @@ void tpd_em_log_release(void)
 int tpd_log_init(void)
 {
 	if (misc_register(&tpd_debug_log_dev) < 0) {
-		pr_info("[tpd_em_log] :register device failed\n");
+		TPD_ERR("[tpd_em_log] :register device failed\n");
 		return -1;
 	}
-	pr_info("[tpd_em_log] :register device successfully\n");
+	TPD_DEBUG("[tpd_em_log] :register device successfully\n");
 	spin_lock_init(&tpd_buf.buffer_lock);
 	return 0;
 }

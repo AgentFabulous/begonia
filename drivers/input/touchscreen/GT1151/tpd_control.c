@@ -94,19 +94,19 @@ void tpd_get_dts_info(void)
 				memcpy(tpd_dts_data.tpd_key_dim_local,
 					key_dim_local, sizeof(key_dim_local));
 				for (i = 0; i < 4; i++) {
-					pr_info("[tpd]key[%d].key_x = %d\n",
+					TPD_DEBUG("[tpd]key[%d].key_x = %d\n",
 						i, tpd_dts_data
 						.tpd_key_dim_local[i]
 						.key_x);
-					pr_info("[tpd]key[%d].key_y = %d\n",
+					TPD_DEBUG("[tpd]key[%d].key_y = %d\n",
 						i, tpd_dts_data
 						.tpd_key_dim_local[i]
 						.key_y);
-					pr_info("[tpd]key[%d].key_W = %d\n",
+					TPD_DEBUG("[tpd]key[%d].key_W = %d\n",
 						i, tpd_dts_data
 						.tpd_key_dim_local[i]
 						.key_width);
-					pr_info("[tpd]key[%d].key_H = %d\n",
+					TPD_DEBUG("[tpd]key[%d].key_H = %d\n",
 						i, tpd_dts_data
 						.tpd_key_dim_local[i]
 						.key_height);

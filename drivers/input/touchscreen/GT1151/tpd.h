@@ -27,11 +27,11 @@
 #define TPD_DEBUG_CODE
 /* #define TPD_DEBUG_TRACK */
 #define TPD_ERR(a, arg...) \
-	pr_info(TPD_DEVICE "ERR:[%s:%d] " a, __func__, __LINE__, ##arg)
+	pr_err(TPD_DEVICE "ERR:[%s:%d] " a, __func__, __LINE__, ##arg)
 
 #ifdef TPD_DEBUG_OPEN
 #define TPD_DEBUG(a, arg...) \
-	pr_info(TPD_DEVICE "INFO:[%s:%d] " a, __func__, __LINE__, ##arg)
+	pr_debug(TPD_DEVICE "INFO:[%s:%d] " a, __func__, __LINE__, ##arg)
 #else
 #define TPD_DEBUG(arg...)
 #endif

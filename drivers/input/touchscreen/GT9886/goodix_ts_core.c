@@ -317,7 +317,7 @@ static void goodix_debugfs_exit(void)
 {
 	debugfs_remove(goodix_dbg.dentry);
 	goodix_dbg.dentry = NULL;
-	pr_info("Debugfs module exit\n");
+	ts_debug("Debugfs module exit\n");
 }
 
 /* show external module information */
