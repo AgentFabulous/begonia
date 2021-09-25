@@ -290,7 +290,7 @@ extern int gM4U_log_to_uart;
 	do {\
 		if (level > gM4U_log_level) {\
 			if (level > gM4U_log_to_uart)\
-				pr_info("[M4U] "string, ##args);\
+				pr_debug("[M4U] "string, ##args);\
 			else\
 				pr_debug("[M4U] "string, ##args);\
 		} \
