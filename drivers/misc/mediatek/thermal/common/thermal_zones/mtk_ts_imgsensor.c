@@ -43,7 +43,7 @@ enum CAMERA_DUAL_CAMERA_SENSOR_ENUM senDevId, MUINT8 *valid, MUINT32 *temp)
 {
 	*valid = SENSOR_TEMPERATURE_CANNOT_SEARCH_SENSOR;
 	*temp = -127;
-	pr_notice("[Thermal/TZ/IMGS] E_WF: %s doesn't exist\n", __func__);
+	pr_err("[Thermal/TZ/IMGS] E_WF: %s doesn't exist\n", __func__);
 
 	return -1;
 }
@@ -62,12 +62,12 @@ enum CAMERA_DUAL_CAMERA_SENSOR_ENUM senDevId, MUINT8 *valid, MUINT32 *temp)
 #define mtk_imgs_dprintk(fmt, args...)   \
 	do {                                    \
 		if (mtk_imgs_debug_log) {                \
-			pr_notice("[Thermal/TZ/IMGS]" fmt, ##args);\
+			pr_debug("[Thermal/TZ/IMGS]" fmt, ##args);\
 		}                                   \
 	} while (0)
 
 #define mtk_imgs_printk(fmt, args...)   \
-	pr_notice("[Thermal/TZ/IMGS]" fmt, ##args)
+	pr_debug("[Thermal/TZ/IMGS]" fmt, ##args)
 /*=============================================================
  * Function prototype
  *=============================================================

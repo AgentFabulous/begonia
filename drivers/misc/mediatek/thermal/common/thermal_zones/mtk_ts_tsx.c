@@ -81,7 +81,7 @@ struct thermal_zone_device *thermal, unsigned long *t)
 {
 	*t = mtktstsx_get_hw_temp();
 	mtktstsx_cur_temp = *t;
-/*	pr_notice("[mtktstsx_cur_temp] Raw=%d\n", mtktstsx_cur_temp);*/
+/*	pr_debug("[mtktstsx_cur_temp] Raw=%d\n", mtktstsx_cur_temp);*/
 
 
 	thermal->polling_delay = interval * 1000;

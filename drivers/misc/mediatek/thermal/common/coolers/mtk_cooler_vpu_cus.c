@@ -29,7 +29,7 @@
 #include "vpu_dvfs.h"
 
 #define mtk_cooler_vpu_dprintk(fmt, args...)	\
-	pr_notice("thermal/cooler/vpu " fmt, ##args)
+	pr_debug("thermal/cooler/vpu " fmt, ##args)
 
 static struct thermal_cooling_device
 *cl_vpu_dev = { 0 };

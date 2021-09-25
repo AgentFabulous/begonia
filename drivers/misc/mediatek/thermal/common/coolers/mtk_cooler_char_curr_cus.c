@@ -45,7 +45,7 @@ static struct charger_consumer *thm_chr_consumer;
 #define CHAR_CURR_TABLE_INDEX 16
 
 #define mtk_cooler_char_curr_dprintk(fmt, args...)	\
-	pr_notice("thermal/cooler/char_curr " fmt, ##args)
+	pr_debug("thermal/cooler/char_curr " fmt, ##args)
 
 static struct thermal_cooling_device
 *cl_char_curr_dev = { 0 };

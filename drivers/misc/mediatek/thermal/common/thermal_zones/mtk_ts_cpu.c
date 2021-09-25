@@ -269,14 +269,14 @@ static void temp_valid_unlock(unsigned long *flags);
 unsigned int  __attribute__((weak))
 mt_gpufreq_get_max_power(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 IMM_IsAdcInitReady(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 #if 0
@@ -284,13 +284,13 @@ IMM_IsAdcInitReady(void)
 	void __attribute__ ((weak))
 mt_ppm_cpu_thermal_protect(unsigned int limited_power)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 }
 #else
 	void __attribute__ ((weak))
 mt_cpufreq_thermal_protect(unsigned int limited_power)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 }
 #endif
 #endif
@@ -299,7 +299,7 @@ mt_cpufreq_thermal_protect(unsigned int limited_power)
 mtk_get_gpu_loading(unsigned int *pLoading)
 {
 #ifdef CONFIG_MTK_GPU_SUPPORT
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 #endif
 	return 0;
 }
@@ -307,46 +307,46 @@ mtk_get_gpu_loading(unsigned int *pLoading)
 	void __attribute__ ((weak))
 mt_ptp_lock(unsigned long *flags)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 }
 
 	void __attribute__ ((weak))
 mt_ptp_unlock(unsigned long *flags)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 }
 
 	void __attribute__ ((weak))
 mt_cpufreq_thermal_5A_limit(bool enable)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 }
 
 	unsigned int __attribute__ ((weak))
 mt_gpufreq_get_cur_freq(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	unsigned int __attribute__ ((weak))
 mt_ppm_thermal_get_max_power(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	unsigned int  __attribute__((weak))
 mt_gpufreq_get_seg_max_opp_index(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	unsigned int  __attribute__((weak))
 mt_gpufreq_get_dvfs_table_num(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
@@ -549,7 +549,7 @@ struct thermal_zone_device *thermal, struct thermal_cooling_device *cdev)
 	}
 
 	if (mtk_thermal_zone_bind_cooling_device(thermal, table_val, cdev)) {
-		tscpu_warn("%s error binding cooling dev\n", __func__);
+		pr_err("%s error binding cooling dev\n", __func__);
 		return -EINVAL;
 	}
 
@@ -601,7 +601,7 @@ struct thermal_zone_device *thermal, struct thermal_cooling_device *cdev)
 
 
 	if (thermal_zone_unbind_cooling_device(thermal, table_val, cdev)) {
-		tscpu_warn("%s error unbinding cooling dev\n", __func__);
+		pr_err("%s error unbinding cooling dev\n", __func__);
 		return -EINVAL;
 	}
 
@@ -704,13 +704,13 @@ static int tscpu_get_temp(struct thermal_zone_device *thermal, int *t)
 		ts_temp = get_immediate_ts4_wrap();
 		if (ts_temp > leave_hpm_temp && ts_temp != CLEAR_TEMP) {
 			if (vcorefs_get_kicker_opp(KIR_THERMAL) != OPPI_UNREQ) {
-				tscpu_warn("ts4: temp=%d leave HPM\n", ts_temp);
+				pr_debug("ts4: temp=%d leave HPM\n", ts_temp);
 				r = vcorefs_request_dvfs_opp(KIR_THERMAL,
 								OPPI_UNREQ);
 			}
 		} else if (ts_temp < enter_hpm_temp && ts_temp != CLEAR_TEMP) {
 			if (vcorefs_get_kicker_opp(KIR_THERMAL) != OPPI_PERF) {
-				tscpu_warn("ts4: temp=%d enter HPM\n", ts_temp);
+				pr_debug("ts4: temp=%d enter HPM\n", ts_temp);
 				r = vcorefs_request_dvfs_opp(KIR_THERMAL,
 								OPPI_PERF);
 			}
@@ -772,12 +772,12 @@ static int tscpu_get_temp(struct thermal_zone_device *thermal, int *t)
 	if (curr_temp >= thermal_5A_limit_H && thermal_6353_5A_status == 0) {
 		mt_ppm_set_5A_limit_throttle(1);
 		thermal_6353_5A_status = 1;
-		/*tscpu_warn("mt_ppm_set_5A_limit_throttle(1)\n");*/
+		/*pr_debug("mt_ppm_set_5A_limit_throttle(1)\n");*/
 	} else if (curr_temp < thermal_5A_limit_L
 	&& thermal_6353_5A_status == 1) {
 		mt_ppm_set_5A_limit_throttle(0);
 		thermal_6353_5A_status = 0;
-		/*tscpu_warn("mt_ppm_set_5A_limit_throttle(0)\n");*/
+		/*pr_debug("mt_ppm_set_5A_limit_throttle(0)\n");*/
 	}
 #endif
 
@@ -1295,7 +1295,7 @@ struct file *file, const char __user *buffer, size_t count, loff_t *data)
 	if ((trip1 >= 0) && (trip2 >= 0)) {
 		enter_hpm_temp = trip1;
 		leave_hpm_temp = trip2;
-		tscpu_warn(
+		pr_debug(
 			"%s applied enter_hpm: %d , leave_hpm: %d\n", __func__,
 			enter_hpm_temp, leave_hpm_temp);
 	} else {
@@ -1304,7 +1304,7 @@ struct file *file, const char __user *buffer, size_t count, loff_t *data)
 
 	if (set_enable) {
 		enable_hpm_temp = !!(enable);
-		tscpu_warn("%s enable: %d (%d)\n", __func__,
+		pr_debug("%s enable: %d (%d)\n", __func__,
 						enable_hpm_temp, enable);
 	}
 
@@ -1746,7 +1746,7 @@ struct platform_device *dev, pm_message_t state)
 		do {
 			temp = (readl(THAHBST0) >> 16);
 			if ((cnt + 1) % 10 == 0)
-				pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n",
+				pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n",
 							temp, cnt, __LINE__);
 
 			udelay(50);
@@ -1758,7 +1758,7 @@ struct platform_device *dev, pm_message_t state)
 		do {
 			temp = (readl(THAHBST0) >> 16);
 			if ((cnt + 1) % 10 == 0)
-				pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n",
+				pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n",
 							temp, cnt, __LINE__);
 
 			udelay(2);
@@ -1832,7 +1832,7 @@ static int tscpu_thermal_resume(struct platform_device *dev)
 		do {
 			temp = (readl(THAHBST0) >> 16);
 			if ((cnt + 1) % 10 == 0)
-				pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n",
+				pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n",
 							temp, cnt, __LINE__);
 
 			udelay(50);
@@ -1844,7 +1844,7 @@ static int tscpu_thermal_resume(struct platform_device *dev)
 		do {
 			temp = (readl(THAHBST0) >> 16);
 			if ((cnt + 1) % 10 == 0)
-				pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n",
+				pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n",
 							temp, cnt, __LINE__);
 
 			udelay(2);
@@ -1919,7 +1919,7 @@ static int ktp_thread(void *arg)
 		bank0_T = tscpu_max_temperature();
 		max_temp = bank0_T;
 
-		tscpu_warn("%s temp=%d\n", __func__, max_temp);
+		pr_debug("%s temp=%d\n", __func__, max_temp);
 
 		if ((temp_tc_mid_trip > -275000)
 		&& (max_temp >= (temp_tc_mid_trip - 5000))) {
@@ -2280,16 +2280,16 @@ static int thermal_auxadc_get_data(int times, int channel)
 {
 	int ret = 0, data[4], i, ret_value = 0, ret_temp = 0;
 
-	pr_notice("Thermal_auxadc_get_data\n");
+	pr_debug("Thermal_auxadc_get_data\n");
 
 	if (IMM_IsAdcInitReady() == 0) {
-		pr_notice("[%s]: AUXADC is not ready\n", __func__);
+		pr_err("[%s]: AUXADC is not ready\n", __func__);
 		return 0;
 	}
 
 	for (i = 0; i < times; i++) {
 		ret_value = IMM_GetOneChannelValue(channel, data, &ret_temp);
-		pr_notice("[%s]: raw%d= %d\n", __func__, i,
+		pr_debug("[%s]: raw%d= %d\n", __func__, i,
 								ret_temp);
 		ret += ret_temp;
 	}
@@ -2315,7 +2315,7 @@ static void tscpu_thermal_pause(void)
 	do {
 		temp = (readl(THAHBST0) >> 16);
 		if ((cnt + 1) % 10 == 0)
-			pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n", temp, cnt,
+			pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n", temp, cnt,
 								__LINE__);
 
 		udelay(50);
@@ -2327,7 +2327,7 @@ static void tscpu_thermal_pause(void)
 	do {
 		temp = (readl(THAHBST0) >> 16);
 		if ((cnt + 1) % 10 == 0)
-			pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n", temp, cnt,
+			pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n", temp, cnt,
 								__LINE__);
 
 		udelay(2);
@@ -2378,7 +2378,7 @@ static void tscpu_thermal_release(void)
 	do {
 		temp = (readl(THAHBST0) >> 16);
 		if ((cnt + 1) % 10 == 0)
-			pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n", temp, cnt,
+			pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n", temp, cnt,
 								__LINE__);
 
 		udelay(50);
@@ -2390,7 +2390,7 @@ static void tscpu_thermal_release(void)
 	do {
 		temp = (readl(THAHBST0) >> 16);
 		if ((cnt + 1) % 10 == 0)
-			pr_notice("THAHBST0 = 0x%x, cnt = %d, %d\n", temp, cnt,
+			pr_debug("THAHBST0 = 0x%x, cnt = %d, %d\n", temp, cnt,
 								__LINE__);
 
 		udelay(2);
@@ -2833,14 +2833,14 @@ static int tscpu_thermal_probe(struct platform_device *dev)
 				tscpu_thermal_all_bank_interrupt_handler,
 				IRQF_TRIGGER_LOW, THERMAL_NAME, NULL);
 	if (err)
-		tscpu_warn("tscpu_init IRQ register fail\n");
+		pr_err("tscpu_init IRQ register fail\n");
 #else
 	err =
 		request_irq(THERM_CTRL_IRQ_BIT_ID,
 				tscpu_thermal_all_bank_interrupt_handler,
 				IRQF_TRIGGER_LOW, THERMAL_NAME, NULL);
 	if (err)
-		tscpu_warn("tscpu_init IRQ register fail\n");
+		pr_err("tscpu_init IRQ register fail\n");
 #endif
 
 	tscpu_config_all_tc_hw_protect(trip_temp[0], tc_mid_trip);
@@ -2894,13 +2894,13 @@ static int __init tscpu_init(void)
 #endif
 	err = platform_driver_register(&mtk_thermal_driver);
 	if (err) {
-		tscpu_warn("thermal driver callback register failed..\n");
+		pr_err("thermal driver callback register failed..\n");
 		return err;
 	}
 
 	err = tscpu_register_thermal();
 	if (err) {
-		tscpu_warn("tscpu_register_thermal fail\n");
+		pr_err("tscpu_register_thermal fail\n");
 		goto err_unreg;
 	}
 

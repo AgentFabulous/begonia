@@ -41,7 +41,7 @@ do { \
 	pr_debug("[Thermal/tzcharger2]" fmt, ##args)
 
 #define mtktscharger2_pr_notice(fmt, args...) \
-	pr_notice("[Thermal/tzcharger2]" fmt, ##args)
+	pr_err("[Thermal/tzcharger2]" fmt, ##args)
 
 static kuid_t uid = KUIDT_INIT(0);
 static kgid_t gid = KGIDT_INIT(1000);

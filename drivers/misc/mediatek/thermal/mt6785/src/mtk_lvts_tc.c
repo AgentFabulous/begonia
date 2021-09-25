@@ -1436,7 +1436,7 @@ void lvts_wait_for_all_sensing_point_idle(void)
 			break;
 
 		if ((cnt + 1) % 10 == 0) {
-			pr_notice("Cnt = %d LVTS TC %d, LVTSMSRCTL1[10,7,0] = %d,%d,%d\n",
+			pr_debug("Cnt = %d LVTS TC %d, LVTSMSRCTL1[10,7,0] = %d,%d,%d\n",
 					cnt + 1, (temp >> 16),
 					((temp & _BIT_(2)) >> 2),
 					((temp & _BIT_(1)) >> 1),

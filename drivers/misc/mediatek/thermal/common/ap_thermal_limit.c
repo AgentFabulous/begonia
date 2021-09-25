@@ -112,13 +112,13 @@ static DEFINE_MUTEX(apthermolmt_cpu_mutex);
 void __attribute__ ((weak))
 mt_ppm_cpu_thermal_protect(unsigned int limited_power)
 {
-	pr_notice(TSCPU_LOG_TAG "E_WF: %s doesn't exist\n", __func__);
+	pr_err(TSCPU_LOG_TAG "E_WF: %s doesn't exist\n", __func__);
 }
 #else
 void __attribute__ ((weak))
 mt_cpufreq_thermal_protect(unsigned int limited_power)
 {
-	pr_notice(TSCPU_LOG_TAG "E_WF: %s doesn't exist\n", __func__);
+	pr_err(TSCPU_LOG_TAG "E_WF: %s doesn't exist\n", __func__);
 }
 #endif
 
@@ -126,7 +126,7 @@ mt_cpufreq_thermal_protect(unsigned int limited_power)
 void __attribute__ ((weak))
 mt_gpufreq_thermal_protect(unsigned int limited_power)
 {
-	pr_notice(TSCPU_LOG_TAG "E_WF: %s doesn't exist\n", __func__);
+	pr_err(TSCPU_LOG_TAG "E_WF: %s doesn't exist\n", __func__);
 }
 
 
@@ -372,7 +372,7 @@ void apthermolmt_set_general_cpu_power_limit(unsigned int limit)
 	gp_curr_cpu_pwr_limit = (limit != 0) ? limit : 0x7FFFFFFF;
 
 	if (gp_prev_cpu_pwr_limit != gp_curr_cpu_pwr_limit) {
-		tscpu_warn("%s %d\n", __func__, gp_curr_cpu_pwr_limit);
+		pr_debug("%s %d\n", __func__, gp_curr_cpu_pwr_limit);
 
 		apthermolmt_set_cpu_power_limit(&_gp, gp_curr_cpu_pwr_limit);
 	}
@@ -385,7 +385,7 @@ void apthermolmt_set_general_gpu_power_limit(unsigned int limit)
 	gp_curr_gpu_pwr_limit = (limit != 0) ? limit : 0x7FFFFFFF;
 
 	if (gp_prev_gpu_pwr_limit != gp_curr_gpu_pwr_limit) {
-		tscpu_warn("%s %d\n", __func__, gp_curr_gpu_pwr_limit);
+		pr_debug("%s %d\n", __func__, gp_curr_gpu_pwr_limit);
 
 		apthermolmt_set_gpu_power_limit(&_gp, gp_curr_gpu_pwr_limit);
 	}

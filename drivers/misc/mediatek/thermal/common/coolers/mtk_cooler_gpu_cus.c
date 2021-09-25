@@ -30,7 +30,7 @@
 
 
 #define mtk_cooler_gpu_dprintk(fmt, args...)	\
-	pr_notice("thermal/cooler/gpu " fmt, ##args)
+	pr_debug("thermal/cooler/gpu " fmt, ##args)
 
 static struct thermal_cooling_device
 *cl_gpu_dev = { 0 };

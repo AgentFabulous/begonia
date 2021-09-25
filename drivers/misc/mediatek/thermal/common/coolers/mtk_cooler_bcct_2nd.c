@@ -41,14 +41,14 @@
 	int __attribute__ ((weak))
 get_bat_charging_current_level(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 500;
 }
 
 	enum charger_type __attribute__ ((weak))
 mt_get_charger_type(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return STANDARD_HOST;
 }
 
@@ -57,21 +57,21 @@ mt_get_charger_type(void)
 charger_manager_set_charging_current_limit(
 struct charger_consumer *consumer, int idx, int charging_current_uA)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 	int __attribute__ ((weak))
 charger_manager_set_input_current_limit(
 struct charger_consumer *consumer, int idx, int input_current_uA)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_tchr_x(int *min_temp, int *max_temp)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 /* mtk_chr_get_tchr() */
@@ -79,14 +79,14 @@ mtk_chr_get_tchr_x(int *min_temp, int *max_temp)
 	int __attribute__ ((weak))
 charger_manager_get_current_charging_type(struct charger_consumer *consumer)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return -1;
 }
 #endif
 /* ************************************ */
 
 #define mtk_cooler_bcct_2nd_dprintk_always(fmt, args...) \
-	pr_notice("[Thermal/TC/bcct_2nd]" fmt, ##args)
+	pr_debug("[Thermal/TC/bcct_2nd]" fmt, ##args)
 
 #define mtk_cooler_bcct_2nd_dprintk(fmt, args...) \
 	do { \

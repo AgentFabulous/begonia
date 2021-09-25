@@ -35,12 +35,12 @@ static kuid_t uid = KUIDT_INIT(0);
 static kgid_t gid = KGIDT_INIT(1000);
 
 #define mtk_cooler_cam_dprintk_always(fmt, args...) \
-pr_notice("[Thermal/TC/cam]" fmt, ##args)
+pr_debug("[Thermal/TC/cam]" fmt, ##args)
 
 #define mtk_cooler_cam_dprintk(fmt, args...) \
 do { \
 	if (cl_cam_klog_on == 1) \
-		pr_notice("[Thermal/TC/cam]" fmt, ##args); \
+		pr_debug("[Thermal/TC/cam]" fmt, ##args); \
 } while (0)
 
 

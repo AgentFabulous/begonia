@@ -175,12 +175,12 @@ static kgid_t gid = KGIDT_INIT(1000);
 #define THRML_LOG(fmt, args...) \
 	do { \
 		if (unlikely(enable_ThermalMonitorXlog)) { \
-			pr_notice("THERMAL/MONITOR " fmt, ##args); \
+			pr_debug("THERMAL/MONITOR " fmt, ##args); \
 		} \
 	} while (0)
 
 
-#define THRML_ERROR_LOG(fmt, args...) pr_notice("THERMAL/MONITOR " fmt, ##args)
+#define THRML_ERROR_LOG(fmt, args...) pr_err("THERMAL/MONITOR " fmt, ##args)
 
 /* ************************************ */
 /* Define */

@@ -29,7 +29,7 @@
 #include "flashlight-core.h"
 
 #define mtk_cooler_flashlight_dprintk(fmt, args...)	\
-	pr_notice("thermal/cooler/flashlight " fmt, ##args)
+	pr_debug("thermal/cooler/flashlight " fmt, ##args)
 
 #define FLASHLIGHT_COOLER_NR 1
 

@@ -41,11 +41,11 @@
 #define clNR_dprintk(fmt, args...)   \
 	do {                                    \
 		if (clNR_debug_log == 1) {                \
-			pr_notice(CLNR_LOG_TAG fmt, ##args); \
+			pr_debug(CLNR_LOG_TAG fmt, ##args); \
 		}                                   \
 	} while (0)
 
-#define clNR_printk(fmt, args...) pr_notice(CLNR_LOG_TAG fmt, ##args)
+#define clNR_printk(fmt, args...) pr_debug(CLNR_LOG_TAG fmt, ##args)
 /*=============================================================
  *Local variable definition
  *=============================================================

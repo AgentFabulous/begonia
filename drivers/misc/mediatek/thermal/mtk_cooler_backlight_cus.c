@@ -30,7 +30,7 @@
 #define MAX_BACKLIGHT_BRIGHTNESS 100
 
 #define mtk_cooler_backlight_dprintk(fmt, args...)	\
-	pr_notice("thermal/cooler/backlight " fmt, ##args)
+	pr_debug("thermal/cooler/backlight " fmt, ##args)
 
 
 static struct thermal_cooling_device

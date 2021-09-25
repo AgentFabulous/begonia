@@ -41,14 +41,14 @@
 	int __attribute__ ((weak))
 get_bat_charging_current_level(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 500;
 }
 
 	enum charger_type __attribute__ ((weak))
 mt_get_charger_type(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return STANDARD_HOST;
 }
 
@@ -57,14 +57,14 @@ mt_get_charger_type(void)
 charger_manager_set_charging_current_limit(
 struct charger_consumer *consumer, int idx, int charging_current_uA)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 	int __attribute__ ((weak))
 charger_manager_set_input_current_limit(
 struct charger_consumer *consumer, int idx, int input_current_uA)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
@@ -72,38 +72,38 @@ struct charger_consumer *consumer, int idx, int input_current_uA)
 charger_manager_enable_high_voltage_charging(
 struct charger_consumer *consumer, bool en)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	signed int __attribute__ ((weak))
 battery_get_soc(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 	signed int __attribute__ ((weak))
 battery_get_uisoc(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 	signed int __attribute__ ((weak))
 battery_get_bat_voltage(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 	signed int __attribute__ ((weak))
 battery_get_bat_current(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 	signed int __attribute__ ((weak))
 battery_get_vbus(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
@@ -111,14 +111,14 @@ battery_get_vbus(void)
 	int __attribute__ ((weak))
 mtk_chr_get_aicr(unsigned int *aicr)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_tchr(int *min_temp, int *max_temp)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 /* mtk_chr_get_tchr() */
@@ -126,7 +126,7 @@ mtk_chr_get_tchr(int *min_temp, int *max_temp)
 	int __attribute__ ((weak))
 charger_manager_get_current_charging_type(struct charger_consumer *consumer)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return -1;
 }
 #ifdef CONFIG_MTK_PUMP_EXPRESS_PLUS_30_SUPPORT
@@ -135,7 +135,7 @@ charger_manager_get_pe30_input_current_limit(
 struct charger_consumer *consumer, int idx, int *input_current_uA,
 		int *min_current_uA, int *max_current_uA)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return -1;
 }
 
@@ -143,7 +143,7 @@ struct charger_consumer *consumer, int idx, int *input_current_uA,
 charger_manager_set_pe30_input_current_limit(
 struct charger_consumer *consumer, int idx, int input_current_uA)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return -1;
 }
 #endif /* CONFIG_MTK_PUMP_EXPRESS_PLUS_30_SUPPORT */
@@ -152,89 +152,89 @@ struct charger_consumer *consumer, int idx, int input_current_uA)
 	int __attribute__ ((weak))
 set_bat_charging_current_limit(int current_limit)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 	unsigned int __attribute__ ((weak))
 set_chr_input_current_limit(int current_limit)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_soc(unsigned int *soc)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_ui_soc(unsigned int *ui_soc)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_vbat(unsigned int *vbat)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_ibat(unsigned int *ibat)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_vbus(unsigned int *vbus)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_aicr(unsigned int *aicr)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_tchr(int *min_temp, int *max_temp)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_current_charging_type(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return -1;
 }
 
 	int __attribute__ ((weak))
 mtk_pep30_get_charging_current_limit(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return -1;
 }
 
 	void __attribute__ ((weak))
 mtk_pep30_set_charging_current_limit(int cur)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 }
 #endif
 /* ************************************ */
 
 #define mtk_cooler_bcct_dprintk_always(fmt, args...) \
-	pr_notice("[Thermal/TC/bcct]" fmt, ##args)
+	pr_debug("[Thermal/TC/bcct]" fmt, ##args)
 
 #define mtk_cooler_bcct_dprintk(fmt, args...) \
 	do { \

@@ -441,13 +441,13 @@ static void set_adaptive_gpu_power_limit(unsigned int limit);
 void __attribute__ ((weak))
 mt_ppm_cpu_thermal_protect(unsigned int limited_power)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 }
 #else
 void __attribute__ ((weak))
 mt_cpufreq_thermal_protect(unsigned int limited_power)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 }
 #endif
 #endif
@@ -457,7 +457,7 @@ mtk_eara_thermal_pb_handle(int total_pwr_budget,
 			   int max_cpu_power, int max_gpu_power,
 			   int max_vpu_power,  int max_mdla_power)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
@@ -465,20 +465,20 @@ bool __attribute__((weak))
 mtk_get_gpu_loading(unsigned int *pLoading)
 {
 #ifdef CONFIG_MTK_GPU_SUPPORT
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 #endif
 	return 0;
 }
 unsigned int  __attribute__((weak))
 mt_gpufreq_get_min_power(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 unsigned int  __attribute__((weak))
 mt_gpufreq_get_max_power(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 void __attribute__ ((weak))
@@ -727,7 +727,7 @@ static void atm_profile_atm_period(s64 latest_latency)
 			(latest_latency + (atm_period_avg_delay<<14) -
 						atm_period_avg_delay)>>14;
 	}
-	tscpu_warn("atm period M %lld m %lld a %lld l %lld\n"
+	pr_debug("atm period M %lld m %lld a %lld l %lld\n"
 		, atm_period_max_delay
 		, atm_period_min_delay
 		, atm_period_avg_delay
@@ -749,7 +749,7 @@ static void atm_profile_atm_exec(s64 latest_latency)
 			(latest_latency + (atm_exec_avg_delay<<14) -
 						atm_exec_avg_delay)>>14;
 	}
-	tscpu_warn("atm exec delay M %lld m %lld a %lld l %lld\n"
+	pr_debug("atm exec delay M %lld m %lld a %lld l %lld\n"
 		, atm_exec_max_delay
 		, atm_exec_min_delay
 		, atm_exec_avg_delay
@@ -771,7 +771,7 @@ static void atm_profile_cpu_power_limit(s64 latest_latency)
 			(latest_latency + (cpu_pwr_lmt_avg_delay<<14) -
 						cpu_pwr_lmt_avg_delay)>>14;
 	}
-	tscpu_warn("cpu lmt delay M %lld m %lld a %lld l %lld\n"
+	pr_debug("cpu lmt delay M %lld m %lld a %lld l %lld\n"
 		, cpu_pwr_lmt_max_delay
 		, cpu_pwr_lmt_min_delay
 		, cpu_pwr_lmt_avg_delay
@@ -793,7 +793,7 @@ static void atm_profile_gpu_power_limit(s64 latest_latency)
 			(latest_latency + (gpu_pwr_lmt_avg_delay<<14) -
 						gpu_pwr_lmt_avg_delay)/1024;
 	}
-	tscpu_warn("gpu lmt delay M %lld m %lld a %lld l %lld\n"
+	pr_debug("gpu lmt delay M %lld m %lld a %lld l %lld\n"
 		, gpu_pwr_lmt_max_delay
 		, gpu_pwr_lmt_min_delay
 		, gpu_pwr_lmt_avg_delay
@@ -837,7 +837,7 @@ static void set_adaptive_cpu_power_limit(unsigned int limit)
 #endif
 		print_cunt++;
 		if (print_cunt == 5) {
-			tscpu_warn(
+			pr_debug(
 				"%s (0x%x) %d T=%d, %d T=%d, %d T=%d, %d T=%d, %d T=%d\n",
 				__func__,
 				tscpu_get_temperature_range(),
@@ -853,7 +853,7 @@ static void set_adaptive_cpu_power_limit(unsigned int limit)
 			if ((prv_adp_cpu_pwr_lim != 0x7FFFFFFF) &&
 				((adaptive_cpu_power_limit + 1000)
 				< prv_adp_cpu_pwr_lim))
-				tscpu_warn(
+				pr_debug(
 					"%s Big delta power %u curr_T=%d, %u prev_T=%d\n",
 					__func__, adaptive_cpu_power_limit,
 					krtatm_curr_maxtj, prv_adp_cpu_pwr_lim,
@@ -1119,7 +1119,7 @@ static void catmplus_update_params(void)
 						STEADY_TARGET_TPCB;
 
 	ret = wakeup_ta_algo(TA_CATMPLUS);
-	/*tscpu_warn("catmplus_update_params : ret %d\n" , ret);*/
+	/*pr_debug("catmplus_update_params : ret %d\n" , ret);*/
 }
 
 #endif
@@ -3616,7 +3616,7 @@ exit:
 		polling_time_s = polling_time / 1000000000;
 		polling_time_ns = polling_time % 1000000000;
 		ktime = ktime_set(polling_time_s, polling_time_ns);
-		/* tscpu_warn("%s polling_time_s=%ld  "
+		/* pr_debug("%s polling_time_s=%ld  "
 		 *	"polling_time_ns=%ld\n", __func__,
 		 *	polling_time_s,polling_time_ns);
 		 */
@@ -3747,7 +3747,7 @@ static int krtatm_thread(void *arg)
 			/* To confirm if krtatm kthread is really running. */
 			if (krtatm_curr_maxtj >= 100000 ||
 			(krtatm_curr_maxtj - krtatm_prev_maxtj >= 20000)) {
-				tscpu_warn("%s c %d p %d cl %d gl %d s %d\n",
+				pr_debug("%s c %d p %d cl %d gl %d s %d\n",
 				__func__, krtatm_curr_maxtj,
 				krtatm_prev_maxtj,
 				adaptive_cpu_power_limit,
@@ -3756,7 +3756,7 @@ static int krtatm_thread(void *arg)
 				/* dump more info when atm is deactivated */
 				if (!cl_dev_adp_cpu_state_active) {
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
-					pr_info_ratelimited(TSCPU_LOG_TAG
+					pr_debug(TSCPU_LOG_TAG
 					"tjs %d ttj %d %d on %d sspm %d %d\n",
 					TARGET_TJS[0], TARGET_TJ,
 					current_ETJ, ctm_on,
@@ -3772,7 +3772,7 @@ static int krtatm_thread(void *arg)
 					0);
 #endif
 #else /* !CONFIG_MTK_TINYSYS_SSPM_SUPPORT */
-					pr_info_ratelimited(TSCPU_LOG_TAG
+					pr_debug(TSCPU_LOG_TAG
 					"tjs %d ttj %d %d on %d\n",
 					TARGET_TJS[0], TARGET_TJ,
 					current_ETJ, ctm_on);
@@ -3793,7 +3793,7 @@ static int krtatm_thread(void *arg)
 		schedule();
 	}
 
-	tscpu_warn("%s stopped\n", __func__);
+	pr_debug("%s stopped\n", __func__);
 	return 0;
 }
 #endif	/* FAST_RESPONSE_ATM */

@@ -47,7 +47,7 @@
 #define mtkTTimer_dprintk(fmt, args...)   \
 	do {	\
 		if (mtkTTimer_debug_log)	\
-			pr_notice("[Thermal timer] " fmt, ##args); \
+			pr_debug("[Thermal timer] " fmt, ##args); \
 	} while (0)
 
 static DEFINE_SPINLOCK(tTimer_lock);
@@ -267,7 +267,7 @@ static int mtk_thermal_cpu_pm_notifier(struct notifier_block *nb,
 #if defined(LVTS_CPU_PM_NTFY_PROFILE)
 			end = ktime_get();
 			time_us = ktime_to_us(ktime_sub(end, start));
-			pr_notice("PROF2 CT2:%d\n", time_us);
+			pr_debug("PROF2 CT2:%d\n", time_us);
 #endif
 		}
 		spin_unlock_irqrestore(&mt_thermal_timer_locker, flags);
@@ -285,7 +285,7 @@ static int mtk_thermal_cpu_pm_notifier(struct notifier_block *nb,
 #if defined(LVTS_CPU_PM_NTFY_PROFILE)
 			end = ktime_get();
 			time_us = ktime_to_us(ktime_sub(end, start));
-			pr_notice("PROF2 ST2:%d\n", time_us);
+			pr_debug("PROF2 ST2:%d\n", time_us);
 #endif
 		}
 		cpumask_clear_cpu(smp_processor_id(), &mt_cpu_pdn_mask);
@@ -310,7 +310,7 @@ static int __init mtk_thermal_pm_init(void)
 
 	ret = cpu_pm_register_notifier(&mtk_thermal_pm);
 
-	pr_notice("[Thermal timer][%s:%d] - Registry thermal pm notify (%d)\n",
+	pr_debug("[Thermal timer][%s:%d] - Registry thermal pm notify (%d)\n",
 		__func__, __LINE__, ret);
 
 	return 0;

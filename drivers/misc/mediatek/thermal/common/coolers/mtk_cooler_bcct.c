@@ -44,82 +44,82 @@
 	int __attribute__ ((weak))
 get_bat_charging_current_level(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 500;
 }
 
 	enum charger_type __attribute__ ((weak))
 mt_get_charger_type(void)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return STANDARD_HOST;
 }
 
 	int __attribute__ ((weak))
 set_bat_charging_current_limit(int current_limit)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 	unsigned int __attribute__ ((weak))
 set_chr_input_current_limit(int current_limit)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_soc(unsigned int *soc)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_ui_soc(unsigned int *ui_soc)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_vbat(unsigned int *vbat)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_ibat(unsigned int *ibat)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_vbus(unsigned int *vbus)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_aicr(unsigned int *aicr)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 
 	int __attribute__ ((weak))
 mtk_chr_get_tchr(int *min_temp, int *max_temp)
 {
-	pr_notice("E_WF: %s doesn't exist\n", __func__);
+	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;
 }
 /* ************************************ */
 
 #define mtk_cooler_bcct_dprintk_always(fmt, args...) \
-	pr_notice("[Thermal/TC/bcct]" fmt, ##args)
+	pr_debug("[Thermal/TC/bcct]" fmt, ##args)
 
 #define mtk_cooler_bcct_dprintk(fmt, args...) \
 	do { \

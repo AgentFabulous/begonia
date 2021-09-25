@@ -37,7 +37,7 @@
 
 #if 1
 #define mtk_thermal_policy_dprintk(fmt, args...)	\
-	pr_notice("thermal/thermal_policy " fmt, ##args)
+	pr_debug("thermal/thermal_policy " fmt, ##args)
 #else
 #define mtk_thermal_policy_dprintk(fmt, args...)
 #endif

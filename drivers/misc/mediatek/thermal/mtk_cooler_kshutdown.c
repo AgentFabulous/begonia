@@ -29,7 +29,7 @@
 
 #if 1
 #define mtk_cooler_kshutdown_dprintk(fmt, args...)	\
-	pr_notice("thermal/cooler/kshutdown " fmt, ##args)
+	pr_debug("thermal/cooler/kshutdown " fmt, ##args)
 #else
 #define mtk_cooler_kshutdown_dprintk(fmt, args...)
 #endif

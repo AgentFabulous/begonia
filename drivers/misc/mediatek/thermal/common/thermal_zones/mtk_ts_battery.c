@@ -63,7 +63,7 @@ battery_get_bat_temperature(void)
 	int i;
 
 	for (i = 0; i < 5; i++)
-		pr_notice("[Thermal] E_WF: %s doesn't exist\n", __func__);
+		pr_err("[Thermal] E_WF: %s doesn't exist\n", __func__);
 
 	tsbattery_exit();
 	return -127000;
@@ -219,7 +219,7 @@ static int get_hw_battery_temp(void)
 	prop.intval = -1270;
 	psy = power_supply_get_by_name("battery");
 	if (psy == NULL) {
-			pr_notice("%s can't get battery node\n", __func__);
+			pr_err("%s can't get battery node\n", __func__);
 			return -ENODEV;
 	}
 	power_supply_get_property(psy, POWER_SUPPLY_PROP_TEMP, &prop);

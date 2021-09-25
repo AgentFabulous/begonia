@@ -46,10 +46,10 @@
 	do {                                    \
 		thermal_diff_us = thermal_cTime_us - thermal_pTime_us;	\
 		if (thermal_diff_us > THERMAL_TIME_TH) {                \
-			pr_notice(TSCPU_LOG_TAG "%s: %llu us\n", __func__, \
+			pr_debug(TSCPU_LOG_TAG "%s: %llu us\n", __func__, \
 							thermal_diff_us); \
 		} else if (thermal_diff_us < 0) {	\
-			pr_notice(TSCPU_LOG_TAG \
+			pr_warn(TSCPU_LOG_TAG \
 				"Warning: tProfiling uses incorrect %s %d\n", \
 				__func__, __LINE__); \
 		}	\
@@ -580,12 +580,12 @@ extern void lvts_dump_time_profiling_result(struct seq_file *m);
 #define tscpu_dprintk(fmt, args...)	\
 	do {					\
 		if (tscpu_debug_log == 1) {	\
-			pr_notice(TSCPU_LOG_TAG fmt, ##args);	\
+			pr_debug(TSCPU_LOG_TAG fmt, ##args);	\
 		}	\
 	} while (0)
 
-#define tscpu_printk(fmt, args...)	pr_notice(TSCPU_LOG_TAG fmt, ##args)
-#define tscpu_warn(fmt, args...)	pr_notice(TSCPU_LOG_TAG fmt, ##args)
+#define tscpu_printk(fmt, args...)	pr_debug(TSCPU_LOG_TAG fmt, ##args)
+#define tscpu_warn(fmt, args...)	pr_warn(TSCPU_LOG_TAG fmt, ##args)
 
 /*
  * Support LVTS
@@ -594,16 +594,16 @@ extern void lvts_dump_time_profiling_result(struct seq_file *m);
 #define LVTS_LOG_TAG            "[Thermal/TZ/LVTS]"
 #define LVTS_LOG_REG_TAG        "[Thermal/TZ/LVTSREG]"
 
-#define lvts_reg_print(fmt, args...)	pr_notice(LVTS_LOG_REG_TAG fmt, ##args)
-#define lvts_printk(fmt, args...)	pr_notice(LVTS_LOG_TAG fmt, ##args)
-#define lvts_warn(fmt, args...)		pr_notice(LVTS_LOG_TAG fmt, ##args)
+#define lvts_reg_print(fmt, args...)	pr_debug(LVTS_LOG_REG_TAG fmt, ##args)
+#define lvts_printk(fmt, args...)	pr_debug(LVTS_LOG_TAG fmt, ##args)
+#define lvts_warn(fmt, args...)		pr_warn(LVTS_LOG_TAG fmt, ##args)
 #if 0
-#define lvts_dbg_printk(fmt, args...)  pr_notice(LVTS_LOG_TAG fmt, ##args)
+#define lvts_dbg_printk(fmt, args...)  pr_debug(LVTS_LOG_TAG fmt, ##args)
 #else
 #define lvts_dbg_printk(fmt, args...)   \
 	do {                                    \
 		if (lvts_debug_log == 1) {                \
-			pr_notice(LVTS_LOG_TAG fmt, ##args); \
+			pr_debug(LVTS_LOG_TAG fmt, ##args); \
 		}                                   \
 	} while (0)
 #endif

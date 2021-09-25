@@ -40,11 +40,11 @@
 #define clVR_FPS_dprintk(fmt, args...)   \
 	do {                                    \
 		if (clVR_FPS_debug_log == 1) {                \
-			pr_notice(CLVR_FPS_LOG_TAG fmt, ##args); \
+			pr_debug(CLVR_FPS_LOG_TAG fmt, ##args); \
 		}                                   \
 	} while (0)
 
-#define clVR_FPS_printk(fmt, args...) pr_notice(CLVR_FPS_LOG_TAG fmt, ##args)
+#define clVR_FPS_printk(fmt, args...) pr_debug(CLVR_FPS_LOG_TAG fmt, ##args)
 /*=============================================================
  *Local variable definition
  *=============================================================

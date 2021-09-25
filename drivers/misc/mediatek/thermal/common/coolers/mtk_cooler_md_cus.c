@@ -30,7 +30,7 @@
 
 
 #define mtk_cooler_md_dprintk(fmt, args...)	\
-	pr_notice("thermal/cooler/md " fmt, ##args)
+	pr_debug("thermal/cooler/md " fmt, ##args)
 
 static struct thermal_cooling_device *cl_md_dev = { 0 };
 static unsigned int g_cl_id;
