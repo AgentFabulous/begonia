@@ -8,7 +8,12 @@ sfile="$(readlink -f "$0")"
 outdir="$(pwd)"
 tarfile=$1
 cpio_dir=$outdir/$tarfile.tmp
+if [[ $(arch) == "aarch64" ]]
+then
+cpio=cpio
+else
 cpio=$KBUILD_SRC/tools/build/cpio
+fi
 dir_list="
 include/
 arch/$SRCARCH/include/
